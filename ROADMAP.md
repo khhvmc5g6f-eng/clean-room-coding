@@ -363,15 +363,17 @@ than a bare "worth considering":
    the API across languages -- the remaining per-language cost is
    validating that each grammar's node-kind vocabulary shingles sensibly,
    not writing new code per language.
-5. **SLSA build provenance / in-toto attestations** -- not yet
-   implemented (an earlier banner draft overstated this; corrected).
-   Genuinely buildable next: GitHub's native
-   `actions/attest-build-provenance` action produces real SLSA provenance
-   (itself an in-toto-format attestation) for anything built in the
-   existing CI workflow -- a natural, small addition. Separately, the
-   evidence ledger's hash-chained events are conceptually close to
-   in-toto's "link" metadata; an export from the ledger to real in-toto
-   link files is a natural fit for this project's own architecture.
+5. **SLSA build provenance / in-toto attestations** -- **done** for build
+   provenance: `.github/workflows/release.yml` builds the sdist/wheel on
+   `release: published` and attests them with GitHub's native
+   `actions/attest-build-provenance` (real SLSA v1.0 provenance, in-toto
+   format, Sigstore-signed), then uploads both to the release so a
+   consumer can `gh attestation verify` what they downloaded. Verified the
+   package actually builds cleanly with `python -m build` before writing
+   the workflow, rather than assuming it would. Separately, the evidence
+   ledger's hash-chained events are conceptually close to in-toto's "link"
+   metadata; an export from the ledger to real in-toto link files remains
+   unbuilt and is a natural fit for this project's own architecture.
 
 None of these four libraries are integrated yet -- each is a real
 dependency/architecture decision for the project's maintainer(s) to make
@@ -432,8 +434,10 @@ change that should be evaluated on its own.
   `panel_size` in `.cleanroom.yml`) are recorded in config but not yet
   wired to an actual multi-provider LLM adapter layer -- Claude via
   whatever harness runs `cleanroom judge`'s prompts is the only path today.
-- **No SLSA/in-toto attestations yet** -- see "Competitive landscape";
-  genuinely buildable, not yet built.
+- **SLSA build provenance is now generated on release** (see
+  "Competitive landscape" above) via `.github/workflows/release.yml`, but
+  an export of the evidence ledger to real in-toto "link" metadata is
+  still unbuilt.
 - **No web dashboard, no plugin architecture, no GitLab/Bitbucket
   adapters** -- the CLI/library API is the whole surface for v0.1;
   `docs/architecture.md` notes these as intentionally out of scope for a
@@ -470,8 +474,9 @@ change that should be evaluated on its own.
 5. ~~`spdx-tools`/`cyclonedx-python-lib` to replace the hand-rolled SBOM
    serialization in `provenance/sbom.py`~~ -- **done**, confirmed schema-
    valid against each library's own validator.
-6. SLSA build provenance via `actions/attest-build-provenance` in a
-   release workflow (confirmed buildable; not yet built).
+6. ~~SLSA build provenance via `actions/attest-build-provenance` in a
+   release workflow~~ -- **done** (`.github/workflows/release.yml`, fires
+   on `release: published`).
 7. Automatic clean-room-level (CR0-CR5) computation from project state
    (not yet started).
 8. Transitive dependency resolution for SBOM generation (still not

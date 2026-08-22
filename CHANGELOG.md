@@ -327,4 +327,16 @@ detail:
   `to_spdx()` rather than silently shipping non-conformant output;
   covered by `test_spdx_output_is_schema_valid`.
 
+### Added (sixth pass — SLSA build provenance)
+
+- `.github/workflows/release.yml`: a new workflow, separate from `ci.yml`,
+  that fires only on `release: published` (not every push/tag), builds
+  the sdist/wheel with `python -m build`, generates a real SLSA v1.0
+  build-provenance attestation (in-toto format, Sigstore-signed) via
+  GitHub's native `actions/attest-build-provenance@v4`, and uploads both
+  the artifacts and the attestation to the release so a consumer can run
+  `gh attestation verify` against what they downloaded. Confirmed the
+  package actually builds cleanly with `python -m build` in this repo
+  before writing the workflow, rather than assuming it would.
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD

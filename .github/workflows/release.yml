@@ -1,0 +1,46 @@
+name: Release
+
+# Fires only when a GitHub Release is published (not on every tag push),
+# so provenance is only ever generated for a source snapshot someone
+# deliberately decided to ship. Builds the sdist/wheel from that exact
+# checkout, attests them (SLSA build provenance, in-toto format, signed
+# via Sigstore -- see actions/attest-build-provenance), then attaches both
+# the artifacts and the attestation to the release so a consumer can
+# verify what they downloaded actually came from this repository's CI
+# (`gh attestation verify <file> --repo khhvmc5g6f-eng/clean-room-coding`).
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write      # upload build artifacts to the release
+  id-token: write      # required by actions/attest-build-provenance (Sigstore OIDC)
+  attestations: write  # required by actions/attest-build-provenance
+
+jobs:
+  build-and-attest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build backend
+        run: pip install build
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Generate SLSA build provenance attestation
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: "dist/*"
+
+      - name: Upload build artifacts to the release
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/* --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
