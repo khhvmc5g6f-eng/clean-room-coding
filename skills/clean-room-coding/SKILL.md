@@ -37,7 +37,10 @@ licensing concern in view -- that's just normal coding.
 The `cleanroom` CLI must be installed (`pip install -e ".[dev]"` from a
 checkout of this repo, or `pip install cleanroom` once published). Confirm
 with `cleanroom doctor` before starting a project -- it checks the schema,
-licence-pack and jurisdiction-pack directories are resolvable.
+licence-pack and jurisdiction-pack directories are resolvable. Resuming an
+in-progress project? Run `cleanroom status` first for a one-shot summary
+(zones, registered agents, requirement traceability, ledger event count)
+before deciding which phase to continue from.
 
 ## Orchestration: the phase order
 
@@ -74,7 +77,8 @@ machine-readable output) over re-deriving its logic by hand.
    For obligations of a *specific* SPDX identifier, read the matching pack
    under `/policies/licences/<SPDX-ID>.yml` only when you need it
    (progressive disclosure -- don't load all of them up front; v0.1 ships
-   MIT, Apache-2.0, GPL-3.0-only, AGPL-3.0-only).
+   MIT, Apache-2.0, GPL-3.0-only, AGPL-3.0-only, and BUSL-1.1 -- the
+   licence this project itself ships under).
 
 5. **Jurisdiction** -- `cleanroom jurisdiction` builds `JURISDICTION_MATRIX.json`
    from `.cleanroom.yml`'s configured markets. Never assume a single
@@ -133,11 +137,16 @@ machine-readable output) over re-deriving its logic by hand.
 12. **Provenance** -- `cleanroom provenance` generates SPDX + CycloneDX
     SBOMs for Zone I's declared dependencies.
 
-13. **Audit** -- `cleanroom audit` re-runs the `PathGuard` self-test, a
-    project-specific agent/zone consistency cross-check (do any
-    registered agents' logged actions violate their own permitted zones?),
-    evidence-chain integrity, and a licence scan of Zone H (should only
-    ever contain C0 material) against this project's real policy.
+13. **Audit / Verify** -- `cleanroom audit` re-runs the `PathGuard`
+    self-test, a project-specific agent/zone consistency cross-check (do
+    any registered agents' logged actions violate their own permitted
+    zones?), evidence-chain integrity, and a licence scan of Zone H
+    (should only ever contain C0 material) against this project's real
+    policy. `cleanroom verify` complements it by re-deriving hashes for
+    both the evidence ledger AND the handoff manifest and comparing them
+    against what's recorded -- run it whenever you need to prove nothing
+    was altered after the fact (e.g. before `cleanroom report`, or if a
+    file in Zone H looks like it might have changed since handoff).
 
 14. **Legal / Judge** -- `cleanroom legal --access-authority ...` runs the
     heuristic legal-issue engine (Part XLIV-style: 18 distinct questions,

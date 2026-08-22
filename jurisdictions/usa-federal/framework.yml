@@ -46,11 +46,14 @@ leading_case_law:
       (interface specifications), was a fair use under §107 where there
       was no other way to access those unprotected elements. Foundational
       US authority for lawful reverse-engineering-for-interoperability.
-  - citation: "Oracle America, Inc. v. Google LLC, 593 U.S. ___ (2021)"
+  - citation: "Google LLC v. Oracle America, Inc., 593 U.S. 1 (2021)"
     relevance: >
-      The Supreme Court assumed without deciding that the Java SE API
-      declaring code was copyrightable, but held Google's use of it to
-      reimplement the API in Android was fair use, emphasising the
+      Google was petitioner at the Supreme Court (the case is styled
+      Oracle America, Inc. v. Google Inc. at the Federal Circuit below,
+      but Google LLC v. Oracle America, Inc. at SCOTUS). The Supreme
+      Court assumed without deciding that the Java SE API declaring code
+      was copyrightable, but held Google's use of it to reimplement the
+      API in Android was fair use, emphasising the
       functional, interface-like nature of the declaring code and the
       transformative nature of the reimplementation. Highly relevant
       where a "reference" is an API surface an implementation must be
@@ -76,7 +79,7 @@ court_terminology:
 interoperability_permitted_acts:
   summary: >
     17 U.S.C. §1201(f) (DMCA) and the fair-use factors of §107 (as applied
-    in Sega v. Accolade and Oracle v. Google) are the operative frameworks.
+    in Sega v. Accolade and Google v. Oracle) are the operative frameworks.
     Whether a specific analysis activity qualifies is fact-sensitive; the
     fair-use analysis in particular is a case-by-case four-factor balancing
     test, not a bright-line rule.
@@ -85,4 +88,4 @@ questions_for_review:
   - "Applying Altai's Abstraction-Filtration-Comparison approach: after filtering out ideas, efficiency-dictated elements and public-domain elements, what (if anything) remains as protectable expression, and does the implementation share it?"
   - "Is any DMCA §1201(f) or §107 fair-use argument available for the reference-analysis activity that occurred in Zone R, and has that assessment been documented before analysis began (Part IX), not reconstructed afterward?"
   - "Is a required distribution market the United States, and if so does any GPL/AGPL-triggering distribution occur from or into the US?"
-  - "Where the reference exposes an API/interface, has the analysis distinguished the interface (per Oracle v. Google / Lotus v. Borland) from any copyrightable implementation behind it?"
+  - "Where the reference exposes an API/interface, has the analysis distinguished the interface (per Google v. Oracle / Lotus v. Borland) from any copyrightable implementation behind it?"

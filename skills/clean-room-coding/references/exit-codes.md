@@ -11,7 +11,7 @@ From `src/cleanroom/exit_codes.py`:
 | 4 | CONTAMINATION_FAILURE | Non-C0 material in Zone H, or the isolation self-test failed. |
 | 5 | LICENCE_FAILURE | A licence finding is `denied` or unresolved-and-blocking. |
 | 6 | TEST_FAILURE | Behavioural/pytest/`compare` failure. |
-| 7 | SIMILARITY_FAILURE | Reserved for similarity-gate failures (not yet wired to a dedicated CLI check in v0.1 -- see ROADMAP.md). |
+| 7 | SIMILARITY_FAILURE | `cleanroom similarity` exits 7 when an unresolved suspicious/material finding remains. |
 | 8 | LEGAL_RED | Global legal decision is RED in a required jurisdiction. |
 | 9 | MANUAL_REVIEW_REQUIRED | Release is otherwise allowed but human sign-off is still configured as required -- **this is an expected stop, not a failure.** |
 

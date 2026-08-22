@@ -31,7 +31,7 @@ block` (the default).
 
 ## Licence policy packs
 
-`/policies/licences/*.yml` (MIT, Apache-2.0, GPL-3.0-only, AGPL-3.0-only in
+`/policies/licences/*.yml` (MIT, Apache-2.0, GPL-3.0-only, AGPL-3.0-only, BUSL-1.1 in
 v0.1) are FACTS + structured review questions, never verdicts --
 `key_obligations`, `distribution_triggers`, `network_use_triggers_obligations`,
 `clean_room_relevance`, `structured_issue_prompts`, `uncertainty_notes`.
