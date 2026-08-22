@@ -664,4 +664,30 @@ detail:
 - 11 new regression tests across `test_cli_end_to_end.py` and
   `test_legal_engine_and_panels.py`.
 
+### Added (seventeenth pass — real, opt-in per-invocation PathGuard enforcement)
+
+- New global `--agent-id <id>` CLI option and `Ctx.enforce_zone_access()`:
+  when given, `inspect`/`licence`/`similarity` now call a real
+  `PathGuard.check()` against that agent's actual `AgentRegistry` scope
+  before reading the path they were given, denying access exactly like
+  `run_pathguard_self_test`'s synthetic probe does -- but for a real
+  registered agent on a real invocation, not just a unit-level sanity
+  check. Without `--agent-id`, every command's behaviour is unchanged
+  from before this existed.
+- Verified end-to-end against a real project before writing tests, both
+  directions: a `cleanroom build`-registered (Zone H+I only) agent is
+  genuinely denied `cleanroom licence zone-r` (exit code 4, a real
+  `ContaminationFailure`, not a silent pass), and a separately-registered
+  Zone-R-scoped agent (registered directly via `AgentRegistry`, since no
+  CLI command creates an R-scoped agent today) passes straight through
+  with no denial.
+- **This does not fully close the gap `zones.py`'s own docstring has
+  documented since the second review pass** -- only these three commands
+  are wired, and only when `--agent-id` is passed. Every other command,
+  and any invocation that omits the flag, still reads files directly with
+  no gate. Documented plainly as a narrower, real, opt-in step rather than
+  claiming the gap is fully closed.
+- 3 new CLI-level regression tests covering the deny path, the allow
+  path, and an unregistered `--agent-id` being rejected outright.
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD

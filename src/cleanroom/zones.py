@@ -1,25 +1,44 @@
 """Parts V-VII: the three-zone clean-room model and its technical information barrier.
 
-Honesty about what this enforces, corrected after a security review found
-the previous wording overclaimed: `PathGuard` is a real, tested access-
-control primitive (`run_pathguard_self_test` proves the mechanism itself
-denies correctly), but as of this version, `cli.py`'s commands do not yet
-route their own file reads through it per-invocation -- doing so requires
-every command to know which registered agent is running it, which the
-current stateless-CLI design does not track. Until that wiring exists,
-treat `PathGuard` as available for orchestration you build on top of this
-library (e.g. a harness that spawns an implementation subagent and gates
-its file-read tool through `PathGuard.check()`), not as something that
-already gates every `cleanroom` CLI invocation today.
+Honesty about what this enforces, corrected twice now. A security review
+first found that `PathGuard` was a real, tested access-control primitive
+(`run_pathguard_self_test` proves the mechanism itself denies correctly)
+that `cli.py`'s commands didn't route their own file reads through per-
+invocation, because doing so requires every command to know which
+registered agent is running it -- something the stateless CLI has no way
+to track on its own.
 
-For a signal that IS specific to a real project today, see
-`check_agent_zone_consistency`: it cross-references the AgentRegistry
-(who was registered, with what zone access) against the evidence ledger
-(what zone each logged action actually claimed) and flags any agent
-recorded acting in a zone it wasn't scoped for. That depends on whatever
-orchestration ran the agent having logged the zone honestly -- the same
-good-faith assumption anything built on an evidence ledger ultimately
-rests on -- but it is a real, per-project check, not a fixed unit test.
+That's now solved for a real, opt-in subset of commands: pass a global
+`--agent-id <id>` (an agent registered via `cleanroom build`, or directly
+via `AgentRegistry` for any other role) and `inspect`/`licence`/
+`similarity` (see `cli.py`'s `Ctx.enforce_zone_access`) genuinely call
+`PathGuard.check()` against that agent's real registered scope before
+reading the path given -- verified end-to-end against a real project, not
+just this module's own self-test, including both the deny path (a
+Zone-H+I-only `cleanroom build` agent denied `zone-r`) and the allow path
+(an `R`-scoped agent let through). Without `--agent-id`, every command's
+behaviour is exactly as before this existed -- this is additive, opt-in
+enforcement, not a default that could break an existing invocation.
+
+**This is still a real, narrower-than-total gap, not "solved":** only
+those three commands call `enforce_zone_access`, and only when
+`--agent-id` is actually passed. Every other command, and any invocation
+that omits `--agent-id`, still reads files directly with no gate. Full
+coverage (every command, every invocation, mandatory rather than opt-in)
+remains future work -- see ROADMAP.md. Building `cleanroom` into a larger
+multi-agent orchestration harness can and should call
+`Ctx.enforce_zone_access` (or `PathGuard.check()` directly) for every file
+read its own subagents perform, the same way these three commands now do.
+
+For a signal that IS specific to a real project regardless of
+`--agent-id`, see `check_agent_zone_consistency`: it cross-references the
+AgentRegistry (who was registered, with what zone access) against the
+evidence ledger (what zone each logged action actually claimed) and flags
+any agent recorded acting in a zone it wasn't scoped for. That depends on
+whatever orchestration ran the agent having logged the zone honestly --
+the same good-faith assumption anything built on an evidence ledger
+ultimately rests on -- but it is a real, per-project check, not a fixed
+unit test.
 """
 
 from __future__ import annotations
@@ -116,14 +135,16 @@ def _is_within(path: Path, root: Path) -> bool:
 def run_pathguard_self_test(zone_r: Path, zone_h: Path, zone_i: Path) -> tuple[bool, str]:
     """Part LXXV Isolation Test -- but read this narrowly. This proves the
     PathGuard MECHANISM correctly denies an implementation-scoped access
-    to Zone R when it is actually consulted. It is a unit-level sanity
-    check on inert code, not evidence that any real agent working on this
-    specific project was ever gated by it -- the CLI commands in cli.py
-    do not currently route their own file reads through PathGuard (that
-    would require every command to know, per invocation, which registered
-    agent is running it). For a project-specific signal, see
-    `check_agent_zone_consistency`, which cross-references the actual
-    AgentRegistry and evidence ledger for THIS project."""
+    to Zone R when it is actually consulted, using a synthetic probe scope,
+    not a real registered agent. `cli.py`'s `inspect`/`licence`/`similarity`
+    commands now do route real reads through this same mechanism for real
+    registered agents, but only when the caller opts in with `--agent-id`
+    (see `Ctx.enforce_zone_access` and this module's own docstring) -- every
+    other command, and any invocation without `--agent-id`, is still
+    unguarded. For a project-specific signal that doesn't depend on
+    `--agent-id` at all, see `check_agent_zone_consistency`, which cross-
+    references the actual AgentRegistry and evidence ledger for THIS
+    project."""
     scope = AgentZoneScope(agent_id="pathguard-self-test", role="implementation", permitted_zones=frozenset({"H", "I"}))
     guard = PathGuard(scope, zone_r, zone_h, zone_i)
     probe = zone_r / "__isolation_probe__.txt"

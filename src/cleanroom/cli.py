@@ -60,16 +60,27 @@ from cleanroom.similarity import engine as similarity_engine
 from cleanroom.specification.behavioral import BehavioralSuite
 from cleanroom.specification.graph import RequirementGraph
 from cleanroom.util import hash_tree, sha256_json, utc_now_iso
-from cleanroom.zones import check_agent_zone_consistency, create_zones, run_pathguard_self_test
+from cleanroom.zones import (
+    AgentZoneScope,
+    PathGuard,
+    ZoneAccessDenied,
+    check_agent_zone_consistency,
+    create_zones,
+    run_pathguard_self_test,
+)
 
 
 class Ctx:
-    def __init__(self, project_root: Path, config_path: Path | None, json_output: bool, quiet: bool, verbose: bool):
+    def __init__(
+        self, project_root: Path, config_path: Path | None, json_output: bool, quiet: bool, verbose: bool,
+        agent_id: str | None = None,
+    ):
         self.project_root = project_root
         self.config_path = config_path
         self.json_output = json_output
         self.quiet = quiet
         self.verbose = verbose
+        self.agent_id = agent_id
 
     def echo(self, message: str, **kwargs: Any) -> None:
         if not self.quiet and not self.json_output:
@@ -91,6 +102,30 @@ class Ctx:
         self.emit({"error": str(error), "exit_code": int(error.exit_code)})
         sys.exit(int(error.exit_code))
 
+    def enforce_zone_access(self, project: Project, path: Path) -> None:
+        """Part V-VII: the real per-invocation `PathGuard` gate the rest of
+        this file's docstrings say doesn't exist yet -- it now does, but
+        only opt-in via `--agent-id`, and only for the commands that call
+        this. Without `--agent-id` this is a no-op (existing behaviour is
+        unchanged); the caller is responsible for calling this before it
+        actually reads `path`, not after."""
+        if self.agent_id is None:
+            return
+        registry = AgentRegistry(project.root / "evidence")
+        record = next((a for a in registry.all() if a.agent_id == self.agent_id), None)
+        if record is None:
+            raise click.ClickException(f"No agent registered with id '{self.agent_id}' (register one with 'cleanroom build' first).")
+        scope = AgentZoneScope(
+            agent_id=record.agent_id, role=record.role,
+            permitted_zones=frozenset(record.permitted_zones),
+            prohibited_paths=tuple(Path(p) for p in record.prohibited_paths),
+        )
+        guard = PathGuard(scope, project.zone_r, project.zone_h, project.zone_i)
+        try:
+            guard.check(path)
+        except ZoneAccessDenied as e:
+            self.fail(ContaminationFailure(f"PathGuard denied agent '{self.agent_id}' access to {path}: {e}"))
+
 
 pass_ctx = click.make_pass_decorator(Ctx)
 
@@ -101,11 +136,15 @@ pass_ctx = click.make_pass_decorator(Ctx)
 @click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON instead of human text.")
 @click.option("--quiet", is_flag=True, default=False, help="Suppress non-essential output.")
 @click.option("--verbose", is_flag=True, default=False, help="Verbose diagnostic output.")
+@click.option(
+    "--agent-id", "agent_id", default=None,
+    help="A 'cleanroom build'-registered agent id this invocation is acting on behalf of. When given, commands that read Zone R/H/I gate that read through a real per-invocation PathGuard.check() against that agent's actual registered scope (Part V-VII) -- omit it and behaviour is exactly as before (no gating). This is how an orchestration harness that knows which agent it just spawned gets real enforcement, not just the isolation self-test.",
+)
 @click.version_option(__version__, prog_name="cleanroom")
 @click.pass_context
-def main(click_ctx: click.Context, project_path: Path, config_path: Path | None, json_output: bool, quiet: bool, verbose: bool) -> None:
+def main(click_ctx: click.Context, project_path: Path, config_path: Path | None, json_output: bool, quiet: bool, verbose: bool, agent_id: str | None) -> None:
     """Clean Room Coding: reproducible, auditable clean-room reimplementation tooling."""
-    click_ctx.obj = Ctx(project_root=project_path, config_path=config_path, json_output=json_output, quiet=quiet, verbose=verbose)
+    click_ctx.obj = Ctx(project_root=project_path, config_path=config_path, json_output=json_output, quiet=quiet, verbose=verbose, agent_id=agent_id)
 
 
 # --------------------------------------------------------------------------- init
@@ -247,6 +286,7 @@ def inspect(ctx: Ctx, path: Path | None) -> None:
     what's needed to hash and size it."""
     project = ctx.load_project()
     target = path or project.zone_r
+    ctx.enforce_zone_access(project, target)
     tree, skipped = hash_tree(target)
     extensions: dict[str, int] = {}
     total_bytes = 0
@@ -294,6 +334,7 @@ def licence(ctx: Ctx, path: Path | None) -> None:
     """Part X-XI: deterministic licence discovery and policy evaluation."""
     project = ctx.load_project()
     target = path or project.zone_r
+    ctx.enforce_zone_access(project, target)
     findings = licence_discovery.discover(target)
     allowed = project.config.data.get("dependency_policy", {}).get("allowed_licences", [])
     denied = project.config.data.get("dependency_policy", {}).get("denied_licences", [])
@@ -785,6 +826,8 @@ def similarity(ctx: Ctx, reference_path: Path, implementation_path: Path, negati
     trees, with negative-control background scoring. Never auto-classifies
     above 'suspicious' -- REQUIRED/CONSTRAINED/MATERIAL need human review."""
     project = ctx.load_project()
+    ctx.enforce_zone_access(project, reference_path)
+    ctx.enforce_zone_access(project, implementation_path)
     thresholds = project.config.data.get("similarity", {})
     result = similarity_engine.compare_trees(
         reference_path, implementation_path,

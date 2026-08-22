@@ -430,14 +430,24 @@ change that should be evaluated on its own.
 
 ## Documented limitations (not silently overclaimed)
 
-- **`PathGuard` is not yet wired into every real file read the CLI
-  performs.** See "External review findings" above -- `cli.py`'s commands
-  read project files directly rather than through a per-invocation
-  `PathGuard.check()`, because the current stateless-CLI design doesn't
-  track "which registered agent is running this command." Building on
-  `cleanroom` as a library (e.g. an orchestration harness that spawns
-  implementation subagents) can and should gate their file access through
-  `PathGuard` directly; the CLI itself doesn't yet do this automatically.
+- **`PathGuard` is now wired into real per-invocation reads for a subset
+  of commands, opt-in.** `inspect`/`licence`/`similarity` now call
+  `Ctx.enforce_zone_access()` before reading their target path, which
+  looks up a real `AgentRegistry` record for whatever agent id is passed
+  via the new global `--agent-id <id>` option and runs a real
+  `PathGuard.check()` against that agent's actual registered scope --
+  verified end-to-end (both the deny path, a Zone-H+I-only `cleanroom
+  build` agent denied `zone-r`, and the allow path, an `R`-scoped agent
+  let through) against a real project, not just `run_pathguard_self_test`'s
+  synthetic probe. Without `--agent-id`, every command's behaviour is
+  unchanged from before this existed. **Still a real, narrower gap, not
+  fully solved:** only those three commands are wired, and only when
+  `--agent-id` is actually passed -- every other command, and any
+  invocation that omits the flag, still reads files directly with no
+  gate. Extending coverage to every zone-touching command, and to a real
+  multi-agent orchestration harness built on top of this library that
+  calls `enforce_zone_access` for every subagent file read, remains
+  future work.
 - **Legal-issue engine**: only `protected_expression` has no dedicated
   heuristic -- always `UNKNOWN`. Idea/expression merger judgment has no
   deterministic proxy this tool can compute, unlike the other 17 issues.
@@ -550,9 +560,11 @@ change that should be evaluated on its own.
 
 ## Likely next additions
 
-1. Wire `PathGuard.check()` into a real per-agent file-access path for
-   whatever orchestration harness this library is embedded in (the
-   remaining piece of the isolation-enforcement gap above).
+1. ~~Wire `PathGuard.check()` into a real per-agent file-access path~~ --
+   **partially done**: `inspect`/`licence`/`similarity` now do this via
+   opt-in `--agent-id`. Remaining: every other zone-touching command, and
+   making it the default (or otherwise mandatory) rather than opt-in, for
+   whatever orchestration harness this library is embedded in.
 2. ~~Depend on `license-expression`~~ -- **done**: `spdx.py` is now backed
    by the real `license-expression` library. ScanCode Toolkit remains an
    option for a future optional `[licensecheck]` extra (not a base

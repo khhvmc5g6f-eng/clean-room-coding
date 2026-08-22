@@ -31,9 +31,18 @@ tool), the practical equivalent is: **never point an implementation
 subagent's file-read tool at a Zone R path, and never paste Zone R content
 into an implementation subagent's context.**
 
-Run `cleanroom audit` (which calls `run_isolation_test`) to get a concrete
-pass/fail: it instantiates an implementation-scoped guard and asserts a
-Zone R read is `DENIED`.
+Run `cleanroom audit` (which calls `run_pathguard_self_test`) to get a
+concrete pass/fail: it instantiates an implementation-scoped guard and
+asserts a Zone R read is `DENIED`. That's still a synthetic probe, not a
+real registered agent -- for genuine per-invocation enforcement, pass the
+global `--agent-id <id>` option (an agent registered via `cleanroom
+build`, or directly via `AgentRegistry` for another role) to
+`inspect`/`licence`/`similarity`; each then calls `PathGuard.check()`
+against that agent's real registered scope before reading its target
+path, and denies it exactly like the self-test does when the scope
+doesn't permit it. This is opt-in and currently covers only those three
+commands -- see `src/cleanroom/zones.py`'s module docstring for exactly
+what is and isn't covered.
 
 ## Contamination levels (C0-C5)
 

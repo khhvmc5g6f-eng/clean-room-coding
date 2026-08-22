@@ -153,7 +153,13 @@ machine-readable output) over re-deriving its logic by hand.
     any registered agents' logged actions violate their own permitted
     zones?), evidence-chain integrity, and a licence scan of Zone H
     (should only ever contain C0 material) against this project's real
-    policy. `cleanroom verify` complements it by re-deriving hashes for
+    policy. For a REAL per-invocation gate (not just a self-test), pass
+    the global `--agent-id <id>` option (an agent registered via
+    `cleanroom build`, or directly via `AgentRegistry` for another role)
+    to `inspect`/`licence`/`similarity` -- each genuinely calls
+    `PathGuard.check()` against that agent's actual registered scope
+    before reading its target path. `cleanroom verify` complements it by
+    re-deriving hashes for
     both the evidence ledger AND the handoff manifest and comparing them
     against what's recorded -- run it whenever you need to prove nothing
     was altered after the fact (e.g. before `cleanroom report`, or if a

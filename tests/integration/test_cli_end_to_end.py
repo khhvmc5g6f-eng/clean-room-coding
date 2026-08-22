@@ -406,6 +406,72 @@ def test_judge_adjudicate_rejects_unmatched_issue(tmp_path: Path):
     assert result.exit_code != 0
 
 
+def test_agent_id_denies_implementation_scoped_agent_zone_r_access(tmp_path: Path):
+    """`--agent-id` closes the real (not just unit-tested-in-isolation)
+    gap docs/zones.py's own docstring named: cli.py's commands previously
+    never routed a real file read through PathGuard per invocation. A
+    Zone-H+I-only agent (cleanroom build's only registration path) must
+    now be genuinely denied `cleanroom licence zone-r`, not just fail the
+    self-test in isolation."""
+    from cleanroom.cli import main
+
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    (project_dir / "zone-r" / "lib").mkdir(parents=True)
+    (project_dir / "zone-r" / "lib" / "LICENSE").write_text("MIT License\n", encoding="utf-8")
+
+    build_result = _run(runner, ["--project", str(project_dir), "--json", "build", "--role", "Backend Team"])
+    agent_id = json.loads(build_result.output)["agent_id"]
+
+    # Without --agent-id, behaviour is exactly as before -- this call
+    # succeeds (licence discovery runs; whether findings pass policy is a
+    # separate matter this test doesn't care about).
+    unrestricted = runner.invoke(main, ["--project", str(project_dir), "licence", str(project_dir / "zone-r")])
+    assert "PathGuard" not in unrestricted.output
+
+    denied = runner.invoke(main, ["--agent-id", agent_id, "--project", str(project_dir), "--json", "licence", str(project_dir / "zone-r")])
+    assert denied.exit_code == 4  # ContaminationFailure
+    assert "PathGuard denied" in json.loads(denied.output)["error"]
+
+
+def test_agent_id_allows_r_scoped_agent_zone_r_access(tmp_path: Path):
+    """The allow path, not just the deny path: an agent actually
+    registered WITH Zone R access must pass straight through with no
+    PathGuard denial at all. (No CLI command registers an R-scoped agent
+    today -- 'cleanroom build' only ever registers H+I -- so this uses
+    AgentRegistry directly, exactly as an orchestration harness built on
+    this library would.)"""
+    from cleanroom.cli import main
+    from cleanroom.orchestration.agents import AgentRegistry
+
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    (project_dir / "zone-r" / "lib").mkdir(parents=True)
+    (project_dir / "zone-r" / "lib" / "LICENSE").write_text("MIT License\n", encoding="utf-8")
+
+    registry = AgentRegistry(project_dir / "evidence")
+    record = registry.register(role="Analyst", permitted_zones=["R"])
+
+    result = runner.invoke(main, ["--agent-id", record.agent_id, "--project", str(project_dir), "--json", "licence", str(project_dir / "zone-r")])
+    assert "PathGuard" not in result.output
+
+
+def test_agent_id_rejects_unregistered_id(tmp_path: Path):
+    from cleanroom.cli import main
+
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+
+    result = runner.invoke(main, ["--agent-id", "never-registered", "--project", str(project_dir), "licence", str(project_dir / "zone-r")])
+    assert result.exit_code != 0
+
+
 def test_legal_picks_up_similarity_and_requirement_graph_facts(tmp_path: Path):
     """Regression test: `cleanroom legal` previously never loaded
     evidence/similarity-findings.json or requirements.json into the
