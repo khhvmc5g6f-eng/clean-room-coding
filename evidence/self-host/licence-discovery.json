@@ -1,54 +1,50 @@
 [
   {
-    "concluded": "Apache-2.0",
+    "concluded": "BUSL-1.1",
     "confidence": "high",
     "conflicting_evidence": false,
     "declared": null,
     "detected": [
-      "Apache-2.0"
+      "BUSL-1.1"
     ],
     "evidence": [
       {
-        "excerpt": "Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.",
+        "excerpt": "Business Source License 1.1\n\nParameters\n\nLicensor:              Clean Room Coding Contributors\nLicensed Work:         Clean Room Coding Version 0.1.0 (and each subsequent version released\n                       under this License)\n                       The Licensed Work is (c) 2026 Clean Room Coding Contributors\nAdditional Use Grant:  You may use, copy, modify, self-host and make production use o",
         "source": "LICENSE"
       }
     ],
     "path": "LICENSE",
     "policy_result": {
-      "notes": "All terms in 'Apache-2.0' are explicitly allowed by project policy.",
+      "notes": "All terms in 'BUSL-1.1' are explicitly allowed by project policy.",
       "obligations": [
-        "Include a copy of the Apache-2.0 licence text with any distribution.",
-        "Retain all copyright, patent, trademark and attribution notices from the source form.",
-        "If a NOTICE file is present in the original work, reproduce its attribution contents in derivative distributions.",
-        "Mark any files that were modified from the original with a prominent notice.",
-        "State any changes made to the licensed files."
+        "Comply with whatever the specific project's Additional Use Grant permits/restricts -- this varies per BUSL adopter and must be read per-project, not assumed.",
+        "Reproduce the licence text and Parameters block (Licensor, Licensed Work, Additional Use Grant, Change Date, Change License) in copies/redistributions.",
+        "Track the Change Date per version -- a specific released version converts to the stated Change License on that date regardless of the current version's terms."
       ],
       "status": "allowed"
     }
   },
   {
-    "concluded": "Apache-2.0",
+    "concluded": "BUSL-1.1",
     "confidence": "high",
     "conflicting_evidence": false,
     "declared": null,
     "detected": [
-      "Apache-2.0"
+      "BUSL-1.1"
     ],
     "evidence": [
       {
-        "excerpt": "Clean Room Coding\nCopyright 2026 Clean Room Coding Contributors\n\nThis product includes software developed by the Clean Room Coding project\n(https://github.com/khhvmc5g6f-eng/clean-room-coding).\n\nLicensed under the Apache License, Version 2.0 (the \"License\"); you may not\nuse this file except in compliance with the License. You may obtain a copy\nof the License at\n\n    http://www.apache.org/licenses/",
+        "excerpt": "Clean Room Coding\nCopyright 2026 Clean Room Coding Contributors\n\nThis product includes software developed by the Clean Room Coding project\n(https://github.com/khhvmc5g6f-eng/clean-room-coding).\n\nLicensed under the Business Source License 1.1 (see LICENSE). This is a\nsource-available licence, not an OSI-approved open-source licence: you may\nuse, copy, modify, self-host and make production use of th",
         "source": "NOTICE"
       }
     ],
     "path": "NOTICE",
     "policy_result": {
-      "notes": "All terms in 'Apache-2.0' are explicitly allowed by project policy.",
+      "notes": "All terms in 'BUSL-1.1' are explicitly allowed by project policy.",
       "obligations": [
-        "Include a copy of the Apache-2.0 licence text with any distribution.",
-        "Retain all copyright, patent, trademark and attribution notices from the source form.",
-        "If a NOTICE file is present in the original work, reproduce its attribution contents in derivative distributions.",
-        "Mark any files that were modified from the original with a prominent notice.",
-        "State any changes made to the licensed files."
+        "Comply with whatever the specific project's Additional Use Grant permits/restricts -- this varies per BUSL adopter and must be read per-project, not assumed.",
+        "Reproduce the licence text and Parameters block (Licensor, Licensed Work, Additional Use Grant, Change Date, Change License) in copies/redistributions.",
+        "Track the Change Date per version -- a specific released version converts to the stated Change License on that date regardless of the current version's terms."
       ],
       "status": "allowed"
     }

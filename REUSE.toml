@@ -4,7 +4,9 @@ SPDX-PackageSupplier = "Clean Room Coding Contributors"
 SPDX-PackageDownloadLocation = "https://github.com/khhvmc5g6f-eng/clean-room-coding"
 
 # This project's own source, schemas, policy/jurisdiction packs, docs and
-# tests are Apache-2.0 (see LICENSE/NOTICE). Rather than stamping an
+# tests are licensed under the Business Source License 1.1 (see LICENSE/
+# NOTICE) -- source-available, not OSI-approved; converts to
+# GPL-2.0-or-later on 2030-08-22. Rather than stamping an
 # SPDX-FileCopyrightText/SPDX-License-Identifier header into every file
 # individually, this global annotation covers the whole tree per the
 # REUSE 3.x TOML format; per-file headers remain the more precise option
@@ -13,7 +15,7 @@ SPDX-PackageDownloadLocation = "https://github.com/khhvmc5g6f-eng/clean-room-cod
 path = "**"
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Clean Room Coding Contributors"
-SPDX-License-Identifier = "Apache-2.0"
+SPDX-License-Identifier = "BUSL-1.1"
 
 # Anything vendored under a different licence must get its own, more
 # specific annotation below, added at the same time as the vendored file.

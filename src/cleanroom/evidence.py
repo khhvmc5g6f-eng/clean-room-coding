@@ -44,21 +44,48 @@ class EvidenceLedger:
         self.evidence_dir = evidence_dir
         self.evidence_dir.mkdir(parents=True, exist_ok=True)
         self.ledger_path = evidence_dir / LEDGER_FILENAME
+        # Cached so append() doesn't re-read the whole file every time
+        # (was O(n^2) over a ledger's lifetime); populated lazily and kept
+        # in sync by append() itself. `None` means "not yet loaded".
+        self._cached_last_hash: str | None = None
+        self._cached_sequence: int | None = None
 
     def _last_hash(self) -> tuple[str, int]:
+        if self._cached_last_hash is not None and self._cached_sequence is not None:
+            return self._cached_last_hash, self._cached_sequence
+        events, _ = self._read_all_with_problems()
+        if not events:
+            self._cached_last_hash, self._cached_sequence = GENESIS_HASH, -1
+        else:
+            last = events[-1]
+            self._cached_last_hash, self._cached_sequence = last["event_hash"], last["sequence"]
+        return self._cached_last_hash, self._cached_sequence
+
+    def _read_all_with_problems(self) -> tuple[list[dict[str, Any]], list[str]]:
+        """Parses every line, tolerating corruption instead of crashing
+        (a partial/interrupted write -- e.g. the process was killed
+        mid-append -- is a realistic failure mode for an append-only log).
+        A malformed line is skipped from the returned events and reported
+        as a problem string; if it's the very last line, it's reported as
+        a likely-incomplete write rather than tampering, since nothing
+        else in the chain could reference its hash yet."""
         if not self.ledger_path.exists():
-            return GENESIS_HASH, -1
-        last_line = None
-        sequence = -1
-        with open(self.ledger_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    last_line = line
-                    sequence += 1
-        if last_line is None:
-            return GENESIS_HASH, -1
-        return json.loads(last_line)["event_hash"], sequence
+            return [], []
+        raw_lines = [
+            line.strip() for line in self.ledger_path.read_text(encoding="utf-8").splitlines() if line.strip()
+        ]
+        events: list[dict[str, Any]] = []
+        problems: list[str] = []
+        for i, line in enumerate(raw_lines):
+            try:
+                events.append(json.loads(line))
+            except json.JSONDecodeError as e:
+                is_last = i == len(raw_lines) - 1
+                problems.append(
+                    f"line {i}: {'likely an incomplete/interrupted write' if is_last else 'corrupt JSON, not tampering-safe to ignore'} "
+                    f"({e})"
+                )
+        return events, problems
 
     def append(
         self,
@@ -100,24 +127,20 @@ class EvidenceLedger:
 
         with open(self.ledger_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(event, sort_keys=True) + "\n")
+        self._cached_last_hash, self._cached_sequence = event["event_hash"], event["sequence"]
         return event
 
     def read_all(self) -> list[dict[str, Any]]:
-        if not self.ledger_path.exists():
-            return []
-        events = []
-        with open(self.ledger_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    events.append(json.loads(line))
+        events, _ = self._read_all_with_problems()
         return events
 
     def verify_chain(self) -> list[str]:
-        """Re-walk the hash chain. Returns a list of problems; empty = intact."""
-        problems: list[str] = []
+        """Re-walk the hash chain. Returns a list of problems; empty = intact.
+        A corrupt/truncated line is reported as its own problem rather than
+        raising -- see `_read_all_with_problems`."""
+        events, problems = self._read_all_with_problems()
         expected_previous = GENESIS_HASH
-        for i, event in enumerate(self.read_all()):
+        for i, event in enumerate(events):
             stored_hash = event.get("event_hash")
             recomputed = dict(event)
             recomputed.pop("event_hash", None)

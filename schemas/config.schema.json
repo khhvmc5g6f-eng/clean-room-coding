@@ -60,6 +60,10 @@
         "target_markets": {
           "type": "array",
           "items": { "type": "string", "description": "ISO 3166-1 alpha-2 country code or 'eu'." }
+        },
+        "target_language": {
+          "type": "string",
+          "description": "The programming language/format the implementation team should write the reimplementation in. May differ from the reference's own language -- clean-room reimplementation never mechanically translates the reference's source, so this is a free choice, not a constraint carried over from Zone R. Example: 'same-as-reference', 'python', 'dart', 'typescript', 'rust'."
         }
       }
     },

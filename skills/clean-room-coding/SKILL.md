@@ -46,10 +46,16 @@ genuinely doesn't apply (documented per-phase below). Each phase is one or
 more `cleanroom` CLI invocations -- prefer the CLI (`--json` for
 machine-readable output) over re-deriving its logic by hand.
 
-1. **Init** -- `cleanroom init --name "..." --id ...` creates `.cleanroom.yml`
-   and the three zones (`zone-r` reference / `zone-h` handoff / `zone-i`
-   implementation). Read `references/three-zone-model.md` before deciding
-   zone paths or contamination levels for anything non-default.
+1. **Init** -- `cleanroom init --name "..." --id ... --target-language ...`
+   creates `.cleanroom.yml` and the three zones (`zone-r` reference /
+   `zone-h` handoff / `zone-i` implementation). `--target-language` is
+   asked explicitly, every time -- the reimplementation is never a
+   mechanical translation of the reference's own source (see
+   `references/legal-disclaimer.md`'s framing of why that would defeat
+   clean-room independence), so the implementation language is always a
+   free choice for this project, never assumed to match the reference.
+   Read `references/three-zone-model.md` before deciding zone paths or
+   contamination levels for anything non-default.
 
 2. **Intake** -- `cleanroom intake --source ... --access-authority ...`
    BEFORE touching any reference material. If access authority is
@@ -101,24 +107,37 @@ machine-readable output) over re-deriving its logic by hand.
    implementation subagent yourself, do not grant it read access to
    `zone-r` -- see `references/three-zone-model.md#technical-isolation`.
 
-10. **Architect / Build** -- `cleanroom architect` records an ADR per
-   material design decision (derived from the spec, not from the
-   reference's internal structure). `cleanroom build --role "..."`
-   registers each implementation agent in the evidence ledger, scoped to
-   Zones H+I only.
+10. **Architect / AI-suggest / Build** -- `cleanroom architect` records an
+    ADR per material design decision (derived from the spec, not from the
+    reference's internal structure). `cleanroom ai-suggest` explicitly
+    asks whether AI/ML capability should be added to the reimplementation
+    -- if yes, it searches the real Hugging Face Hub and classifies
+    candidates as embeddable/standalone vs. server-required (or honestly
+    `unknown`), cross-checking each model's licence against this project's
+    own policy; never present one suggestion as "the" answer, this is a
+    shortlist for a human decision. `cleanroom build --role "..."`
+    registers each implementation agent in the evidence ledger, scoped to
+    Zones H+I only.
 
-11. **Test / Compare** -- `cleanroom test` runs the behavioural suite (and
-    Zone I's own pytest suite if present). `cleanroom compare <ref-output>
-    <impl-output>` checks observable-behaviour equivalence under
-    configurable tolerance (timestamps/ordering/floats) -- this compares
-    *behaviour*, never source.
+11. **Test / Compare / Similarity** -- `cleanroom test` runs the
+    behavioural suite (and Zone I's own pytest suite if present).
+    `cleanroom compare <ref-output> <impl-output>` checks
+    observable-behaviour equivalence under configurable tolerance
+    (timestamps/ordering/floats) -- this compares *behaviour*, never
+    source. `cleanroom similarity <ref-dir> <impl-dir>` runs the lexical/
+    structural similarity engine across two source trees and exits 7
+    (`SIMILARITY_FAILURE`) on an unresolved suspicious/material finding --
+    pass `--negative-control <unrelated-project>` where available so
+    common framework boilerplate isn't mistaken for copying.
 
 12. **Provenance** -- `cleanroom provenance` generates SPDX + CycloneDX
     SBOMs for Zone I's declared dependencies.
 
-13. **Audit** -- `cleanroom audit` re-runs the isolation self-test and
-    evidence-chain integrity check, plus a licence scan of Zone H (should
-    only ever contain C0 material).
+13. **Audit** -- `cleanroom audit` re-runs the `PathGuard` self-test, a
+    project-specific agent/zone consistency cross-check (do any
+    registered agents' logged actions violate their own permitted zones?),
+    evidence-chain integrity, and a licence scan of Zone H (should only
+    ever contain C0 material) against this project's real policy.
 
 14. **Legal / Judge** -- `cleanroom legal --access-authority ...` runs the
     heuristic legal-issue engine (Part XLIV-style: 18 distinct questions,
@@ -130,14 +149,30 @@ machine-readable output) over re-deriving its logic by hand.
     -- you are role-playing a simulation for engineering triage, and must
     say so if asked, and must not be sycophantic toward "release".
 
-15. **Report / Release** -- `cleanroom report --version vN` assembles
-    `CLEAN_ROOM_CERTIFICATE.json` + `CLEAN_ROOM_REPORT.md`. `cleanroom
-    release` evaluates the release policy; a `RED` global decision or a
-    failed technical/provenance/contamination gate blocks it outright, and
-    otherwise it still exits `MANUAL_REVIEW_REQUIRED` (9) unless
-    `.cleanroom.yml` disables the human sign-off gate -- **never treat exit
-    code 9 as a failure**, and never tell a user "release approved" on the
-    strength of this tool alone.
+15. **Remediate** -- `cleanroom remediate` closes the loop: every RED
+    legal finding and every suspicious/material similarity finding
+    automatically becomes a tracked task and a blocked requirement-graph
+    node assigned to the implementation team. Re-run it after an actual
+    fix and the task clears itself (`resolved_by_rescan`); if the team
+    instead deliberately accepts residual risk, that requires an explicit
+    `--override --by "<name>" --notes "..."` (recorded as
+    `resolved_by_override`, never silently conflated with a real fix).
+    `cleanroom release` refuses to proceed while any blocking task is open
+    -- this is the actual enforcement point for "does a flagged concern
+    get sent back to be recoded before release."
+
+16. **Report / Release** -- `cleanroom report --version vN [--html] [--pdf]`
+    assembles `CLEAN_ROOM_CERTIFICATE.json` + `CLEAN_ROOM_REPORT.md`
+    (always), plus a colour-coded HTML page and/or paginated PDF covering
+    what the project started with, what it did, remediation status, and
+    the jurisdiction-by-jurisdiction decision. `cleanroom release`
+    evaluates the release policy; a `RED` global decision, a failed
+    technical/provenance/contamination gate, or an open blocking
+    remediation task blocks it outright, and otherwise it still exits
+    `MANUAL_REVIEW_REQUIRED` (9) unless `.cleanroom.yml` disables the
+    human sign-off gate -- **never treat exit code 9 as a failure**, and
+    never tell a user "release approved" on the strength of this tool
+    alone.
 
 ## Exit codes
 

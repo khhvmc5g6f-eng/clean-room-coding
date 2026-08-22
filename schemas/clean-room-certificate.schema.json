@@ -40,6 +40,31 @@
     },
     "global_decision": { "type": "string", "enum": ["GREEN", "GREEN_WITH_CONDITIONS", "AMBER", "RED"] },
     "outstanding_issues": { "type": "array", "items": { "type": "string" } },
+    "remediation": {
+      "type": "object",
+      "description": "Summary of cleanroom remediate's task ledger -- what was flagged and sent back to the implementation team, and whether it's still open.",
+      "properties": {
+        "open_blocking": { "type": "integer", "minimum": 0 },
+        "open_review_required": { "type": "integer", "minimum": 0 },
+        "resolved_by_rescan": { "type": "integer", "minimum": 0 },
+        "resolved_by_override": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "project_summary": {
+      "type": "object",
+      "description": "What the project started with -- for the 'what it started with' section of the human-readable report.",
+      "properties": {
+        "reference_summary": { "type": "string" },
+        "intended_output_licence": { "type": "string" },
+        "distribution_model": { "type": "array", "items": { "type": "string" } },
+        "target_markets": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "phases_completed": {
+      "type": "array",
+      "description": "Which cleanroom pipeline phases have recorded at least one evidence-ledger event -- 'what it did'.",
+      "items": { "type": "string" }
+    },
     "evidence_bundle_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "evidence_bundle_location": { "type": "string" },
     "generated_utc": { "type": "string", "format": "date-time" },

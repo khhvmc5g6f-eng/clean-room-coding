@@ -1,0 +1,50 @@
+# Licence policy pack: BUSL-1.1 (Business Source License 1.1)
+# This is the licence Clean Room Coding itself ships under (see /LICENSE) --
+# included here so the tool can recognise and reason about its own licence,
+# and so any project using `cleanroom` to analyse a BUSL-licensed dependency
+# has real facts rather than "unknown".
+
+spdx_id: BUSL-1.1
+family: source_available
+osi_approved: false
+fsf_libre: false
+copyleft: delayed_copyleft
+
+summary: >
+  A source-available licence (created by MariaDB Corporation) that grants
+  broad rights to copy, modify and make production use, subject to a
+  project-specific "Additional Use Grant" that typically excludes offering
+  the software as a competing hosted/managed product. On a fixed future
+  "Change Date" (per version, commonly 3-4 years after release), the
+  licence automatically converts to a specified OSI-approved "Change
+  License" (commonly a GPL-2.0-or-later-compatible licence).
+
+key_obligations:
+  - "Comply with whatever the specific project's Additional Use Grant permits/restricts -- this varies per BUSL adopter and must be read per-project, not assumed."
+  - "Reproduce the licence text and Parameters block (Licensor, Licensed Work, Additional Use Grant, Change Date, Change License) in copies/redistributions."
+  - "Track the Change Date per version -- a specific released version converts to the stated Change License on that date regardless of the current version's terms."
+
+distribution_triggers: [source, binary, saas, library, container]
+network_use_triggers_obligations: variable  # depends entirely on the specific Additional Use Grant
+patent_grant: false
+trademark_grant: false
+
+clean_room_relevance: >
+  Because BUSL is a template licence with a mandatory, project-specific
+  "Additional Use Grant" and "Change License", NO general statement about
+  "what BUSL requires" is safe -- the operative terms are whatever that
+  specific project filled in. Always read the actual LICENSE file's
+  Parameters block for the project in question rather than relying on
+  general BUSL knowledge.
+
+structured_issue_prompts:
+  - "What does this specific project's Additional Use Grant actually permit and prohibit? (Read the LICENSE file itself -- do not assume a 'typical' BUSL grant.)"
+  - "What is the Change Date for the specific version in use, and what does it convert to?"
+  - "Does the intended use (e.g. offering a hosted/SaaS product) fall inside or outside the Additional Use Grant's carve-out?"
+  - "Is a commercial licence available from the Licensor for uses the Additional Use Grant doesn't cover?"
+
+uncertainty_notes: >
+  BUSL is explicitly NOT an open-source licence (it says so in its own
+  Notice section) even though it is source-available and eventually
+  becomes open. Do not describe a BUSL-licensed dependency as "open
+  source" in any report this tool generates.

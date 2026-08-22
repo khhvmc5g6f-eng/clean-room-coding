@@ -15,7 +15,7 @@ cleanroom doctor
 
 ```bash
 mkdir -p /tmp/my-reimplementation && cd /tmp/my-reimplementation
-cleanroom init --name "My Reimplementation" --id my-reimpl
+cleanroom init --name "My Reimplementation" --id my-reimpl --target-language python
 ```
 
 This writes `.cleanroom.yml` and creates `zone-r/` (Reference),

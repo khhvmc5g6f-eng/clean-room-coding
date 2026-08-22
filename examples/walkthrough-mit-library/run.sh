@@ -10,7 +10,7 @@ mkdir -p "$PROJECT_DIR"
 cd "$PROJECT_DIR"
 
 echo "== init =="
-cleanroom init --name "Sort Library Reimplementation" --id sort-reimpl
+cleanroom init --name "Sort Library Reimplementation" --id sort-reimpl --target-language python
 
 echo "== reference material (synthetic, MIT-licensed) =="
 mkdir -p zone-r/upstream-sort-lib

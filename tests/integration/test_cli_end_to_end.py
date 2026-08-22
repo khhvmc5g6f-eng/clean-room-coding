@@ -23,7 +23,7 @@ def test_full_pipeline(tmp_path: Path, monkeypatch):
     project_dir = tmp_path / "proj"
     project_dir.mkdir()
 
-    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo"])
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
     assert (project_dir / ".cleanroom.yml").is_file()
 
     (project_dir / "zone-r" / "lib").mkdir(parents=True)

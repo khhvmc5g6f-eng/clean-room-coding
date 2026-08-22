@@ -34,23 +34,32 @@ from cleanroom.handoff import manifest as handoff_manifest
 from cleanroom.jurisdiction import resolver as jurisdiction_resolver
 from cleanroom.legal import engine as legal_engine
 from cleanroom.legal import panels as legal_panels
+from cleanroom.legal import remediation as remediation_module
 from cleanroom.licence import discovery as licence_discovery
 from cleanroom.licence import policy as licence_policy
 from cleanroom.orchestration.agents import AgentRegistry
 from cleanroom.project import Project
 from cleanroom.provenance import sbom as sbom_module
-from cleanroom.report import build_certificate, release_allowed, render_final_report, save_certificate
+from cleanroom.report import (
+    build_certificate,
+    release_allowed,
+    render_final_report,
+    render_html_report,
+    save_certificate,
+)
 from cleanroom.sanitisation import scanner as sanitisation_scanner
 from cleanroom.schema_registry import schema_dir
+from cleanroom.similarity import engine as similarity_engine
 from cleanroom.specification.behavioral import BehavioralSuite
 from cleanroom.specification.graph import RequirementGraph
 from cleanroom.util import hash_tree, sha256_json
-from cleanroom.zones import create_zones, run_isolation_test
+from cleanroom.zones import check_agent_zone_consistency, create_zones, run_pathguard_self_test
 
 
 class Ctx:
-    def __init__(self, project_root: Path, json_output: bool, quiet: bool, verbose: bool):
+    def __init__(self, project_root: Path, config_path: Path | None, json_output: bool, quiet: bool, verbose: bool):
         self.project_root = project_root
+        self.config_path = config_path
         self.json_output = json_output
         self.quiet = quiet
         self.verbose = verbose
@@ -67,7 +76,7 @@ class Ctx:
 
     def load_project(self) -> Project:
         try:
-            return Project.discover(self.project_root)
+            return Project.discover(self.project_root, explicit_config_path=self.config_path)
         except CleanRoomError as e:
             raise click.ClickException(str(e)) from e
 
@@ -81,7 +90,7 @@ pass_ctx = click.make_pass_decorator(Ctx)
 
 @click.group()
 @click.option("--project", "project_path", type=click.Path(path_type=Path), default=Path("."), help="Project root (default: current directory).")
-@click.option("--config", "config_path", type=click.Path(path_type=Path), default=None, help="Explicit .cleanroom.yml path (overrides discovery).")
+@click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), default=None, help="Explicit .cleanroom.yml path (overrides discovery).")
 @click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON instead of human text.")
 @click.option("--quiet", is_flag=True, default=False, help="Suppress non-essential output.")
 @click.option("--verbose", is_flag=True, default=False, help="Verbose diagnostic output.")
@@ -89,7 +98,7 @@ pass_ctx = click.make_pass_decorator(Ctx)
 @click.pass_context
 def main(click_ctx: click.Context, project_path: Path, config_path: Path | None, json_output: bool, quiet: bool, verbose: bool) -> None:
     """Clean Room Coding: reproducible, auditable clean-room reimplementation tooling."""
-    click_ctx.obj = Ctx(project_root=project_path, json_output=json_output, quiet=quiet, verbose=verbose)
+    click_ctx.obj = Ctx(project_root=project_path, config_path=config_path, json_output=json_output, quiet=quiet, verbose=verbose)
 
 
 # --------------------------------------------------------------------------- init
@@ -97,9 +106,20 @@ def main(click_ctx: click.Context, project_path: Path, config_path: Path | None,
 @main.command()
 @click.option("--name", prompt="Project name", help="Human-readable project name.")
 @click.option("--id", "project_id", default=None, help="Machine identifier (default: derived from --name).")
+@click.option(
+    "--target-language",
+    prompt="Target implementation language (e.g. 'same-as-reference', 'python', 'dart', 'typescript', 'rust')",
+    default="same-as-reference",
+    help=(
+        "The reimplementation is never a mechanical translation of the reference's source "
+        "(that would defeat clean-room independence) -- so the target language is a free "
+        "choice for the implementation team, not something inherited from Zone R. Record it "
+        "up front so the answer is explicit rather than assumed."
+    ),
+)
 @click.option("--force", is_flag=True, default=False, help="Overwrite an existing .cleanroom.yml.")
 @pass_ctx
-def init(ctx: Ctx, name: str, project_id: str | None, force: bool) -> None:
+def init(ctx: Ctx, name: str, project_id: str | None, target_language: str, force: bool) -> None:
     """Create a new Clean Room Coding project in the current/target directory."""
     root = ctx.project_root
     root.mkdir(parents=True, exist_ok=True)
@@ -108,7 +128,7 @@ def init(ctx: Ctx, name: str, project_id: str | None, force: bool) -> None:
         raise click.ClickException(f"{config_file} already exists. Use --force to overwrite.")
 
     pid = project_id or re.sub(r"[^a-z0-9-]", "-", name.lower()).strip("-") or "project"
-    data = default_config(name, pid)
+    data = default_config(name, pid, target_language=target_language)
     with open(config_file, "w", encoding="utf-8") as f:
         yaml.safe_dump(data, f, sort_keys=False)
 
@@ -123,15 +143,16 @@ def init(ctx: Ctx, name: str, project_id: str | None, force: bool) -> None:
         actor=Actor(type="human", id="cli-user", role="initiator"),
         action="cleanroom init",
         result="success",
-        detail=f"Created project '{name}' ({pid})",
+        detail=f"Created project '{name}' ({pid}), target_language={target_language}",
     )
     ctx.emit(
-        {"project": pid, "config": str(config_file), "zones": data["zones"]},
+        {"project": pid, "config": str(config_file), "zones": data["zones"], "target_language": target_language},
         human=(
             f"Project created.\n\n"
             f"Reference Zone:       {data['zones']['reference_path']}\n"
             f"Handoff Zone:         {data['zones']['handoff_path']}\n"
             f"Implementation Zone:  {data['zones']['implementation_path']}\n"
+            f"Target language:      {target_language}\n"
             f"Evidence Ledger:      enabled ({root / 'evidence'})\n"
         ),
     )
@@ -219,7 +240,7 @@ def inspect(ctx: Ctx, path: Path | None) -> None:
     what's needed to hash and size it."""
     project = ctx.load_project()
     target = path or project.zone_r
-    tree = hash_tree(target)
+    tree, skipped = hash_tree(target)
     extensions: dict[str, int] = {}
     total_bytes = 0
     for rel in tree:
@@ -235,13 +256,16 @@ def inspect(ctx: Ctx, path: Path | None) -> None:
         "total_bytes": total_bytes,
         "extensions": dict(sorted(extensions.items(), key=lambda kv: -kv[1])),
         "tree_hash": sha256_json(tree),
+        "skipped": skipped,
     }
+    if skipped:
+        ctx.echo(f"WARNING: {len(skipped)} path(s) skipped as unsafe (symlink escaping root, or not a regular file) -- see 'skipped' in output.")
     project.evidence.append(
         actor=Actor(type="tool", id="cleanroom-inspect"),
         action="cleanroom inspect",
         zone="R" if target == project.zone_r else "none",
         result="success",
-        detail=f"{summary['file_count']} file(s), {summary['total_bytes']} bytes under {target}",
+        detail=f"{summary['file_count']} file(s), {summary['total_bytes']} bytes under {target}, {len(skipped)} skipped",
     )
     ctx.emit(
         summary,
@@ -249,6 +273,7 @@ def inspect(ctx: Ctx, path: Path | None) -> None:
             f"{summary['file_count']} file(s), {summary['total_bytes']} bytes under {target}\n"
             f"Extensions: {summary['extensions']}\n"
             f"Tree hash: {summary['tree_hash']}"
+            + (f"\nSkipped: {skipped}" if skipped else "")
         ),
     )
 
@@ -281,8 +306,8 @@ def licence(ctx: Ctx, path: Path | None) -> None:
         actor=Actor(type="tool", id="cleanroom-licence-discovery"),
         action="cleanroom licence",
         zone="R",
-        result="success",
-        detail=f"{len(results)} location(s) scanned under {target}",
+        result="denied" if blocking else "success",
+        detail=f"{len(results)} location(s) scanned under {target}, blocking={blocking}",
     )
     ctx.emit(
         {"scanned": str(target), "findings": results, "blocking": blocking},
@@ -473,6 +498,13 @@ def handoff(ctx: Ctx, specification_version: str, all_c0: bool, signer: str | No
             signer=signer,
         )
     except ContaminationFailure as e:
+        project.evidence.append(
+            actor=Actor(type="human" if signer else "tool", id=signer or "cleanroom-cli"),
+            action="cleanroom handoff",
+            zone="H",
+            result="denied",
+            detail=str(e),
+        )
         ctx.fail(e)
         return
     m = handoff_manifest.sign_manifest(m, gpg_key_id=signer)
@@ -516,6 +548,66 @@ def architect(ctx: Ctx, title: str, decision: str, rationale: str) -> None:
     )
     project.evidence.append(actor=Actor(type="human", id="cli-user", role="architect"), action="cleanroom architect", zone="I", detail=str(path))
     ctx.emit({"adr": str(path)})
+
+
+# --------------------------------------------------------------------------- ai-suggest
+
+@main.command(name="ai-suggest")
+@click.option("--want-ai/--no-ai", "want_ai", default=None, help="Skip the interactive yes/no prompt.")
+@click.option("--capability", default=None, help="Free-text AI capability to search for, e.g. 'text classification'.")
+@click.option("--embeddable-only", is_flag=True, default=False, help="Only show models that don't require a dedicated inference server.")
+@click.option("--limit", default=10, help="Max models to return.")
+@pass_ctx
+def ai_suggest(ctx: Ctx, want_ai: bool | None, capability: str | None, embeddable_only: bool, limit: int) -> None:
+    """Before implementing, ask explicitly whether AI/ML capability should
+    be added -- and if so, search the real Hugging Face Hub for candidate
+    models, distinguishing embeddable/standalone models (ONNX/GGUF/TFLite/
+    CoreML -- no server needed) from ones that require a dedicated
+    inference server, and cross-checking each model's licence against this
+    project's own dependency_policy. Never recommends a single "the"
+    model -- this is a structured shortlist for a human decision."""
+    project = ctx.load_project()
+    if want_ai is None:
+        want_ai = click.confirm("Do you want to add AI/ML capability to this reimplementation?", default=False)
+
+    if not want_ai:
+        project.evidence.append(actor=Actor(type="human", id="cli-user"), action="cleanroom ai-suggest", detail="declined")
+        ctx.emit({"ai_requested": False})
+        return
+
+    if not capability:
+        capability = click.prompt("Describe the desired AI capability (e.g. 'text classification', 'speech to text', 'code similarity')")
+
+    try:
+        from cleanroom.ai.suggest import evaluate_against_policy, search_models
+        suggestions = search_models(capability, limit=limit)
+    except ImportError as e:
+        raise click.ClickException(str(e)) from e
+    except Exception as e:  # network/Hub API failure -- a real external-system boundary
+        raise click.ClickException(f"Hugging Face Hub search failed: {e}") from e
+
+    allowed = project.config.data.get("dependency_policy", {}).get("allowed_licences", [])
+    denied = project.config.data.get("dependency_policy", {}).get("denied_licences", [])
+    suggestions = evaluate_against_policy(suggestions, allowed=allowed, denied=denied)
+    if embeddable_only:
+        suggestions = [s for s in suggestions if s.deployment_shape == "embeddable"]
+
+    out_path = project.root / "evidence" / "ai-model-suggestions.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = [s.to_dict() for s in suggestions]
+    out_path.write_text(jsonlib.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+    project.evidence.append(
+        actor=Actor(type="tool", id="cleanroom-ai-suggest"), action="cleanroom ai-suggest",
+        detail=f"capability={capability!r}, {len(suggestions)} suggestion(s)",
+    )
+    ctx.emit(
+        {"ai_requested": True, "capability": capability, "suggestions": payload, "saved_to": str(out_path)},
+        human="\n".join(
+            f"{s['model_id']} [{s['deployment_shape']}] licence={s['licence']} policy={s['licence_policy_status']} -- {s['url']}"
+            for s in payload
+        ) or "(no models found)",
+    )
 
 
 # --------------------------------------------------------------------------- build
@@ -594,6 +686,8 @@ def compare(ctx: Ctx, reference_output: Path, implementation_output: Path, ignor
         a_lines, b_lines = sorted(a_lines), sorted(b_lines)
 
     if float_epsilon is not None:
+        if float_epsilon <= 0:
+            raise click.ClickException("--float-epsilon must be a positive number.")
         float_re = re.compile(r"-?\d+\.\d+")
 
         def round_floats(lines: list[str]) -> list[str]:
@@ -606,6 +700,45 @@ def compare(ctx: Ctx, reference_output: Path, implementation_output: Path, ignor
     ctx.emit({"equivalent": equivalent, "differing_lines": diff_count, "reference_line_count": len(a_lines), "implementation_line_count": len(b_lines)})
     if not equivalent:
         sys.exit(int(ExitCode.TEST_FAILURE))
+
+
+# --------------------------------------------------------------------------- similarity
+
+@main.command()
+@click.argument("reference_path", type=click.Path(exists=True, path_type=Path))
+@click.argument("implementation_path", type=click.Path(exists=True, path_type=Path))
+@click.option("--negative-control", "negative_controls", multiple=True, type=click.Path(exists=True, path_type=Path), help="An unrelated project in the same language, for background scoring (Part XXXVI). Repeatable.")
+@click.option("--max-comparisons", type=int, default=2000, help="Cap on all-pairs fallback comparisons when files don't match by name.")
+@pass_ctx
+def similarity(ctx: Ctx, reference_path: Path, implementation_path: Path, negative_controls: tuple[Path, ...], max_comparisons: int) -> None:
+    """Parts XXXIV-XXXVI: lexical + structural similarity across two source
+    trees, with negative-control background scoring. Never auto-classifies
+    above 'suspicious' -- REQUIRED/CONSTRAINED/MATERIAL need human review."""
+    project = ctx.load_project()
+    thresholds = project.config.data.get("similarity", {})
+    result = similarity_engine.compare_trees(
+        reference_path, implementation_path,
+        lexical_threshold=thresholds.get("lexical_threshold", 0.15),
+        structural_threshold=thresholds.get("structural_threshold", 0.15),
+        negative_control_roots=list(negative_controls),
+        max_comparisons=max_comparisons,
+    )
+    out_path = project.root / "evidence" / "similarity-findings.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(jsonlib.dumps(result["findings"], indent=2, sort_keys=True), encoding="utf-8")
+
+    suspicious = [f for f in result["findings"] if f["classification"] in ("suspicious", "material")]
+    if result["comparisons_skipped"]:
+        ctx.echo(f"WARNING: {result['comparisons_skipped']} comparison(s) skipped (max_comparisons={max_comparisons}); not silently complete.")
+    project.evidence.append(
+        actor=Actor(type="tool", id="cleanroom-similarity-engine"),
+        action="cleanroom similarity",
+        result="success" if not suspicious else "failure",
+        detail=f"{result['comparisons_run']} comparison(s), {len(suspicious)} suspicious/material",
+    )
+    ctx.emit({**result, "saved_to": str(out_path)})
+    if suspicious:
+        sys.exit(int(ExitCode.SIMILARITY_FAILURE))
 
 
 # --------------------------------------------------------------------------- provenance
@@ -630,25 +763,51 @@ def provenance(ctx: Ctx) -> None:
 @main.command()
 @pass_ctx
 def audit(ctx: Ctx) -> None:
-    """Combined technical audit: isolation test, licence policy, ledger integrity."""
+    """Combined technical audit: PathGuard self-test, agent/zone consistency,
+    ledger integrity, and Zone H licence policy (Zone H must be C0-only AND
+    every concluded licence there must be allowed by THIS project's actual
+    policy, not a hardcoded list)."""
     project = ctx.load_project()
-    isolation_ok, isolation_detail = run_isolation_test(project.zone_r, project.zone_h, project.zone_i)
+    isolation_ok, isolation_detail = run_pathguard_self_test(project.zone_r, project.zone_h, project.zone_i)
     ledger_problems = project.evidence.verify_chain()
 
-    findings = licence_discovery.discover(project.zone_h)
-    non_c0 = [f for f in findings if f.concluded and f.concluded not in ("MIT", "Apache-2.0")]
+    registry = AgentRegistry(project.root / "evidence")
+    zone_consistency_problems = check_agent_zone_consistency(
+        [a.to_dict() for a in registry.all()], project.evidence.read_all()
+    )
 
+    findings = licence_discovery.discover(project.zone_h)
+    allowed = project.config.data.get("dependency_policy", {}).get("allowed_licences", [])
+    denied = project.config.data.get("dependency_policy", {}).get("denied_licences", [])
+    unknown_action = project.config.data.get("dependency_policy", {}).get("unknown_licence_action", "block")
+    zone_h_results = []
+    licence_blocking = False
+    for finding in findings:
+        policy_result = licence_policy.evaluate(finding.concluded, allowed=allowed, denied=denied)
+        licence_blocking = licence_blocking or licence_policy.is_blocking(policy_result["status"], unknown_action)
+        d = finding.to_dict()
+        d["policy_result"] = policy_result
+        zone_h_results.append(d)
+
+    _, zone_h_skipped = hash_tree(project.zone_h)
+
+    ok = isolation_ok and not ledger_problems and not zone_consistency_problems and not licence_blocking and not zone_h_skipped
     result = {
-        "isolation_test": {"passed": isolation_ok, "detail": isolation_detail},
+        "pathguard_self_test": {"passed": isolation_ok, "detail": isolation_detail},
+        "agent_zone_consistency": {"ok": not zone_consistency_problems, "problems": zone_consistency_problems},
         "evidence_chain_intact": not ledger_problems,
         "evidence_chain_problems": ledger_problems,
-        "zone_h_licence_findings": [f.to_dict() for f in findings],
+        "zone_h_licence_findings": zone_h_results,
+        "zone_h_licence_blocking": licence_blocking,
+        "zone_h_unsafe_paths_skipped": zone_h_skipped,
     }
-    project.evidence.append(actor=Actor(type="tool", id="cleanroom-audit"), action="cleanroom audit", result="success" if isolation_ok and not ledger_problems else "failure")
+    project.evidence.append(actor=Actor(type="tool", id="cleanroom-audit"), action="cleanroom audit", result="success" if ok else "failure")
     ctx.emit(result)
-    if not isolation_ok:
+    if not isolation_ok or zone_h_skipped:
         sys.exit(int(ExitCode.CONTAMINATION_FAILURE))
-    if ledger_problems:
+    if licence_blocking:
+        sys.exit(int(ExitCode.LICENCE_FAILURE))
+    if ledger_problems or zone_consistency_problems:
         sys.exit(int(ExitCode.GENERAL_FAILURE))
 
 
@@ -661,7 +820,7 @@ def legal(ctx: Ctx, access_authority: str) -> None:
     """Part XLIV: run the heuristic legal issue engine. NOT LEGAL ADVICE."""
     project = ctx.load_project()
     licence_findings = [f.to_dict() for f in licence_discovery.discover(project.zone_r)]
-    isolation_ok, _ = run_isolation_test(project.zone_r, project.zone_h, project.zone_i)
+    isolation_ok, _ = run_pathguard_self_test(project.zone_r, project.zone_h, project.zone_i)
     j = project.config.data["jurisdiction"]
     markets = j["required_markets"] + [m for m in j.get("informational_markets", []) if m not in j["required_markets"]]
     findings: list[dict[str, Any]] = []
@@ -717,6 +876,74 @@ def judge(ctx: Ctx) -> None:
     ctx.emit({"prompts_written_for": written, "directory": str(out_dir)})
 
 
+# --------------------------------------------------------------------------- remediate
+
+@main.command()
+@click.option("--override", "override_id", default=None, help="Mark a specific open task resolved by human sign-off instead of a clean re-scan (Part LI).")
+@click.option("--by", "override_by", default=None, help="Required with --override: who is accepting this residual risk.")
+@click.option("--notes", "override_notes", default=None, help="Required with --override: why.")
+@pass_ctx
+def remediate(ctx: Ctx, override_id: str | None, override_by: str | None, override_notes: str | None) -> None:
+    """Routes RED legal findings and suspicious/material similarity findings
+    back to the implementation team as blocking requirement-graph nodes.
+    Idempotent: re-running after a fix clears the task automatically; a
+    fix that was never made stays open and blocks 'cleanroom release'."""
+    project = ctx.load_project()
+    tasks_path = project.root / "REMEDIATION_TASKS.json"
+    existing_tasks = jsonlib.loads(tasks_path.read_text(encoding="utf-8")) if tasks_path.is_file() else []
+
+    legal_path = project.root / "evidence" / "legal-findings.json"
+    similarity_path = project.root / "evidence" / "similarity-findings.json"
+    legal_findings = jsonlib.loads(legal_path.read_text(encoding="utf-8")) if legal_path.is_file() else []
+    similarity_findings = jsonlib.loads(similarity_path.read_text(encoding="utf-8")) if similarity_path.is_file() else []
+
+    if override_id:
+        if not override_by or not override_notes:
+            raise click.ClickException("--override requires both --by and --notes.")
+        try:
+            existing_tasks = remediation_module.apply_override(existing_tasks, override_id, by=override_by, notes=override_notes)
+        except ValueError as e:
+            raise click.ClickException(str(e)) from e
+
+    tasks = remediation_module.reconcile(existing_tasks, legal_findings, similarity_findings)
+    tasks_path.write_text(jsonlib.dumps(tasks, indent=2, sort_keys=True), encoding="utf-8")
+
+    graph_path = project.root / "requirements.json"
+    graph = RequirementGraph.load(graph_path)
+    for task in tasks:
+        node_id = task["id"]
+        if task["status"] == "open":
+            graph.add({
+                "id": node_id, "kind": "remediation",
+                "statement": task["description"],
+                "classification": "source_implementation_detail",
+                "status": "blocked",
+                "blocker": {
+                    "reason": task["description"],
+                    "responsible_component": task["assigned_to"],
+                    "next_required_action": (
+                        "Re-implement to address the finding, then re-run 'cleanroom legal'/'cleanroom similarity' "
+                        "and 'cleanroom remediate' -- or obtain an explicit human override."
+                    ),
+                },
+            })
+        elif node_id in graph.nodes:
+            graph.nodes[node_id]["status"] = "implemented"
+            graph.nodes[node_id].pop("blocker", None)
+    graph.save(graph_path)
+
+    blocking_open = remediation_module.open_blocking_tasks(tasks)
+    project.evidence.append(
+        actor=Actor(type="human" if override_id else "tool", id=override_by or "cleanroom-remediate"),
+        action="cleanroom remediate" + (f" --override {override_id}" if override_id else ""),
+        result="denied" if blocking_open else "success",
+        detail=f"{len(tasks)} task(s), {len(blocking_open)} open blocking",
+    )
+    ctx.emit({"tasks": tasks, "open_blocking": len(blocking_open), "saved_to": str(tasks_path)})
+    if blocking_open and not override_id:
+        ctx.fail(PolicyFailure(f"{len(blocking_open)} blocking remediation task(s) remain open; see {tasks_path}"))
+
+
 # --------------------------------------------------------------------------- verify
 
 @main.command()
@@ -739,11 +966,40 @@ def verify(ctx: Ctx) -> None:
 
 # --------------------------------------------------------------------------- report / release / status
 
+_PHASE_LABELS = {
+    "cleanroom init": "Init", "cleanroom intake": "Intake", "cleanroom inspect": "Inspect",
+    "cleanroom licence": "Licence discovery", "cleanroom jurisdiction": "Jurisdiction resolution",
+    "cleanroom analyse": "Analysis", "specify add-requirement": "Specification",
+    "specify add-behavioral": "Specification", "cleanroom sanitise": "Sanitisation",
+    "cleanroom handoff": "Handoff", "cleanroom architect": "Architecture",
+    "cleanroom build (agent registered)": "Implementation build", "cleanroom test": "Testing",
+    "cleanroom similarity": "Similarity analysis", "cleanroom provenance": "Provenance/SBOM",
+    "cleanroom audit": "Audit", "cleanroom legal": "Legal triage", "cleanroom judge": "Judicial review prompts",
+    "cleanroom remediate": "Remediation", "cleanroom report": "Reporting", "cleanroom release": "Release",
+}
+
+
+def _phases_completed(events: list[dict[str, Any]]) -> list[str]:
+    seen: list[str] = []
+    for event in events:
+        action = event.get("action", "")
+        matched = next((label for prefix, label in _PHASE_LABELS.items() if action.startswith(prefix)), None)
+        if matched and matched not in seen:
+            seen.append(matched)
+    return seen
+
+
 @main.command()
 @click.option("--version", "version", default="0.0.0")
+@click.option("--html", "emit_html", is_flag=True, default=False, help="Also write CLEAN_ROOM_REPORT.html (colour-coded, self-contained).")
+@click.option("--pdf", "emit_pdf", is_flag=True, default=False, help="Also write CLEAN_ROOM_REPORT.pdf (requires: pip install 'cleanroom[pdf]').")
 @pass_ctx
-def report(ctx: Ctx, version: str) -> None:
-    """Part XCIII: assemble the final report and CLEAN_ROOM_CERTIFICATE.json."""
+def report(ctx: Ctx, version: str, emit_html: bool, emit_pdf: bool) -> None:
+    """Part XCIII: assemble the final report -- what the project started
+    with, what it did, functional/provenance/similarity status, remediation
+    (findings sent back to the implementation team), jurisdictions, and the
+    global decision. Writes CLEAN_ROOM_CERTIFICATE.json + CLEAN_ROOM_REPORT.md
+    always; --html/--pdf add colour-coded renderings of the same data."""
     project = ctx.load_project()
     graph = RequirementGraph.load(project.root / "requirements.json")
     trace = graph.traceability_report()
@@ -759,25 +1015,71 @@ def report(ctx: Ctx, version: str) -> None:
     required_markets = project.config.required_markets()
     global_decision = legal_panels.global_decision(jurisdiction_decisions, required_markets) if jurisdiction_decisions else "AMBER"
 
+    similarity_path = project.root / "evidence" / "similarity-findings.json"
+    if similarity_path.is_file():
+        sim_findings = jsonlib.loads(similarity_path.read_text(encoding="utf-8"))
+        unresolved = [f for f in sim_findings if f["classification"] in ("suspicious", "material")]
+        similarity_result = "material_findings_open" if unresolved else "no_material_findings"
+    else:
+        similarity_result = "not_run"
+
+    tasks_path = project.root / "REMEDIATION_TASKS.json"
+    tasks = jsonlib.loads(tasks_path.read_text(encoding="utf-8")) if tasks_path.is_file() else []
+    remediation_summary = {
+        "open_blocking": sum(1 for t in tasks if t["status"] == "open" and t["severity"] == "blocking"),
+        "open_review_required": sum(1 for t in tasks if t["status"] == "open" and t["severity"] == "review_required"),
+        "resolved_by_rescan": sum(1 for t in tasks if t["status"] == "resolved_by_rescan"),
+        "resolved_by_override": sum(1 for t in tasks if t["status"] == "resolved_by_override"),
+    }
+
+    impl_config = project.config.data.get("implementation", {})
+    ref_config = project.config.data.get("reference", {})
+    ref_repos = [r.get("url", "") for r in ref_config.get("repositories", [])]
+    project_summary = {
+        "reference_summary": "; ".join(ref_repos) if ref_repos else "(not recorded in .cleanroom.yml reference.repositories)",
+        "intended_output_licence": impl_config.get("output_licence", "(not recorded)"),
+        "distribution_model": impl_config.get("distribution_model", []),
+        "target_markets": sorted(set(required_markets) | set(project.config.data.get("jurisdiction", {}).get("informational_markets", []))),
+    }
+
+    outstanding = [b["statement"] for b in graph.blockers()]
+
     certificate = build_certificate(
         project=project.config.data["project"]["name"],
         version=version,
-        reference=None,
+        reference=(ref_repos[0] if ref_repos else None),
         clean_room_level=project.config.clean_room_level,
         tests=tests_summary,
         requirement_traceability_percent=trace.get("completion_percent", 0.0),
         provenance_status="partial" if (project.root / "evidence" / "sbom").is_dir() else "unknown",
-        similarity_result="not_run",
+        similarity_result=similarity_result,
         jurisdictions=[{"jurisdiction": j, "decision_state": s, "required_market": j in required_markets} for j, s in jurisdiction_decisions.items()],
         global_decision=global_decision,
-        outstanding_issues=[b["statement"] for b in graph.blockers()],
+        outstanding_issues=outstanding,
         evidence_bundle_location=str(project.root / "evidence"),
+        remediation=remediation_summary,
+        project_summary=project_summary,
+        phases_completed=_phases_completed(project.evidence.read_all()),
     )
     save_certificate(certificate, project.root / "CLEAN_ROOM_CERTIFICATE.json")
     report_text = render_final_report(certificate)
     (project.root / "CLEAN_ROOM_REPORT.md").write_text(report_text, encoding="utf-8")
-    project.evidence.append(actor=Actor(type="tool", id="cleanroom-report"), action="cleanroom report", result="success")
-    ctx.emit(certificate, human=report_text)
+
+    written = {"markdown": str(project.root / "CLEAN_ROOM_REPORT.md"), "certificate": str(project.root / "CLEAN_ROOM_CERTIFICATE.json")}
+    if emit_html:
+        html_path = project.root / "CLEAN_ROOM_REPORT.html"
+        html_path.write_text(render_html_report(certificate), encoding="utf-8")
+        written["html"] = str(html_path)
+    if emit_pdf:
+        try:
+            from cleanroom.report_pdf import render_pdf_report
+        except ImportError as e:
+            raise click.ClickException(str(e)) from e
+        pdf_path = render_pdf_report(certificate, project.root / "CLEAN_ROOM_REPORT.pdf")
+        written["pdf"] = str(pdf_path)
+
+    project.evidence.append(actor=Actor(type="tool", id="cleanroom-report"), action="cleanroom report", result="success", detail=f"outputs={list(written)}")
+    ctx.emit({**certificate, "outputs": written}, human=report_text)
 
 
 @main.command()
@@ -791,8 +1093,11 @@ def release(ctx: Ctx) -> None:
     certificate = jsonlib.loads(cert_path.read_text(encoding="utf-8"))
     policy = project.config.data["release_policy"]
 
-    isolation_ok, _ = run_isolation_test(project.zone_r, project.zone_h, project.zone_i)
+    isolation_ok, _ = run_pathguard_self_test(project.zone_r, project.zone_h, project.zone_i)
     ledger_ok = not project.evidence.verify_chain()
+    tasks_path = project.root / "REMEDIATION_TASKS.json"
+    tasks = jsonlib.loads(tasks_path.read_text(encoding="utf-8")) if tasks_path.is_file() else []
+    open_blocking_remediation = len(remediation_module.open_blocking_tasks(tasks))
 
     allowed, reasons = release_allowed(
         technical_gate=certificate["tests"].get("fail", 0) == 0,
@@ -803,6 +1108,7 @@ def release(ctx: Ctx) -> None:
         require_provenance_gate=policy["require_provenance_gate"],
         require_contamination_gate=policy["require_contamination_gate"],
         block_on_red_required_jurisdiction=policy["block_on_red_required_jurisdiction"],
+        open_blocking_remediation=open_blocking_remediation,
     )
     human_signoff_required = project.config.data.get("approval_gates", {}).get("human_signoff_required_for_release", True)
     project.evidence.append(actor=Actor(type="tool", id="cleanroom-release"), action="cleanroom release", result="success" if allowed else "denied", detail="; ".join(reasons))

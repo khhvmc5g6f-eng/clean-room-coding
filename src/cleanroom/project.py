@@ -16,8 +16,8 @@ class Project:
     evidence: EvidenceLedger
 
     @classmethod
-    def discover(cls, start: Path) -> "Project":
-        config_path = find_config(start)
+    def discover(cls, start: Path, *, explicit_config_path: Path | None = None) -> "Project":
+        config_path = find_config(start, explicit_path=explicit_config_path)
         config = load_config(config_path)
         root = config_path.parent
         evidence = EvidenceLedger(root / "evidence")

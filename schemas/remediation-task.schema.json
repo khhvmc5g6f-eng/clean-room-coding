@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroom.dev/schemas/remediation-task.schema.json",
+  "title": "Remediation Task",
+  "description": "A legal or similarity finding routed back to the implementation team for recoding before release, per non-negotiable principle 16 (release is evidence-gated) and Part LI (a human, not this tool, ultimately decides). See CONTRIBUTING.md / cleanroom remediate.",
+  "type": "object",
+  "required": ["id", "source_type", "source_ref", "severity", "description", "assigned_to", "status", "created_utc"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^CR-REM-[0-9]{6}$" },
+    "source_type": { "type": "string", "enum": ["legal_finding", "similarity_finding"] },
+    "source_ref": { "type": "string", "description": "The legal-finding issue+jurisdiction or similarity-finding id this task was derived from." },
+    "severity": { "type": "string", "enum": ["blocking", "review_required"] },
+    "description": { "type": "string" },
+    "assigned_to": { "type": "string", "default": "implementation-team" },
+    "requirement_node_id": { "type": "string", "description": "The blocked requirement-graph node (kind=remediation) tracking this task, if any." },
+    "status": { "type": "string", "enum": ["open", "resolved_by_rescan", "resolved_by_override"] },
+    "created_utc": { "type": "string", "format": "date-time" },
+    "resolved_utc": { "type": "string", "format": "date-time" },
+    "override": {
+      "type": "object",
+      "description": "Present only when a human deliberately accepted residual risk instead of the underlying finding clearing on re-scan (Part LI).",
+      "properties": {
+        "by": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

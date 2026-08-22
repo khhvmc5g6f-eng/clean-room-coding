@@ -17,7 +17,7 @@ from typing import Any
 from cleanroom.contamination import Contamination
 from cleanroom.exit_codes import ContaminationFailure
 from cleanroom.schema_registry import validate
-from cleanroom.util import sha256_file, sha256_json, utc_now_iso
+from cleanroom.util import is_safe_regular_file, sha256_file, sha256_json, utc_now_iso
 
 MANIFEST_FILENAME = "HANDOFF_MANIFEST.json"
 HANDOFF_DOC_FILENAME = "CLEAN_ROOM_HANDOFF.md"
@@ -38,9 +38,15 @@ def build_manifest(
     files = []
     violations = []
     for path in sorted(zone_h.rglob("*")):
-        if path.is_dir() or path.name in (MANIFEST_FILENAME, HANDOFF_DOC_FILENAME, ".gitkeep"):
+        if path.is_dir() and not path.is_symlink():
+            continue
+        if path.name in (MANIFEST_FILENAME, HANDOFF_DOC_FILENAME, ".gitkeep"):
             continue
         rel = path.relative_to(zone_h).as_posix()
+        safe, reason = is_safe_regular_file(path, zone_h)
+        if not safe:
+            violations.append(f"{rel}: unsafe path, refusing to include in handoff ({reason})")
+            continue
         level = file_contamination.get(rel)
         if level is None:
             violations.append(f"{rel}: no contamination classification recorded")
@@ -83,11 +89,15 @@ def sign_manifest(manifest: dict[str, Any], *, gpg_key_id: str | None = None) ->
     if available and a key id is supplied. Never fabricates a signature."""
     if not gpg_key_id or not shutil.which("gpg"):
         return manifest
-    result = subprocess.run(
-        ["gpg", "--local-user", gpg_key_id, "--detach-sign", "--armor", "--output", "-"],
-        input=manifest["manifest_hash"].encode("utf-8"),
-        capture_output=True,
-    )
+    try:
+        result = subprocess.run(
+            ["gpg", "--batch", "--pinentry-mode", "error", "--local-user", gpg_key_id, "--detach-sign", "--armor", "--output", "-"],
+            input=manifest["manifest_hash"].encode("utf-8"),
+            capture_output=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        return manifest
     if result.returncode == 0:
         manifest["signature"] = {
             "algorithm": "gpg-detached-armor-over-manifest_hash",

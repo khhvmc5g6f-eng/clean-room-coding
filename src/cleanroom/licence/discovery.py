@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from cleanroom.licence.spdx import KNOWN_IDENTIFIERS
+from cleanroom.util import is_safe_regular_file
 
 LICENCE_FILENAME_RE = re.compile(
     r"^(LICEN[CS]E|COPYING|NOTICE|COPYRIGHT)(\..*)?$", re.IGNORECASE
@@ -26,21 +27,31 @@ SPDX_HEADER_RE = re.compile(r"SPDX-License-Identifier:\s*([^\n\r]+)")
 # REUSE-IgnoreEnd
 
 # Distinctive fingerprints for the licences this v0.1 build understands deeply.
-# Order matters: more specific / more restrictive variants are checked first
-# so e.g. AGPL text isn't mis-fingerprinted as plain GPL.
-TEXT_FINGERPRINTS: list[tuple[str, list[str]]] = [
-    ("AGPL-3.0-only", ["GNU AFFERO GENERAL PUBLIC LICENSE", "Version 3"]),
-    ("GPL-3.0-only", ["GNU GENERAL PUBLIC LICENSE", "Version 3"]),
-    ("GPL-2.0-only", ["GNU GENERAL PUBLIC LICENSE", "Version 2"]),
-    ("LGPL-3.0-only", ["GNU LESSER GENERAL PUBLIC LICENSE", "Version 3"]),
-    ("LGPL-2.1-only", ["GNU LESSER GENERAL PUBLIC LICENSE", "Version 2.1"]),
-    ("MPL-2.0", ["Mozilla Public License Version 2.0"]),
-    ("Apache-2.0", ["Apache License", "Version 2.0"]),
-    ("MIT", ["Permission is hereby granted, free of charge"]),
-    ("BSD-3-Clause", ["Redistributions of source code must retain", "Neither the name"]),
-    ("BSD-2-Clause", ["Redistributions of source code must retain"]),
-    ("ISC", ["Permission to use, copy, modify, and/or distribute this software"]),
-    ("Unlicense", ["This is free and unencumbered software released into the public domain"]),
+# Each entry is (spdx_id, required_markers, excluded_markers). `excluded`
+# exists because some real license texts are proper supersets of another's
+# marker set -- e.g. the canonical AGPL-3.0 text's own preamble contains the
+# phrase "the ordinary GNU General Public License, version 3", which
+# satisfies GPL-3.0-only's markers too; canonical BSD-3-Clause text contains
+# BSD-2-Clause's entire marker phrase as a strict substring. Without the
+# exclusion, both fingerprints match simultaneously and the finding is
+# reported as "conflicting" for completely unambiguous, mainstream licence
+# text -- verified empirically against the real gnu.org AGPL-3.0/GPL-2.0/
+# LGPL texts and a canonical BSD-3-Clause file (see
+# tests/unit/test_licence_discovery.py's real-license-text regression tests).
+TEXT_FINGERPRINTS: list[tuple[str, list[str], list[str]]] = [
+    ("AGPL-3.0-only", ["GNU AFFERO GENERAL PUBLIC LICENSE", "Version 3"], []),
+    ("GPL-3.0-only", ["GNU GENERAL PUBLIC LICENSE", "Version 3"], ["GNU AFFERO GENERAL PUBLIC LICENSE"]),
+    ("GPL-2.0-only", ["GNU GENERAL PUBLIC LICENSE", "Version 2"], ["GNU AFFERO GENERAL PUBLIC LICENSE", "GNU LESSER GENERAL PUBLIC LICENSE"]),
+    ("LGPL-3.0-only", ["GNU LESSER GENERAL PUBLIC LICENSE", "Version 3"], []),
+    ("LGPL-2.1-only", ["GNU LESSER GENERAL PUBLIC LICENSE", "Version 2.1"], []),
+    ("MPL-2.0", ["Mozilla Public License Version 2.0"], []),
+    ("Apache-2.0", ["Apache License", "Version 2.0"], []),
+    ("MIT", ["Permission is hereby granted, free of charge"], []),
+    ("BSD-3-Clause", ["Redistributions of source code must retain", "Neither the name"], []),
+    ("BSD-2-Clause", ["Redistributions of source code must retain"], ["Neither the name of"]),
+    ("ISC", ["Permission to use, copy, modify, and/or distribute this software"], []),
+    ("Unlicense", ["This is free and unencumbered software released into the public domain"], []),
+    ("BUSL-1.1", ["Business Source License 1.1"], []),
 ]
 
 MANIFEST_FILENAMES = {"package.json", "pyproject.toml", "Cargo.toml", "composer.json"}
@@ -64,9 +75,13 @@ class LicenceFinding:
 
 def _fingerprint_text(text: str) -> list[str]:
     matches = []
-    for spdx_id, markers in TEXT_FINGERPRINTS:
-        if all(marker.lower() in text.lower() for marker in markers):
-            matches.append(spdx_id)
+    lowered = text.lower()
+    for spdx_id, markers, excluded in TEXT_FINGERPRINTS:
+        if not all(marker.lower() in lowered for marker in markers):
+            continue
+        if any(marker.lower() in lowered for marker in excluded):
+            continue
+        matches.append(spdx_id)
     return matches
 
 
@@ -83,6 +98,8 @@ def _scan_licence_files(root: Path) -> list[LicenceFinding]:
         if path.is_dir() or any(part in IGNORE_DIRNAMES for part in path.parts):
             continue
         if not LICENCE_FILENAME_RE.match(path.name):
+            continue
+        if not is_safe_regular_file(path, root)[0]:
             continue
         text = _read_text(path)
         detected = _fingerprint_text(text)
@@ -111,6 +128,8 @@ def _scan_spdx_headers(root: Path, source_extensions: set[str]) -> list[LicenceF
             continue
         if path.suffix not in source_extensions:
             continue
+        if not is_safe_regular_file(path, root)[0]:
+            continue
         head = _read_text(path, limit=2000)
         match = SPDX_HEADER_RE.search(head)
         if not match:
@@ -136,6 +155,8 @@ def _scan_manifests(root: Path) -> list[LicenceFinding]:
         if path.is_dir() or path.name not in MANIFEST_FILENAMES:
             continue
         if any(part in IGNORE_DIRNAMES for part in path.parts):
+            continue
+        if not is_safe_regular_file(path, root)[0]:
             continue
         rel = path.relative_to(root).as_posix()
         declared = None

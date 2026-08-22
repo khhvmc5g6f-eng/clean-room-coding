@@ -213,8 +213,8 @@ def _saas_network_provision(bundle: CaseBundle) -> dict[str, Any]:
 # Issues not yet backed by a specific heuristic in v0.1 (patents, trademarks,
 # database_rights, confidentiality, trade_secrets, linking, licence_obligations,
 # derivative_work_question, contractual_permissions, distribution,
-# interoperability_provisions) are honestly reported UNKNOWN rather than
-# simulated with a fake heuristic. See ROADMAP.md.
+# interoperability_provisions, protected_expression) are honestly reported
+# UNKNOWN rather than simulated with a fake heuristic. See ROADMAP.md.
 _HEURISTICS: dict[str, Callable[[CaseBundle], list[dict[str, Any]]]] = {
     "lawful_access": lambda b: [_lawful_access(b)],
     "copyright_subsistence": lambda b: [_copyright_subsistence(b)],

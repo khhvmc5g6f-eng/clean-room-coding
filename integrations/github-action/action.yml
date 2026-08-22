@@ -1,9 +1,12 @@
 name: "Clean Room Coding"
 description: >-
-  Run Clean Room Coding's doctor/licence/audit/report checks against a
-  project and surface the results in CI. Never auto-approves a release --
-  MANUAL_REVIEW_REQUIRED (exit code 9) is treated as expected, not a
-  failure, because a human must always sign off before release.
+  Run Clean Room Coding's doctor/licence/audit/remediate/report checks
+  against a project and surface the results in CI. A blocking remediation
+  task (a RED legal finding or a material/suspicious similarity finding
+  routed back to the implementation team) fails the check. Never
+  auto-approves a release -- MANUAL_REVIEW_REQUIRED (exit code 9) is
+  treated as expected, not a failure, because a human must always sign
+  off before release.
 author: "Clean Room Coding Contributors"
 
 inputs:
@@ -85,6 +88,7 @@ runs:
         run_check doctor
         run_check licence
         run_check audit
+        run_check remediate
         run_check report
 
         if [ "$overall_failed" -ne 0 ]; then

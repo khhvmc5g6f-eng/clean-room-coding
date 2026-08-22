@@ -49,8 +49,17 @@ def load_config(path: Path) -> ProjectConfig:
     return ProjectConfig(path=path, data=data)
 
 
-def find_config(start: Path) -> Path:
-    """Search upward from `start` for .cleanroom.yml, like git does for .git."""
+def find_config(start: Path, *, explicit_path: Path | None = None) -> Path:
+    """Search upward from `start` for .cleanroom.yml, like git does for .git.
+
+    If `explicit_path` is given (the CLI's --config flag), it overrides
+    discovery entirely -- it must exist, or this raises immediately rather
+    than silently falling back to upward search.
+    """
+    if explicit_path is not None:
+        if not explicit_path.is_file():
+            raise ConfigurationError(f"--config was given as {explicit_path}, but that file does not exist.")
+        return explicit_path
     current = start.resolve()
     for candidate in [current, *current.parents]:
         candidate_file = candidate / DEFAULT_CONFIG_FILENAME
@@ -62,7 +71,7 @@ def find_config(start: Path) -> Path:
     )
 
 
-def default_config(project_name: str, project_id: str) -> dict[str, Any]:
+def default_config(project_name: str, project_id: str, *, target_language: str = "same-as-reference") -> dict[str, Any]:
     return {
         "schema_version": "1.0.0",
         "project": {"name": project_name, "id": project_id},
@@ -73,6 +82,7 @@ def default_config(project_name: str, project_id: str) -> dict[str, Any]:
             "strict_isolation": True,
         },
         "clean_room_level": "CR2",
+        "implementation": {"target_language": target_language},
         "jurisdiction": {"required_markets": ["gb"], "informational_markets": ["us"]},
         "dependency_policy": {
             "allowed_licences": ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC"],

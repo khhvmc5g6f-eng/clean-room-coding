@@ -7,8 +7,8 @@
   "required": ["id", "kind", "statement", "classification", "status"],
   "additionalProperties": false,
   "properties": {
-    "id": { "type": "string", "pattern": "^CR-(REQ|FEAT|SCR|API|BEH|IMPL|VER)-[0-9]{6}$" },
-    "kind": { "type": "string", "enum": ["requirement", "feature", "screen", "api", "acceptance_test", "implementation", "verification"] },
+    "id": { "type": "string", "pattern": "^CR-(REQ|FEAT|SCR|API|BEH|IMPL|VER|REM)-[0-9]{6}$" },
+    "kind": { "type": "string", "enum": ["requirement", "feature", "screen", "api", "acceptance_test", "implementation", "verification", "remediation"] },
     "statement": { "type": "string", "minLength": 1 },
     "classification": {
       "type": "string",

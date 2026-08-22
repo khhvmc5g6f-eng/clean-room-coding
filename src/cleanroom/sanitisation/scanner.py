@@ -34,7 +34,12 @@ PROMPT_INJECTION_MARKERS = re.compile(
     r"reveal your (system prompt|instructions))"
 )
 
-IDENTIFIER_RE = re.compile(r"\b([a-z]+(?:[A-Z][a-z0-9]*)+|[A-Z][a-zA-Z0-9]*[a-z])\b")
+# camelCase, PascalCase, or snake_case -- catching only camelCase/PascalCase
+# missed the majority of realistic leaks from Python/Rust/Ruby reference
+# material, which overwhelmingly uses snake_case.
+IDENTIFIER_RE = re.compile(
+    r"\b([a-z]+(?:[A-Z][a-z0-9]*)+|[A-Z][a-zA-Z0-9]*[a-z]|[a-z][a-z0-9]*(?:_[a-z0-9]+)+)\b"
+)
 
 
 @dataclass
@@ -114,12 +119,23 @@ def scan_identifier_overlap(text: str, reference_identifiers: set[str], *, min_l
 
 
 def scan_verbatim_overlap(text: str, reference_texts: list[str], *, min_run: int = 40) -> list[SanitisationFinding]:
-    """Flags any substring of >= min_run characters shared verbatim with reference documentation/source."""
+    """Flags any substring of >= min_run characters shared verbatim with
+    reference documentation/source. Checks EVERY offset (a stride-sampled
+    version previously missed runs whose length was close to min_run --
+    verified empirically: a run of exactly min_run chars had roughly a
+    1-in-(min_run/2) chance of landing on a sampled offset). Builds each
+    reference text's n-grams into a set once, so this is O(len(ref) +
+    len(text)*min_run) rather than O(len(text)/step * len(ref))."""
     findings = []
+    seen_chunks: set[str] = set()
     for ref in reference_texts:
-        for i in range(0, max(len(text) - min_run, 0) + 1, min_run // 2 or 1):
+        if len(ref) < min_run:
+            continue
+        ref_ngrams = {ref[i : i + min_run] for i in range(len(ref) - min_run + 1)}
+        for i in range(len(text) - min_run + 1):
             chunk = text[i : i + min_run]
-            if len(chunk) == min_run and chunk in ref:
+            if chunk in ref_ngrams and chunk not in seen_chunks:
+                seen_chunks.add(chunk)
                 findings.append(
                     SanitisationFinding(
                         category="verbatim_text_overlap",
