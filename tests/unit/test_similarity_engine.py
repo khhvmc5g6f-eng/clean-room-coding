@@ -50,6 +50,49 @@ def test_max_comparisons_cap_reports_skipped_not_silently(tmp_path: Path):
     assert result["comparisons_skipped"] == 3
 
 
+def test_duplicate_basename_in_reference_tree_is_not_silently_dropped(tmp_path: Path):
+    """Regression test: a single-file-per-name dict previously collapsed
+    multiple reference files sharing a basename (e.g. 'utils.py' in two
+    different reference directories) to whichever sorted last, silently
+    losing any comparison against the other(s). Both must be matched."""
+    ref = tmp_path / "ref"
+    impl = tmp_path / "impl"
+    (ref / "dir_a").mkdir(parents=True)
+    (ref / "dir_b").mkdir(parents=True)
+    impl.mkdir()
+    (ref / "dir_a" / "utils.py").write_text("def a(): pass\n", encoding="utf-8")
+    (ref / "dir_b" / "utils.py").write_text("def b(): pass\n", encoding="utf-8")
+    (impl / "utils.py").write_text("def a(): pass\n", encoding="utf-8")
+
+    result = compare_trees(ref, impl)
+    assert result["files_matched_by_name"] == 2  # matched against BOTH same-named ref files
+    assert result["comparisons_run"] == 2
+
+
+def test_all_pairs_truncation_is_not_biased_toward_first_impl_file(tmp_path: Path):
+    """Regression test: a flat slice of all-pairs previously gave earlier
+    (by sort order) unmatched impl files full reference coverage while
+    later ones got none at all. Round-robin must give every unmatched impl
+    file at least one comparison before any gets a second, when the budget
+    allows it."""
+    ref = tmp_path / "ref"
+    impl = tmp_path / "impl"
+    ref.mkdir()
+    impl.mkdir()
+    (ref / "r0.py").write_text("def r0(): pass\n", encoding="utf-8")
+    (ref / "r1.py").write_text("def r1(): pass\n", encoding="utf-8")
+    (impl / "a_first.py").write_text("def a(): pass\n", encoding="utf-8")
+    (impl / "z_last.py").write_text("def z(): pass\n", encoding="utf-8")
+
+    # Budget for exactly 2 comparisons out of 4 possible (2 impl x 2 ref).
+    # compare_trees doesn't expose the raw pairs directly, so infer from
+    # findings which impl files were compared at all.
+    result = compare_trees(ref, impl, max_comparisons=2)
+    compared_impl_names = {f["implementation_ref"] for f in result["findings"]}
+    assert "a_first.py" in compared_impl_names
+    assert "z_last.py" in compared_impl_names
+
+
 def test_findings_have_both_lexical_and_structural_methods(tmp_path: Path):
     ref = tmp_path / "ref"
     impl = tmp_path / "impl"

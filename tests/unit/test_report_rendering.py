@@ -63,3 +63,17 @@ def test_pdf_report_generates_valid_file(tmp_path: Path):
     data = path.read_bytes()
     assert data[:5] == b"%PDF-"
     assert len(data) > 500
+
+
+def test_pdf_report_handles_unicode_punctuation_without_crashing(tmp_path: Path):
+    """Regression test: fpdf2's core fonts (Helvetica/Courier) only support
+    Latin-1. An em dash, curly quotes, or an ellipsis in ordinary
+    human-entered project metadata or LLM-authored finding text previously
+    crashed `cleanroom report --pdf` outright with
+    FPDFUnicodeEncodingException. Must render without raising."""
+    cert = _sample_certificate()
+    cert["project"] = "Demo — with an em dash and ‘curly quotes’"
+    cert["outstanding_issues"] = ["contains an ellipsis… and a bullet •"]
+    path = render_pdf_report(cert, tmp_path / "unicode-report.pdf")
+    assert path.is_file()
+    assert path.read_bytes()[:5] == b"%PDF-"

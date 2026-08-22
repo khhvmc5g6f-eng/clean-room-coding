@@ -97,7 +97,17 @@ def reconcile(
 
     for key, task in by_key.items():
         if key in expected:
-            reconciled.append(task)  # still triggers -- leave as-is (open, or already resolved).
+            if task["status"] == "resolved_by_rescan":
+                # The underlying finding cleared once (hence resolved_by_rescan)
+                # and has now reappeared -- a regression. Re-open it; do NOT
+                # touch resolved_by_override, which is a deliberate human
+                # decision that must survive a finding reappearing (see
+                # apply_override's docstring/design).
+                task = dict(task)
+                task["status"] = "open"
+                task["description"] = expected[key]["description"]
+                task.pop("resolved_utc", None)
+            reconciled.append(task)
             continue
         if task["status"] == "open":
             task = dict(task)
@@ -105,12 +115,23 @@ def reconcile(
             task["resolved_utc"] = now
         reconciled.append(task)
 
+    # New tasks get the next number after the highest ID already in use.
+    # IDs are assigned ONCE, here, and never recomputed on a later
+    # reconcile() call -- `apply_override` matches on `id`, so an ID must
+    # stay valid across runs regardless of insertion order or how many
+    # tasks clear/reopen in between (previously this renumbered every
+    # task from scratch on every call, which could -- under same-tick
+    # timestamp collisions -- silently shift which finding an id pointed
+    # at between one `remediate` run and the next).
+    existing_numbers = [int(t["id"].rsplit("-", 1)[1]) for t in reconciled if t.get("id")]
+    next_number = max(existing_numbers, default=0) + 1
+
     for key, meta in expected.items():
         if key in by_key:
             continue
         reconciled.append(
             {
-                "id": f"CR-REM-{len(reconciled) + 1:06d}",
+                "id": f"CR-REM-{next_number:06d}",
                 "source_type": meta["source_type"],
                 "source_ref": meta["source_ref"],
                 "severity": meta["severity"],
@@ -120,11 +141,9 @@ def reconcile(
                 "created_utc": now,
             }
         )
+        next_number += 1
 
-    # Re-number deterministically so IDs stay stable/sorted regardless of insertion order.
-    reconciled.sort(key=lambda t: (t["created_utc"], t["source_type"], t["source_ref"]))
-    for i, task in enumerate(reconciled, start=1):
-        task["id"] = f"CR-REM-{i:06d}"
+    reconciled.sort(key=lambda t: (t["created_utc"], t["id"]))
     return reconciled
 
 

@@ -160,6 +160,116 @@ and this pass fixed:
   whole file on every append (was O(n^2) over a ledger's lifetime); the
   gpg signing subprocess now has a timeout and runs non-interactively.
 
+## Second review pass (2026-08-22) -- code added after the first pass, fixed
+
+A follow-up review specifically covering code written after the first pass
+above (the similarity engine's CLI wiring, the remediation loop, AI-model
+suggestion, and the PDF/HTML report renderers), plus a full legal-citation
+fact-check and a Skill-accuracy audit, found and this pass fixed:
+
+- **Critical (correctness): a regressed finding stayed silently resolved
+  forever.** `legal/remediation.py`'s `reconcile()` only ever transitioned
+  an `open` task to `resolved_by_rescan`; if a finding that had already
+  cleared (and was marked `resolved_by_rescan`) reappeared later (a fix
+  reverted, a regression reintroduced), the task was left
+  `resolved_by_rescan` and never reopened -- `cleanroom release` would
+  silently stop blocking on a live RED finding. Confirmed by direct
+  reproduction before fixing. Fixed: a `resolved_by_rescan` task whose
+  finding reappears is now reopened; a `resolved_by_override` task
+  (a deliberate human decision) correctly never auto-reopens.
+- **Critical (correctness): `cleanroom report --pdf` crashed on ordinary
+  human-entered text.** fpdf2's core fonts only support Latin-1; a
+  project name or finding description containing an em dash, curly
+  quotes, or an ellipsis (routine in both human-entered `.cleanroom.yml`
+  metadata and LLM-authored legal/similarity finding text) raised
+  `FPDFUnicodeEncodingException` and crashed the report outright.
+  Confirmed by direct reproduction. Fixed by downgrading common Unicode
+  punctuation to ASCII equivalents and falling back to safe replacement
+  for anything else, applied centrally to every `cell`/`multi_cell` call.
+- Remediation task IDs were recomputed by sort position on every
+  `reconcile()` call rather than assigned once; under same-tick timestamp
+  collisions (rapid re-runs, a frozen clock in tests) a human's recorded
+  `--override <id>` could silently apply to a different finding after a
+  later run. Fixed: IDs are now assigned once at creation and never
+  reassigned.
+- `similarity/engine.py` matched at most one same-named reference file per
+  basename (a dict keyed by filename, last-sorted-wins), silently losing
+  a comparison against any other reference file sharing that basename
+  (e.g. two different reference directories both containing `utils.py`) --
+  contradicting the module's own "never silently dropped" documentation.
+  Fixed: an impl file now matches every same-named reference file.
+- `similarity/engine.py`'s all-pairs fallback truncated with a flat slice
+  ordered by impl-file sort position, so hitting `--max-comparisons` could
+  give an early-sorted impl file full reference coverage while a
+  later-sorted one -- which could just as plausibly be the copied one --
+  got none. Fixed with round-robin distribution across unmatched impl
+  files.
+- `similarity/structural.py`'s generic (non-Python) fallback matched
+  keywords by substring/prefix, misreading `"iffy"`, `"definitely(...)"`,
+  `"classList.add(...)"` as `if`/`def`/`class` control-flow structure, and
+  clamped only the *emitted* depth value while letting the internal
+  counter go negative on a stray unmatched bracket (plausible inside a
+  string/comment, since this fallback does no comment/string stripping),
+  permanently offsetting every subsequent line's signature. Fixed with a
+  word-boundary regex and by clamping the counter itself; also extended
+  the keyword list to cover Go/Rust/Ruby (`func`, `fn`/`match`/`loop`,
+  `elsif`/`unless`/`until`), which the module is explicitly routed to
+  handle but previously had no vocabulary for.
+- `ai/suggest.py`'s Hub-licence-to-SPDX table was missing several common,
+  *legitimate* SPDX identifiers (`CC-BY-NC-4.0`, `WTFPL`, `OFL-1.1`,
+  `LGPL-2.1-only`), which the fix adds -- while deliberately continuing to
+  leave model-specific "Responsible AI License" tags (`openrail`,
+  `llama2`/`llama3`, `bigscience-openrail-m`, etc.) unmapped, since they
+  carry real use-restrictions with no honest SPDX equivalent.
+- **`sanitisation/differential.py` (the RAW_ANALYSIS/SANITISED_SPECIFICATION
+  differential record, Part XXI) was fully implemented but never called
+  from anywhere** -- `cleanroom sanitise` built its own ad-hoc dict instead
+  of using it, meaning the differential record ADR-0002 documents as part
+  of the three-zone model didn't actually exist in the live pipeline.
+  Fixed: `cleanroom sanitise` now builds and persists a real
+  `SanitisationReport`/`DifferentialEntry` record (each blocking finding
+  becomes an explicit "removed" entry with its reason).
+- Two legal citation errors, found by an independent fact-check against
+  primary sources (legislation.gov.uk, copyright.gov, CourtListener,
+  BAILII, MariaDB's own BUSL FAQ) that verified ~30 claims total: IBCOS
+  Computers Ltd v Barclays Highland Finance Ltd was missing "Mercantile"
+  from the party name; Oracle America, Inc. v. Google LLC, 593 U.S. ___
+  (2021) had the wrong party order and an unfinalised reporter citation
+  (the Supreme Court case is Google LLC v. Oracle America, Inc., 593 U.S.
+  1 (2021) -- Google was petitioner). Both fixed. Every other citation and
+  every licence-pack mechanic checked out accurate.
+- The Skill's own documentation had drifted from the code it describes:
+  `references/exit-codes.md` wrongly said `SIMILARITY_FAILURE` (7) was
+  "not yet wired" (it has been, since `cleanroom similarity` was added,
+  and this directly contradicted SKILL.md's own phase 11); `cleanroom
+  verify` and `cleanroom status` were never mentioned anywhere in the
+  skill despite being real, shipped commands; the licence-pack count was
+  stale at four in two places (BUSL-1.1 makes it five). All fixed.
+
+**Confirmed as genuinely orphaned, left as a documented decision rather
+than force-fixed:** `orchestration/heartbeat.py` (Part XXVIII stall/loop
+detection) has no caller anywhere in the codebase and 0% test coverage --
+unlike `differential.py`, it has no natural single-shot CLI hook (it's
+designed to consume a live tick-by-tick observation stream from an
+orchestration harness running multiple agents over time, which this
+stateless CLI doesn't have a producer for yet). It's well-written and
+documented, but not wired to anything real. Wiring it in properly needs an
+actual multi-agent orchestration harness to feed it ticks -- tracked as a
+roadmap item, not silently removed or silently claimed as functional.
+
+**Deferred (real, lower-priority findings from the same review, not yet
+acted on):** `similarity/negative_control.py`'s `background_scores`
+recomputes every negative-control file's score for every (reference,
+implementation) pair rather than caching per implementation file (real
+but pure performance, not correctness); `structural_method` (`python_ast`
+vs `generic_fallback`) is recorded on each finding but not yet consulted
+by `classify()` to down-weight the weaker fallback's findings relative to
+real AST comparisons; the PDF jurisdiction table renders row-by-row with
+manual `cell()` calls, so a page break could in principle land mid-row
+without a repeated header (fpdf2's built-in table API would fix this more
+robustly than a manual patch); `ai/suggest.py`'s Hub search call has no
+explicit timeout.
+
 ## Competitive landscape (researched 2026-08-22)
 
 A research pass across GitHub and Hugging Face found no existing tool
@@ -171,24 +281,71 @@ scanning, similarity engine, SBOM, or evidence ledger. Concrete, real
 opportunities to strengthen this project by depending on established
 libraries rather than hand-rolled logic, in priority order:
 
-1. **`license-expression`** (aboutcode-org) -- a mature, complete SPDX
-   expression parser/normaliser. Could replace `licence/spdx.py`'s
-   deliberately minimal ~30-identifier parser.
-2. **ScanCode Toolkit** (aboutcode-org) -- an industry-standard licence-
-   text-matching engine (tens of thousands of rules, confidence scoring)
-   that could replace or augment `licence/discovery.py`'s hand-rolled
-   text fingerprints, which this pass's bug (see above) shows are fragile
-   against real-world text.
-3. **`spdx-tools`** / **`cyclonedx-python`** -- official libraries for
-   emitting spec-valid SPDX/CycloneDX documents, in place of the
-   hand-rolled serialisation in `provenance/sbom.py`.
-4. **tree-sitter** (via `ast-grep-py` or `py-tree-sitter` directly) -- real
-   multi-language parsing to replace the generic bracket/keyword
-   structural-similarity fallback for JS/Go/Rust/Java. Dolos (a modern
-   MOSS/JPlag-style tool) uses exactly this architecture and is a good
-   blueprint.
+A follow-up pass (2026-08-22) turned each of the four candidates below into
+a concrete, verified integration plan (real current PyPI versions/licences,
+actual API signatures fetched from source, and an effort estimate) rather
+than a bare "worth considering":
+
+1. **`license-expression`** (PyPI `license-expression`, v30.4.4, Apache-2.0)
+   -- would replace `licence/spdx.py`. `Licensing(symbols=[...]).validate(expr)`
+   returns an `ExpressionInfo(errors, invalid_symbols, normalized_expression)`
+   that maps closely onto this project's known/unknown split, and unknown
+   identifiers fall through permissively (no exception) unless
+   `validate=True` is requested -- matching this project's "never silently
+   turn uncertainty into certainty" design. The one real gap: `parse()`
+   returns a nested boolean-algebra tree, not the flat, appearance-ordered
+   `operators` list `spdx.py` currently exposes -- needs a small tree-walk
+   adapter or keeping the existing regex tokenizer just for that field.
+   **Effort: ~1-2 days** (a genuine compatibility shim, not a drop-in).
+2. **ScanCode Toolkit** (PyPI `scancode-toolkit`, v32.5.0, and a lighter
+   `scancode-toolkit-mini` twin; both `Apache-2.0 AND CC-BY-4.0 AND
+   LicenseRef-scancode-other-permissive AND LicenseRef-scancode-other-copyleft`
+   for bundled third-party reference license *text*, not the code itself)
+   -- would replace/augment `licence/discovery.py`'s hand-rolled text
+   fingerprints, whose exact failure mode (see the second review pass
+   above -- BSD-3/BSD-2 and AGPL/GPL-3.0 substring collisions) is
+   structurally what ScanCode's real rule-based/n-gram matcher with
+   `min_score`/`match_coverage` thresholds is built to avoid. Its
+   `scancode.api.get_licenses(path)` returns SPDX expressions natively
+   plus a numeric `score`/`match_coverage`/`rule_relevance` per match (no
+   confidence enum -- needs a bucketing scheme), and it operates on a file
+   path only (no in-memory string API). Confirmed heavy: ~40 transitive
+   dependencies (lxml, pdfminer.six, pefile, etc.) even in the "mini"
+   variant -- this is real, not just reputation. **Recommendation: make it
+   an optional `[licensecheck]` extra, not a base dependency; effort ~1-2
+   days for a thin adapter + tests.**
+3. **`spdx-tools`** (PyPI `spdx-tools`, v0.8.5, Apache-2.0) and
+   **`cyclonedx-python-lib`** (PyPI `cyclonedx-python-lib`, v11.12.0,
+   Apache-2.0 -- note this is the *library*, distinct from the
+   `cyclonedx-bom` CLI package, which does real transitive dependency
+   resolution and would be scope creep beyond this project's documented
+   direct-deps-only v0.1 design) -- both would replace the hand-rolled
+   dict serialisation in `provenance/sbom.py` with typed models
+   (`Document`/`Package`/`Relationship`; `Bom`/`Component`) plus a real
+   schema validator (`validate_full_spdx_document`;
+   `JsonStrictValidator(SchemaVersion.V1_5)`) gained for free.
+   `discover_dependencies()` stays untouched; only `to_spdx`/`to_cyclonedx`/
+   `save` change. **Effort: ~1.5-2 days combined**, low risk -- the main
+   surprise risk is the libraries' stricter validation surfacing latent
+   bugs (e.g. a malformed purl) the current permissive code accepts
+   silently.
+4. **`ast-grep-py`** (PyPI `ast-grep-py`, v0.45.1, MIT) -- confirmed the
+   clear winner over `py-tree-sitter` for the generic structural-similarity
+   fallback: JavaScript, Go, Rust and Java are all in ast-grep's built-in
+   language table (a single compiled wheel, no per-language grammar
+   packages to install/version separately, unlike `py-tree-sitter` where
+   `tree-sitter-java`'s grammar package is confirmed stalled at Dec 2024
+   versus the others' 2025/2026 releases -- a real per-language
+   maintenance-drift risk `ast-grep-py` avoids). `SgRoot(source,
+   lang).root().kind()` / `.children()` maps directly onto the existing
+   `type(node).__name__` walk pattern used for Python. **Effort: ~half a
+   day to a day total for all four languages** once one
+   `<lang>_structural_shape()` wrapper exists, since ast-grep normalizes
+   the API across languages -- the remaining per-language cost is
+   validating that each grammar's node-kind vocabulary shingles sensibly,
+   not writing new code per language.
 5. **SLSA build provenance / in-toto attestations** -- not yet
-   implemented (the original banner draft overstated this; corrected).
+   implemented (an earlier banner draft overstated this; corrected).
    Genuinely buildable next: GitHub's native
    `actions/attest-build-provenance` action produces real SLSA provenance
    (itself an in-toto-format attestation) for anything built in the
@@ -196,6 +353,10 @@ libraries rather than hand-rolled logic, in priority order:
    evidence ledger's hash-chained events are conceptually close to
    in-toto's "link" metadata; an export from the ledger to real in-toto
    link files is a natural fit for this project's own architecture.
+
+None of these four libraries are integrated yet -- each is a real
+dependency/architecture decision for the project's maintainer(s) to make
+deliberately, not something to silently swap in.
 
 None of these are integrated yet -- doing so is a deliberate future
 decision, not a silent gap, since each is a real dependency/architecture
@@ -266,14 +427,28 @@ change that should be evaluated on its own.
 1. Wire `PathGuard.check()` into a real per-agent file-access path for
    whatever orchestration harness this library is embedded in (the
    remaining piece of the isolation-enforcement gap above).
-2. Depend on `license-expression` and/or ScanCode Toolkit instead of the
-   hand-rolled SPDX parser and licence-text fingerprints.
-3. More legal-issue heuristics (particularly `distribution`,
+2. Depend on `license-expression` (~1-2 days) and/or ScanCode Toolkit as an
+   optional extra (~1-2 days) instead of the hand-rolled SPDX parser and
+   licence-text fingerprints -- see "Competitive landscape" for the
+   verified effort estimates and the one real gap in each (flat operator
+   list; heavy transitive dependency tree).
+3. `ast-grep-py`-based structural similarity for JS/Go/Rust/Java
+   (~half a day to a day for all four -- see "Competitive landscape").
+4. More legal-issue heuristics (particularly `distribution`,
    `licence_obligations`, `derivative_work_question`, since those close
    the loop with the licence-discovery/policy layer that already exists).
-4. A third jurisdiction pack (EU, as the design brief's next most-requested).
-5. Transitive dependency resolution for SBOM generation.
-6. Automatic clean-room-level computation from project state.
-7. SLSA build provenance via `actions/attest-build-provenance` in the
+5. A third jurisdiction pack (EU, as the design brief's next most-requested).
+6. `spdx-tools`/`cyclonedx-python-lib` for spec-valid, schema-validated SBOM
+   output in place of the hand-rolled serialisation (~1.5-2 days combined).
+7. Transitive dependency resolution for SBOM generation.
+8. Automatic clean-room-level computation from project state.
+9. SLSA build provenance via `actions/attest-build-provenance` in the
    release workflow.
-8. tree-sitter-based structural similarity for JS/Go/Rust/Java.
+10. Cache `similarity/negative_control.py`'s background scores per
+    implementation file rather than recomputing per (reference,
+    implementation) pair, and make `classify()` down-weight findings whose
+    `structural_method` is `generic_fallback` rather than real AST
+    comparison.
+11. Decide `orchestration/heartbeat.py`'s fate: build a real multi-agent
+    orchestration harness that can feed it observation ticks, or remove it
+    -- it is currently well-written but genuinely unused.

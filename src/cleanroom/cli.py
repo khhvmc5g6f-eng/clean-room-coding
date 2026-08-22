@@ -48,6 +48,7 @@ from cleanroom.report import (
     save_certificate,
 )
 from cleanroom.sanitisation import scanner as sanitisation_scanner
+from cleanroom.sanitisation.differential import DifferentialEntry, SanitisationReport
 from cleanroom.schema_registry import schema_dir
 from cleanroom.similarity import engine as similarity_engine
 from cleanroom.specification.behavioral import BehavioralSuite
@@ -440,26 +441,38 @@ def add_behavioral(ctx: Ctx, given: str, when: str, then: str, requirement_ids: 
 @click.argument("path", type=click.Path(exists=True, path_type=Path))
 @pass_ctx
 def sanitise(ctx: Ctx, path: Path) -> None:
-    """Parts XX-XXI: scan a candidate handoff document; block on secrets/verbatim overlap."""
+    """Parts XX-XXI: scan a candidate handoff document; block on secrets/
+    verbatim overlap. Persists a real SanitisationReport (the raw-analysis/
+    sanitised-specification differential -- what would be removed, and
+    why) rather than just the raw finding list."""
     project = ctx.load_project()
     text = path.read_text(encoding="utf-8", errors="replace")
     findings = sanitisation_scanner.scan(text)
     blocked = sanitisation_scanner.is_handoff_blocked(findings)
-    report = {
-        "source_document": str(path),
-        "findings": [f.to_dict() for f in findings],
-        "blocked": blocked,
-    }
+    differential_report = SanitisationReport(
+        source_document=str(path),
+        raw_analysis_ref=str(path),
+        findings=findings,
+        entries=[
+            DifferentialEntry(
+                raw_excerpt=f.excerpt,
+                sanitised_excerpt=None,
+                action="removed",
+                reason=f.detail,
+            )
+            for f in findings
+            if f.severity == "blocking"
+        ],
+    )
     report_path = project.root / "evidence" / "sanitisation-reports" / f"{path.name}.json"
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(jsonlib.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+    differential_report.save(report_path)
     project.evidence.append(
         actor=Actor(type="tool", id="cleanroom-sanitisation-scanner"),
         action="cleanroom sanitise",
         result="denied" if blocked else "success",
         detail=str(path),
     )
-    ctx.emit(report)
+    ctx.emit(differential_report.to_dict())
     if blocked:
         ctx.fail(ContaminationFailure(f"{path} contains blocking sanitisation findings; see {report_path}"))
 

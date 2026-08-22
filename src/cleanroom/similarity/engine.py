@@ -44,27 +44,49 @@ class ComparisonPlan:
 def _plan_pairs(reference_root: Path, implementation_root: Path, *, max_comparisons: int) -> ComparisonPlan:
     ref_files = _source_files(reference_root)
     impl_files = _source_files(implementation_root)
-    ref_by_name = {f.name: f for f in ref_files}
+
+    # A basename can legitimately appear more than once in the reference
+    # tree (e.g. "utils.py" in two different reference directories) -- a
+    # single-file dict here previously kept only the last one sorted,
+    # silently losing a comparison against the other(s) without ever
+    # counting it in `skipped`. Match against every same-named candidate.
+    ref_by_name: dict[str, list[Path]] = {}
+    for f in ref_files:
+        ref_by_name.setdefault(f.name, []).append(f)
 
     pairs: list[tuple[Path, Path]] = []
     matched_by_name = 0
     unmatched_impl: list[Path] = []
     for impl_file in impl_files:
-        ref_match = ref_by_name.get(impl_file.name)
-        if ref_match is not None:
-            pairs.append((ref_match, impl_file))
-            matched_by_name += 1
+        ref_matches = ref_by_name.get(impl_file.name)
+        if ref_matches:
+            for ref_match in ref_matches:
+                pairs.append((ref_match, impl_file))
+                matched_by_name += 1
         else:
             unmatched_impl.append(impl_file)
 
     skipped = 0
     if unmatched_impl and ref_files:
         remaining_budget = max(max_comparisons - len(pairs), 0)
-        all_pairs = [(r, i) for i in unmatched_impl for r in ref_files]
-        if len(all_pairs) > remaining_budget:
-            skipped = len(all_pairs) - remaining_budget
-            all_pairs = all_pairs[:remaining_budget]
-        pairs.extend(all_pairs)
+        # Round-robin across unmatched impl files rather than a flat slice
+        # ordered by impl file: a flat slice can give early-sorted impl
+        # files full ref coverage while later-sorted ones get none at all,
+        # even though a copied file could be any of them. Round-robin
+        # spreads the budget so truncation isn't file-order-biased.
+        per_impl_pairs = [[(r, i) for r in ref_files] for i in unmatched_impl]
+        budgeted: list[tuple[Path, Path]] = []
+        round_index = 0
+        while len(budgeted) < remaining_budget and any(per_impl_pairs):
+            for bucket in per_impl_pairs:
+                if round_index < len(bucket) and len(budgeted) < remaining_budget:
+                    budgeted.append(bucket[round_index])
+            round_index += 1
+            if round_index >= max((len(b) for b in per_impl_pairs), default=0):
+                break
+        total_available = sum(len(b) for b in per_impl_pairs)
+        skipped = total_available - len(budgeted)
+        pairs.extend(budgeted)
 
     return ComparisonPlan(pairs=pairs, matched_by_name=matched_by_name, skipped=skipped)
 

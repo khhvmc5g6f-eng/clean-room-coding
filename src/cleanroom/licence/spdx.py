@@ -25,8 +25,9 @@ KNOWN_IDENTIFIERS = {
     "LGPL-2.1-only", "LGPL-2.1-or-later", "LGPL-3.0-only", "LGPL-3.0-or-later",
     "AGPL-3.0-only", "AGPL-3.0-or-later",
     "MPL-2.0", "EPL-1.0", "EPL-2.0", "EUPL-1.2",
-    "Unlicense", "CC0-1.0", "CC-BY-4.0", "CC-BY-SA-4.0",
+    "Unlicense", "CC0-1.0", "CC-BY-4.0", "CC-BY-SA-4.0", "CC-BY-NC-4.0",
     "Python-2.0", "Zlib", "BSL-1.0", "Artistic-2.0", "BUSL-1.1",
+    "WTFPL", "OFL-1.1",
 }
 
 KNOWN_EXCEPTIONS = {"Classpath-exception-2.0", "GCC-exception-3.1", "OpenSSL-exception"}

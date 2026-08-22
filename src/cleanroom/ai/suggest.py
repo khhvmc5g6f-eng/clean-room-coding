@@ -121,8 +121,19 @@ def evaluate_against_policy(suggestions: list[ModelSuggestion], *, allowed: list
 _HUB_LICENCE_TO_SPDX = {
     "mit": "MIT", "apache-2.0": "Apache-2.0", "bsd-3-clause": "BSD-3-Clause",
     "bsd-2-clause": "BSD-2-Clause", "isc": "ISC", "gpl-3.0": "GPL-3.0-only",
-    "gpl-2.0": "GPL-2.0-only", "lgpl-3.0": "LGPL-3.0-only", "agpl-3.0": "AGPL-3.0-only",
-    "mpl-2.0": "MPL-2.0", "cc0-1.0": "CC0-1.0", "unlicense": "Unlicense",
+    "gpl-2.0": "GPL-2.0-only", "lgpl-3.0": "LGPL-3.0-only", "lgpl-2.1": "LGPL-2.1-only",
+    "agpl-3.0": "AGPL-3.0-only", "mpl-2.0": "MPL-2.0", "cc0-1.0": "CC0-1.0",
+    "unlicense": "Unlicense", "cc-by-4.0": "CC-BY-4.0", "cc-by-sa-4.0": "CC-BY-SA-4.0",
+    "cc-by-nc-4.0": "CC-BY-NC-4.0", "wtfpl": "WTFPL", "ofl-1.1": "OFL-1.1",
+    # Deliberately NOT mapped: "openrail", "creativeml-openrail-m", "llama2",
+    # "llama3", "gemma", "bigscience-openrail-m", "bigscience-bloom-rail-1.0"
+    # and similar model-specific "Responsible AI License" (RAIL) tags. These
+    # carry real use-restrictions (e.g. field-of-use limits) with no SPDX
+    # equivalent -- forcing one onto the closest-sounding permissive/
+    # copyleft SPDX id would fabricate a conclusion this project's own
+    # policy engine could then wrongly report as "allowed". Correctly
+    # falling through to `None` -> policy status "unknown" here is the
+    # honest behaviour, not a gap to fill.
 }
 
 

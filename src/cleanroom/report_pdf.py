@@ -26,8 +26,36 @@ _DECISION_RGB = {
     "GREEN": (30, 125, 50),
 }
 
+# fpdf2's core fonts (Helvetica, Courier) only support Latin-1. Any of the
+# text rendered here can be ordinary human-entered project metadata or
+# LLM-authored legal/similarity finding text -- neither is guaranteed
+# ASCII (an em dash or curly quote from either source previously crashed
+# `cleanroom report --pdf` outright with FPDFUnicodeEncodingException,
+# confirmed via a regression test with a real em dash in a project name).
+# Common punctuation is downgraded to a readable ASCII equivalent first;
+# anything else outside Latin-1 (e.g. non-Latin scripts) falls back to
+# best-effort transliteration so the report renders instead of crashing.
+_UNICODE_DOWNGRADES = {
+    "—": "--", "–": "-", "‘": "'", "’": "'",
+    "“": '"', "”": '"', "…": "...", "•": "-",
+    " ": " ",
+}
+
+
+def _safe_text(value: Any) -> str:
+    text = str(value)
+    for char, replacement in _UNICODE_DOWNGRADES.items():
+        text = text.replace(char, replacement)
+    return text.encode("latin-1", "replace").decode("latin-1")
+
 
 class _ReportPDF(FPDF):
+    def cell(self, w=None, h=None, text: str = "", *args: Any, **kwargs: Any):
+        return super().cell(w, h, _safe_text(text), *args, **kwargs)
+
+    def multi_cell(self, w: float, h: float | None = None, text: str = "", *args: Any, **kwargs: Any):
+        return super().multi_cell(w, h, _safe_text(text), *args, **kwargs)
+
     def header(self) -> None:
         self.set_font("Helvetica", "B", 14)
         self.cell(0, 10, "Clean Room Coding -- Final Report", ln=True)

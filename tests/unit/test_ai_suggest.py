@@ -40,8 +40,17 @@ def test_classify_unknown_when_evidence_insufficient():
 def test_normalise_hub_licence_maps_known_ids():
     assert _normalise_hub_licence("mit") == "MIT"
     assert _normalise_hub_licence("apache-2.0") == "Apache-2.0"
-    assert _normalise_hub_licence("cc-by-nc-4.0") is None  # unmapped -- must not guess
+    assert _normalise_hub_licence("cc-by-nc-4.0") == "CC-BY-NC-4.0"  # a real SPDX id
     assert _normalise_hub_licence(None) is None
+
+
+def test_normalise_hub_licence_never_guesses_a_rail_style_licence():
+    # "openrail"/"llama2"/etc. are real Hub licence tags with genuine
+    # use-restrictions but NO SPDX equivalent -- must stay unmapped rather
+    # than be forced onto the nearest-sounding SPDX id.
+    assert _normalise_hub_licence("openrail") is None
+    assert _normalise_hub_licence("llama2") is None
+    assert _normalise_hub_licence("bigscience-openrail-m") is None
 
 
 def test_search_models_maps_hub_response(monkeypatch):
@@ -73,7 +82,7 @@ def test_search_models_maps_hub_response(monkeypatch):
 def test_evaluate_against_policy_never_fabricates_status_for_unmapped_licence():
     fake_model = SimpleNamespace(
         id="org/model", pipeline_tag="text-classification", library_name="transformers",
-        downloads=1, likes=1, tags=["license:cc-by-nc-4.0"], siblings=[],
+        downloads=1, likes=1, tags=["license:openrail"], siblings=[],
     )
 
     class FakeApi:
@@ -84,4 +93,4 @@ def test_evaluate_against_policy_never_fabricates_status_for_unmapped_licence():
         suggestions = search_models("x", limit=1)
 
     evaluate_against_policy(suggestions, allowed=["MIT"], denied=[])
-    assert suggestions[0].licence_policy_status == "unknown"  # cc-by-nc-4.0 has no SPDX mapping here
+    assert suggestions[0].licence_policy_status == "unknown"  # "openrail" has no SPDX mapping here

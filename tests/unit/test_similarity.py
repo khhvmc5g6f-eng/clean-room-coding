@@ -1,6 +1,6 @@
 from cleanroom.similarity.classify import classify
 from cleanroom.similarity.lexical import jaccard, lexical_similarity
-from cleanroom.similarity.structural import structural_similarity
+from cleanroom.similarity.structural import generic_structural_shape, structural_similarity
 
 
 def test_identical_text_lexical_similarity_is_one():
@@ -60,3 +60,43 @@ def test_classify_never_auto_assigns_material_or_required():
     assert "material" not in AUTOMATIC_CLASSIFICATIONS
     assert "required" not in AUTOMATIC_CLASSIFICATIONS
     assert "constrained" not in AUTOMATIC_CLASSIFICATIONS
+
+
+def test_generic_structural_shape_does_not_misread_identifiers_as_keywords():
+    """Regression test: a substring/startswith-based keyword scan
+    previously matched 'iffy', 'definitely(...)', 'classList.add(...)' as
+    if/def/class control-flow structure. Must require word boundaries."""
+    shape = generic_structural_shape("iffy = definitely(classList.add(x))\n")
+    assert not any(s in ("kw:if", "kw:def", "kw:class") for s in shape)
+
+
+def test_generic_structural_shape_matches_real_keywords_with_boundaries():
+    shape = generic_structural_shape("if x:\n    return y\n")
+    assert "kw:if" in shape
+    assert "kw:return" in shape
+
+
+def test_generic_structural_shape_depth_is_clamped_not_just_emitted():
+    """Regression test: a stray unmatched closing bracket (plausible inside
+    a string/comment, since this fallback does no string/comment stripping)
+    previously drove the internal depth counter negative WITHOUT clamping
+    the counter itself (only its emitted value was clamped) -- so once
+    real nesting pushed the counter back above zero, every subsequent
+    line's emitted depth was permanently offset by the size of that one
+    stray excursion, rather than reflecting true nesting. A correctly
+    clamped counter recovers exactly, with no lasting offset."""
+    # A stray '}' with no matching '{' first, then two levels of real
+    # brace nesting -- the clamped depth sequence must be 0, 1, 2, 2.
+    source = "}\nif (x) {\n  if (y) {\n    return z;\n"
+    shape = generic_structural_shape(source)
+    depths = [s for s in shape if s.startswith("depth:")]
+    assert depths == ["depth:0", "depth:1", "depth:2", "depth:2"]
+
+
+def test_generic_structural_shape_covers_go_rust_ruby_keywords():
+    assert "kw:func" in generic_structural_shape("func main() {\n")
+    assert "kw:fn" in generic_structural_shape("fn main() {\n")
+    assert "kw:match" in generic_structural_shape("match x {\n")
+    assert "kw:loop" in generic_structural_shape("loop {\n")
+    assert "kw:elsif" in generic_structural_shape("elsif x\n")
+    assert "kw:unless" in generic_structural_shape("unless x\n")

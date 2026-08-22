@@ -11,13 +11,23 @@ other languages (e.g. via tree-sitter) is on the roadmap -- see ROADMAP.md.
 from __future__ import annotations
 
 import ast
+import re
 
 from cleanroom.similarity.lexical import jaccard, shingles
 
+# Covers the control-flow vocabularies of Python/JS/Java (if/else/for/while/
+# try/except/switch/case), Go (func), Rust (fn/match/loop), and Ruby
+# (elsif/unless/until) -- the languages engine.py routes to this fallback.
 _STRUCTURAL_KEYWORDS = {
-    "if", "else", "elif", "for", "while", "try", "except", "finally",
-    "return", "def", "class", "function", "switch", "case", "do",
+    "if", "else", "elif", "elsif", "for", "while", "try", "except", "finally",
+    "return", "def", "class", "function", "func", "fn", "switch", "case",
+    "do", "match", "loop", "unless", "until",
 }
+# Matched with word boundaries (re.finditer, not startswith/substring) so
+# an identifier that merely starts with a keyword -- "iffy", "definitely",
+# "classList", "document.write" -- is never misread as control-flow
+# structure. A previous substring-based version did exactly that.
+_KEYWORD_RE = re.compile(r"\b(" + "|".join(re.escape(k) for k in _STRUCTURAL_KEYWORDS) + r")\b")
 
 
 def python_structural_shape(source: str) -> list[str] | None:
@@ -41,11 +51,17 @@ def generic_structural_shape(source: str) -> list[str]:
     depth = 0
     for line in source.splitlines():
         stripped = line.strip()
-        for word in _STRUCTURAL_KEYWORDS:
-            if stripped.startswith(word) or f" {word} " in f" {stripped} ":
-                shape.append(f"kw:{word}")
-        depth += stripped.count("{") + stripped.count("(") - stripped.count("}") - stripped.count(")")
-        shape.append(f"depth:{max(depth, 0)}")
+        for match in _KEYWORD_RE.finditer(stripped):
+            shape.append(f"kw:{match.group(1)}")
+        # Clamp depth itself (not just what's emitted): a single stray
+        # unmatched closing bracket -- plausible inside a string literal or
+        # comment, since this fallback does no string/comment stripping --
+        # could otherwise drive depth permanently negative, after which
+        # every remaining line in the file collapses to the same emitted
+        # "depth:0" regardless of its real nesting, making two structurally
+        # very different files after that point indistinguishable.
+        depth = max(depth + stripped.count("{") + stripped.count("(") - stripped.count("}") - stripped.count(")"), 0)
+        shape.append(f"depth:{depth}")
     return shape
 
 

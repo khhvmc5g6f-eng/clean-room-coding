@@ -164,4 +164,57 @@ detail:
   it now degrades gracefully and reports the corruption as a
   `verify_chain()` finding instead of crashing.
 
+### Fixed (second review pass, code added after the first)
+
+- **A regressed legal/similarity finding stayed silently `resolved_by_rescan`
+  forever** — `legal/remediation.py`'s `reconcile()` never reopened a task
+  whose underlying finding had cleared once and then reappeared, so
+  `cleanroom release` would silently stop blocking on a live RED finding
+  after a fix was reverted. Confirmed by direct reproduction; fixed by
+  reopening `resolved_by_rescan` tasks (never `resolved_by_override`,
+  which is a deliberate human decision) when their finding recurs.
+- **`cleanroom report --pdf` crashed on ordinary human-entered text** — an
+  em dash, curly quotes, or an ellipsis in a project name or a
+  legal/similarity finding description (routine in both `.cleanroom.yml`
+  metadata and LLM-authored finding text) raised
+  `FPDFUnicodeEncodingException`, since fpdf2's core fonts only support
+  Latin-1. Confirmed by direct reproduction; fixed centrally for every
+  `cell`/`multi_cell` call.
+- Remediation task IDs were recomputed by sort position on every
+  `reconcile()` call rather than assigned once, which could — under
+  same-tick timestamp collisions — silently shift which finding a
+  previously-recorded `--override <id>` pointed at. IDs are now assigned
+  once at creation and never reassigned.
+- `similarity/engine.py` matched at most one same-named reference file per
+  basename, silently losing comparisons against any other reference file
+  sharing that name; now matches every same-named candidate. Its all-pairs
+  fallback also truncated with an impl-file-order-biased flat slice
+  instead of round-robin, which could give one impl file full reference
+  coverage while another got none at all under the same `--max-comparisons`
+  budget.
+- `similarity/structural.py`'s non-Python fallback matched keywords by
+  substring (misreading `"iffy"`, `"classList.add(...)"` as control-flow
+  structure) and only clamped its *emitted* depth, not the internal
+  counter, so one stray unmatched bracket could permanently offset every
+  later line's signature. Fixed with word-boundary matching and clamping
+  the counter itself; also added missing Go/Rust/Ruby keywords.
+- `ai/suggest.py`'s Hub-licence-to-SPDX table was missing several
+  legitimate SPDX identifiers (`CC-BY-NC-4.0`, `WTFPL`, `OFL-1.1`,
+  `LGPL-2.1-only`) — added, while deliberately leaving model-specific
+  "Responsible AI License" tags unmapped since they have no honest SPDX
+  equivalent.
+- `sanitisation/differential.py` (the RAW_ANALYSIS/SANITISED_SPECIFICATION
+  record ADR-0002 documents) was fully implemented but never called from
+  anywhere — `cleanroom sanitise` now actually builds and persists a real
+  `SanitisationReport`/`DifferentialEntry` record.
+- Two legal citation errors found by an independent fact-check of ~30
+  claims against primary sources: a missing "Mercantile" in the IBCOS
+  case name, and the wrong party order/an unfinalised reporter citation
+  for the Oracle/Google Supreme Court case (correct: *Google LLC v. Oracle
+  America, Inc.*, 593 U.S. 1 (2021)).
+- The Skill's documentation had drifted from the code: `references/
+  exit-codes.md` wrongly said exit code 7 was unwired (it has been, since
+  `cleanroom similarity` shipped); `cleanroom verify`/`cleanroom status`
+  were never mentioned in the skill; the licence-pack count was stale.
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD
