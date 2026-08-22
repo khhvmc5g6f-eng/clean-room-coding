@@ -573,23 +573,27 @@ change that should be evaluated on its own.
 ## Documented limitations (not silently overclaimed)
 
 - **`PathGuard` is now wired into real per-invocation reads for a subset
-  of commands, opt-in.** `inspect`/`licence`/`similarity` now call
-  `Ctx.enforce_zone_access()` before reading their target path, which
+  of commands, opt-in.** `inspect`/`licence`/`similarity`/`sanitise` now
+  call `Ctx.enforce_zone_access()` before reading their target path, which
   looks up a real `AgentRegistry` record for whatever agent id is passed
-  via the new global `--agent-id <id>` option and runs a real
+  via the global `--agent-id <id>` option and runs a real
   `PathGuard.check()` against that agent's actual registered scope --
-  verified end-to-end (both the deny path, a Zone-H+I-only `cleanroom
-  build` agent denied `zone-r`, and the allow path, an `R`-scoped agent
-  let through) against a real project, not just `run_pathguard_self_test`'s
-  synthetic probe. Without `--agent-id`, every command's behaviour is
-  unchanged from before this existed. **Still a real, narrower gap, not
-  fully solved:** only those three commands are wired, and only when
-  `--agent-id` is actually passed -- every other command, and any
-  invocation that omits the flag, still reads files directly with no
-  gate. Extending coverage to every zone-touching command, and to a real
-  multi-agent orchestration harness built on top of this library that
-  calls `enforce_zone_access` for every subagent file read, remains
-  future work.
+  verified end-to-end (the deny path -- a Zone-H+I-only `cleanroom build`
+  agent denied `zone-r`, and separately an R-only agent denied `cleanroom
+  sanitise` of a Zone H document, the actual R-to-H boundary-crossing gate
+  PathGuard exists to police -- and the allow path, an `R`-scoped agent
+  let through `licence`, an `H`-scoped agent let through `sanitise`)
+  against real projects, not just `run_pathguard_self_test`'s synthetic
+  probe. Without `--agent-id`, every command's behaviour is unchanged from
+  before this existed. **Still a real, narrower gap, not fully solved:**
+  only those four commands are wired, and only when `--agent-id` is
+  actually passed -- every other command, and any invocation that omits
+  the flag, still reads files directly with no gate. `compare` and
+  `similarity --negative-control` are deliberately excluded (see "Likely
+  next additions" #1 for why). Extending coverage to every remaining
+  zone-touching command, and to a real multi-agent orchestration harness
+  built on top of this library that calls `enforce_zone_access` for every
+  subagent file read, remains future work.
 - **Legal-issue engine**: only `protected_expression` has no dedicated
   heuristic -- always `UNKNOWN`. Idea/expression merger judgment has no
   deterministic proxy this tool can compute, unlike the other 17 issues.
@@ -601,7 +605,7 @@ change that should be evaluated on its own.
   not the actual contract text), `linking` (via `output_distribution_model`
   + reference licence copyleft strength), and `contractual_permissions`
   (via each policy pack's `reverse_engineering_restriction` field for the
-  5 currently-known licences, not the actual contract if access is
+  13 currently-known licences, not the actual contract if access is
   `contractual`) are all real but narrower-than-a-full-analysis triage
   signals -- each documents exactly what it does and doesn't establish in
   its own `alternative_explanation` field.
@@ -814,3 +818,13 @@ change that should be evaluated on its own.
     licence discovery~~ -- **done** (see "SBOM/dependency discovery"
     above); `--resolve-transitive` for these two ecosystems remains
     unimplemented and is now reported honestly as such.
+14. ~~Model EUPL-1.2's Article 5 compatibility clause in the legal
+    engine~~ -- **done** (`CaseBundle.output_licence_id` +
+    `_compatible_licence_overlap()`, see "Update (2026-08-22): the EUPL
+    compatibility clause and the US-agency licences" above). Still only
+    narrows, not eliminates, the underlying limitation: confirming an
+    actual Article-5 merge remains a human question this tool surfaces
+    but does not resolve.
+15. ~~Reconsider the US-agency licences (NASA-1.3, NIST-PD, NTIA-PD)~~ --
+    **done**, and NASA-1.3 turned out to be a real copyleft-shaped
+    licence, not a public-domain notice (see the same Update above).
