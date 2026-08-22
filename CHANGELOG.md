@@ -339,4 +339,28 @@ detail:
   package actually builds cleanly with `python -m build` in this repo
   before writing the workflow, rather than assuming it would.
 
+### Added (seventh pass — automatic clean-room-level computation)
+
+- `src/cleanroom/maturity.py`: `cleanroom status` now reports a
+  `computed_maturity` field, independently derived from real project
+  state, alongside the declared `clean_room_level` in `.cleanroom.yml`
+  (the two are never silently reconciled -- a mismatch surfaces as
+  `matches_declared: false`, not auto-corrected in either direction).
+  Levels are cumulative and evaluated deterministically from files/state
+  this tool already produces: ledger events and zone directories (CR1); a
+  handoff manifest plus a Zone-R-blind implementation agent registered via
+  `cleanroom build` (CR2); the PathGuard self-test passing and a generated
+  SBOM (CR3); similarity findings, an intact evidence-ledger hash chain,
+  full jurisdiction-pack coverage for required markets, and legal findings
+  (CR4); a cryptographically signed handoff manifest (part of CR5).
+  CR5's other criterion -- adversarial legal review actually reviewed by
+  qualified counsel -- is always reported unmet with an explanatory note,
+  since no project file can establish that a human lawyer did this; the
+  computed level therefore can never automatically reach CR5, by design.
+  Verified end-to-end (not just unit-level) by manually driving a real
+  project through `init` -> `build`/`handoff` -> `provenance` ->
+  `similarity`/`legal` and printing the computed level at each stage
+  before trusting the corresponding regression test
+  (`test_computed_maturity_level_advances_with_real_project_state`).
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD

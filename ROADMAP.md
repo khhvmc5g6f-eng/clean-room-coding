@@ -427,9 +427,13 @@ change that should be evaluated on its own.
   comparisons beyond the cap are reported as `comparisons_skipped`, never
   silently dropped, but a very large, entirely-renamed codebase won't get
   full pairwise coverage without raising the cap.
-- **No automatic clean-room-level (CR0-CR5) computation** -- see
-  docs/clean-room-levels.md. The level in `.cleanroom.yml` is a
-  declaration the project's owners back up manually today.
+- **Automatic clean-room-level (CR0-CR5) computation** now exists
+  (`src/cleanroom/maturity.py`, surfaced via `cleanroom status`'s
+  `computed_maturity` field) -- see docs/clean-room-levels.md. It is
+  independent of, and never silently reconciled with, the declared
+  `clean_room_level` in `.cleanroom.yml`; CR5 can never be automatically
+  reached since its qualified-counsel-review criterion has no fact this
+  tool can check.
 - **Provider diversity / multi-model panels** (`panel_diversity_required`,
   `panel_size` in `.cleanroom.yml`) are recorded in config but not yet
   wired to an actual multi-provider LLM adapter layer -- Claude via
@@ -477,8 +481,8 @@ change that should be evaluated on its own.
 6. ~~SLSA build provenance via `actions/attest-build-provenance` in a
    release workflow~~ -- **done** (`.github/workflows/release.yml`, fires
    on `release: published`).
-7. Automatic clean-room-level (CR0-CR5) computation from project state
-   (not yet started).
+7. ~~Automatic clean-room-level (CR0-CR5) computation from project
+   state~~ -- **done** (`src/cleanroom/maturity.py`, `cleanroom status`).
 8. Transitive dependency resolution for SBOM generation (still not
    started -- separate from the serialization work just done).
 9. Decide `orchestration/heartbeat.py`'s fate: build a real multi-agent

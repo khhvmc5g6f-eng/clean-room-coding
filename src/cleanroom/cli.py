@@ -37,6 +37,7 @@ from cleanroom.legal import panels as legal_panels
 from cleanroom.legal import remediation as remediation_module
 from cleanroom.licence import discovery as licence_discovery
 from cleanroom.licence import policy as licence_policy
+from cleanroom import maturity
 from cleanroom.orchestration.agents import AgentRegistry
 from cleanroom.project import Project
 from cleanroom.provenance import sbom as sbom_module
@@ -1161,6 +1162,7 @@ def status(ctx: Ctx) -> None:
     ctx.emit({
         "project": project.config.project_id,
         "clean_room_level": project.config.clean_room_level,
+        "computed_maturity": maturity.compute_level(project),
         "zones": {"R": str(project.zone_r), "H": str(project.zone_h), "I": str(project.zone_i)},
         "requirement_traceability": graph.traceability_report(),
         "agents": [a.to_dict() for a in registry.all()],

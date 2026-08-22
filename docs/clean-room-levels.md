@@ -29,9 +29,16 @@ verification/gating is on the roadmap -- see ROADMAP.md).
   (adversarial or a lawyer) could pick up and reconstruct the process
   from without trusting any single participant's say-so.
 
-**v0.1 honesty note:** the CLI does not yet compute "you are at CR3, not
-CR4" automatically from project state -- that's a natural next step (see
-ROADMAP.md) but for now the level in `.cleanroom.yml` is a declaration the
-project's owners are responsible for backing up with the actual gates
-described above, most of which `cleanroom audit`/`cleanroom report` do let
-you verify individually.
+**Automatic computation:** `cleanroom status` now reports a
+`computed_maturity` field (`src/cleanroom/maturity.py`) alongside the
+declared `clean_room_level`, independently derived from real, checkable
+project state (ledger events, zone directories, a handoff manifest, a
+Zone-R-blind implementation agent, the PathGuard self-test, generated
+SBOM, similarity findings, jurisdiction pack coverage, legal findings,
+manifest signature) -- never silently reconciled with the declaration in
+either direction, so a mismatch (`matches_declared: false`) stays visible.
+CR5's "adversarial legal review... reviewed by qualified counsel"
+criterion is always reported unmet: whether a human lawyer actually
+endorsed `cleanroom judge`'s prompts isn't a fact any of this tool's files
+can establish, so the computed level can never automatically reach CR5 --
+that remains a human judgment call, not an automated gate.

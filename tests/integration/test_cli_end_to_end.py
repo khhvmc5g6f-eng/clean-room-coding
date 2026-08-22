@@ -90,6 +90,57 @@ def test_full_pipeline(tmp_path: Path, monkeypatch):
     assert verify_payload["handoff_manifest_intact"] is True
 
 
+def _computed_level(runner: CliRunner, project_dir: Path) -> dict:
+    result = _run(runner, ["--project", str(project_dir), "--json", "status"])
+    return json.loads(result.output)["computed_maturity"]
+
+
+def test_computed_maturity_level_advances_with_real_project_state(tmp_path: Path):
+    """`cleanroom status`'s computed_maturity is meant to be derived purely
+    from on-disk project state, not the declared .cleanroom.yml value --
+    drive a project through CR1 -> CR2 -> CR3 -> CR4 and confirm the
+    computed level actually advances at each real milestone, and that CR5
+    (adversarial legal review by qualified counsel) never auto-grants."""
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    assert _computed_level(runner, project_dir)["computed_level"] == "CR1"
+
+    (project_dir / "zone-r" / "lib").mkdir(parents=True)
+    (project_dir / "zone-r" / "lib" / "LICENSE").write_text("MIT License\n\nPermission is hereby granted...\n", encoding="utf-8")
+    _run(runner, ["--project", str(project_dir), "intake", "--source", "lib", "--access-authority", "public"])
+    _run(runner, ["--project", str(project_dir), "jurisdiction"])
+
+    (project_dir / "zone-h" / "spec.md").write_text("GIVEN a list\nWHEN sorted\nTHEN it is ordered\n", encoding="utf-8")
+    _run(runner, ["--project", str(project_dir), "sanitise", str(project_dir / "zone-h" / "spec.md")])
+    _run(runner, ["--project", str(project_dir), "handoff", "--specification-version", "v1", "--all-c0"])
+    _run(runner, ["--project", str(project_dir), "build", "--role", "Implementation Team"])
+    assert _computed_level(runner, project_dir)["computed_level"] == "CR2"
+
+    (project_dir / "zone-i").mkdir(exist_ok=True)
+    (project_dir / "zone-i" / "requirements.txt").write_text("click==8.1.7\n", encoding="utf-8")
+    _run(runner, ["--project", str(project_dir), "provenance"])
+    assert _computed_level(runner, project_dir)["computed_level"] == "CR3"
+
+    (project_dir / "zone-r" / "sort.py").write_text("def sort_ref(x):\n    return sorted(x)\n", encoding="utf-8")
+    (project_dir / "zone-i" / "sort.py").write_text("def totally_different_impl(y):\n    result = []\n    return result\n", encoding="utf-8")
+    similarity_result = _run(runner, ["--project", str(project_dir), "similarity", str(project_dir / "zone-r"), str(project_dir / "zone-i")])
+    assert json.loads(similarity_result.output)["comparisons_skipped"] == 0
+    _run(runner, ["--project", str(project_dir), "legal", "--access-authority", "public"])
+
+    final = _computed_level(runner, project_dir)
+    assert final["computed_level"] == "CR4"
+    assert final["declared_level"] == "CR2"  # default_config()'s declaration, never silently changed
+    assert final["matches_declared"] is False
+
+    cr5 = next(level for level in final["levels"] if level["level"] == "CR5")
+    assert cr5["satisfied"] is False
+    counsel_criterion = next(c for c in cr5["criteria"] if "counsel" in c["description"])
+    assert counsel_criterion["met"] is False  # never auto-granted, even though CR4 is fully satisfied
+
+
 def test_legal_picks_up_similarity_and_requirement_graph_facts(tmp_path: Path):
     """Regression test: `cleanroom legal` previously never loaded
     evidence/similarity-findings.json or requirements.json into the
