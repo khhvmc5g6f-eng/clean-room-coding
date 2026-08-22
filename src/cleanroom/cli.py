@@ -54,11 +54,12 @@ from cleanroom.report import (
 )
 from cleanroom.sanitisation import scanner as sanitisation_scanner
 from cleanroom.sanitisation.differential import DifferentialEntry, SanitisationReport
+from cleanroom import schema_registry
 from cleanroom.schema_registry import schema_dir
 from cleanroom.similarity import engine as similarity_engine
 from cleanroom.specification.behavioral import BehavioralSuite
 from cleanroom.specification.graph import RequirementGraph
-from cleanroom.util import hash_tree, sha256_json
+from cleanroom.util import hash_tree, sha256_json, utc_now_iso
 from cleanroom.zones import check_agent_zone_consistency, create_zones, run_pathguard_self_test
 
 
@@ -990,6 +991,116 @@ def judge(ctx: Ctx) -> None:
 
     project.evidence.append(actor=Actor(type="tool", id="cleanroom-judge"), action="cleanroom judge", result="success", detail=f"panels={list(written)}")
     ctx.emit({"prompts_written_for": written, "directory": str(out_dir)})
+
+
+# --------------------------------------------------------------------------- judge-adjudicate
+
+@main.command(name="judge-adjudicate")
+@click.argument("pack_id")
+@click.argument("answer_file", type=click.Path(exists=True, path_type=Path))
+@click.option("--panel-member", "panel_member_id", required=True, help="Identifies this specific panel member's answer (e.g. 'member-1'), distinct from other members reviewing the same pack -- required so a second submission is recorded as an ADDITIONAL panel member's view, not silently overwriting the first.")
+@click.option("--model-provider", default=None)
+@click.option("--model-id", default=None)
+@pass_ctx
+def judge_adjudicate(ctx: Ctx, pack_id: str, answer_file: Path, panel_member_id: str, model_provider: str | None, model_id: str | None) -> None:
+    """Parts XLV-LI, LIV: ingest one judicial-review panel member's completed
+    answer to 'cleanroom judge's prompts for PACK_ID, and merge it back into
+    the matching legal-finding records. ANSWER_FILE is a JSON list of
+    {issue, decision_state, for_release_argument, against_release_argument,
+    adjudication} objects, one per issue the panel member adjudicated.
+
+    Supports panel_size > 1 (Part LIV, provider diversity): call this once
+    per independent panel member reviewing the same pack, each with its own
+    --panel-member id. Every finding's top-level decision_state (and the
+    other panel-facing fields) always reflects the worst-wins aggregate
+    across every panel member recorded so far for that finding -- a single
+    dissenting RED/AMBER member is never smoothed over by others' more
+    favourable view."""
+    project = ctx.load_project()
+    findings_path = project.root / "evidence" / "legal-findings.json"
+    if not findings_path.is_file():
+        raise click.ClickException("Run 'cleanroom legal' first.")
+    findings = jsonlib.loads(findings_path.read_text(encoding="utf-8"))
+    answers = jsonlib.loads(answer_file.read_text(encoding="utf-8"))
+
+    markets_for_pack = {
+        market for market, mapped_pack_id in jurisdiction_resolver.COUNTRY_TO_PACK.items() if mapped_pack_id == pack_id
+    }
+    if not markets_for_pack:
+        raise click.ClickException(f"'{pack_id}' is not a known jurisdiction pack id (see jurisdiction/resolver.py's COUNTRY_TO_PACK).")
+
+    now = utc_now_iso()
+    updated_issues: list[str] = []
+    for answer in answers:
+        matched = False
+        for finding in findings:
+            if finding["issue"] != answer["issue"] or (finding.get("jurisdiction") or "").lower() not in markets_for_pack:
+                continue
+            matched = True
+            entry = {
+                "panel_member_id": panel_member_id,
+                "decision_state": answer["decision_state"],
+                "reviewer": f"simulated-{pack_id}-judicial-panel",
+                "submitted_utc": now,
+            }
+            for key in ("for_release_argument", "against_release_argument", "adjudication"):
+                if answer.get(key):
+                    entry[key] = answer[key]
+            if model_provider:
+                entry["model_provider"] = model_provider
+            if model_id:
+                entry["model_id"] = model_id
+            finding.setdefault("panel_adjudications", [])
+            finding["panel_adjudications"] = [
+                a for a in finding["panel_adjudications"] if a.get("panel_member_id") != panel_member_id
+            ] + [entry]
+
+            worst_state = legal_panels.aggregate_panel_decision(finding["panel_adjudications"])
+            worst_entry = max(
+                finding["panel_adjudications"],
+                key=lambda a: legal_panels.DECISION_RANK.get(a["decision_state"], 2),
+            )
+            finding["decision_state"] = worst_state
+            finding["reviewer"] = worst_entry["reviewer"]
+            for key in ("for_release_argument", "against_release_argument", "adjudication"):
+                if worst_entry.get(key):
+                    finding[key] = worst_entry[key]
+            updated_issues.append(answer["issue"])
+        if not matched:
+            raise click.ClickException(
+                f"No legal finding matches issue '{answer['issue']}' for pack '{pack_id}' (checked markets {sorted(markets_for_pack)}) -- run 'cleanroom legal' with this project's actual configured markets first."
+            )
+
+    for finding in findings:
+        errors = schema_registry.validate(finding, "legal-finding.schema.json")
+        if errors:
+            raise click.ClickException(f"Refusing to save: adjudicated finding fails schema validation: {errors}")
+
+    findings_path.write_text(jsonlib.dumps(findings, indent=2, sort_keys=True), encoding="utf-8")
+
+    providers_config = project.config.data.get("providers", {})
+    panel_size_required = providers_config.get("panel_size", 1)
+    diversity_required = providers_config.get("panel_diversity_required", False)
+    member_ids = {a["panel_member_id"] for f in findings for a in f.get("panel_adjudications", []) if f["issue"] in updated_issues}
+    providers_seen = {
+        a.get("model_provider") for f in findings for a in f.get("panel_adjudications", []) if f["issue"] in updated_issues
+    } - {None}
+    diversity_satisfied = (not diversity_required) or len(providers_seen) > 1
+
+    project.evidence.append(
+        actor=Actor(type="human", id=panel_member_id, role="judicial-panel-member", model_provider=model_provider, model_id=model_id),
+        action="cleanroom judge-adjudicate", result="success",
+        detail=f"pack={pack_id} panel_member={panel_member_id} issues={updated_issues}",
+    )
+    ctx.emit({
+        "pack_id": pack_id, "panel_member_id": panel_member_id, "issues_updated": updated_issues,
+        "panel_completeness": {
+            "panel_size_required": panel_size_required, "panel_members_recorded": len(member_ids),
+            "panel_size_satisfied": len(member_ids) >= panel_size_required,
+            "diversity_required": diversity_required, "distinct_providers_recorded": sorted(p for p in providers_seen if p),
+            "diversity_satisfied": diversity_satisfied,
+        },
+    })
 
 
 # --------------------------------------------------------------------------- remediate

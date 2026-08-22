@@ -619,4 +619,49 @@ detail:
   asserts pack-id strings specifically do NOT match (to prevent this
   exact confusion recurring silently).
 
+### Added (sixteenth pass — close the judicial-review feedback loop; wire provider diversity)
+
+- Discovered a deeper gap while investigating "provider diversity /
+  multi-model panels are recorded in config but not wired to anything":
+  `cleanroom judge` only ever WROTE prompt files -- there was no command
+  anywhere that read a completed judicial-review answer back into the
+  system, for any panel size, even though `legal-finding.schema.json`
+  already had `for_release_argument`/`against_release_argument`/
+  `adjudication`/`reviewer` fields clearly meant for exactly this.
+- New `cleanroom judge-adjudicate <pack-id> <answer-file>
+  --panel-member <id> [--model-provider ...] [--model-id ...]`: ingests
+  one panel member's answer (a JSON list of per-issue adjudications) and
+  merges it into the matching finding(s), matched by issue plus which of
+  that pack's real configured markets the finding is under (not the pack
+  id itself -- a different string space, see `COUNTRY_TO_PACK`).
+  Re-submitting under the same `--panel-member` id replaces that member's
+  prior answer rather than duplicating it.
+- Extended `legal-finding.schema.json` with a `panel_adjudications` array
+  (one entry per independent panel member) and added
+  `legal/panels.py::aggregate_panel_decision()` -- the same worst-wins,
+  never-round-up philosophy as the existing `aggregate_jurisdiction_decision`,
+  applied across panel members instead of across findings. A finding's
+  top-level `decision_state`/`reviewer`/argument fields always reflect
+  that aggregate, so a single dissenting RED/AMBER panel member is never
+  smoothed over by other members' more favourable view, and callers that
+  only read the top-level fields keep working correctly regardless of
+  `panel_size`.
+- The command reports whether `.cleanroom.yml`'s `providers.panel_size`/
+  `panel_diversity_required` are actually satisfied yet (distinct
+  providers recorded so far) -- informational only. This does NOT change
+  `cleanroom report`/`release`'s `global_decision`, which remains purely
+  finding-based (the deterministic legal-issue engine's output); the
+  judicial panel's adjudication is recorded as additional evidentiary
+  context on the finding, not silently made into a second release gate.
+- Verified the entire flow by hand against a real project before writing
+  tests: ran `init` -> `jurisdiction` -> `legal` -> `judge` ->
+  `judge-adjudicate` with two disagreeing simulated panel members,
+  confirmed worst-wins held, confirmed resubmission replaced rather than
+  duplicated, and confirmed a market mapped to a different pack was left
+  untouched. That verification caught a real bug before it ever reached a
+  test file: `utc_now_iso` was used but never imported in `cli.py`,
+  which would have made every real invocation crash outright.
+- 11 new regression tests across `test_cli_end_to_end.py` and
+  `test_legal_engine_and_panels.py`.
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD

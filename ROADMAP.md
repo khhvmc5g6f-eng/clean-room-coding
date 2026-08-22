@@ -111,13 +111,14 @@ see "External review findings" and "Competitive landscape" below.
   fragile system-library dependency) covering what the project started
   with, what it did (derived from the evidence ledger), functional
   coverage, remediation status, jurisdictions, and outstanding issues.
-- 27-command CLI (`init`, `doctor`, `intake`, `inspect`, `licence`,
+- 28-command CLI (`init`, `doctor`, `intake`, `inspect`, `licence`,
   `jurisdiction`, `analyse`, `specify`, `sanitise`, `handoff`, `architect`,
   `ai-suggest`, `build`, `heartbeat`, `test`, `compare`, `similarity`,
-  `provenance`, `audit`, `legal`, `judge`, `remediate`, `verify`, `report`,
-  `release`, `status`, `benchmark`) with `--json`/`--quiet`/`--verbose`/
-  `--project`/`--config` (now actually wired to an explicit config path,
-  not silently ignored) and documented exit codes; Click-based
+  `provenance`, `audit`, `legal`, `judge`, `judge-adjudicate`, `remediate`,
+  `verify`, `report`, `release`, `status`, `benchmark`) with
+  `--json`/`--quiet`/`--verbose`/`--project`/`--config` (now actually
+  wired to an explicit config path, not silently ignored) and documented
+  exit codes; Click-based
   `CliRunner` integration tests drive the full pipeline end-to-end.
 - The Agent Skill (`skills/clean-room-coding/SKILL.md` +
   progressive-disclosure `references/`).
@@ -495,9 +496,25 @@ change that should be evaluated on its own.
   reached since its qualified-counsel-review criterion has no fact this
   tool can check.
 - **Provider diversity / multi-model panels** (`panel_diversity_required`,
-  `panel_size` in `.cleanroom.yml`) are recorded in config but not yet
-  wired to an actual multi-provider LLM adapter layer -- Claude via
-  whatever harness runs `cleanroom judge`'s prompts is the only path today.
+  `panel_size` in `.cleanroom.yml`) are now wired to something real: a new
+  `cleanroom judge-adjudicate <pack-id> <answer-file> --panel-member <id>`
+  command ingests one independent panel member's completed judicial-
+  review answer and merges it into the matching legal-finding record(s),
+  closing a loop that didn't exist before at any panel size --
+  `legal-finding.schema.json` already had `for_release_argument`/
+  `against_release_argument`/`adjudication`/`reviewer` fields clearly
+  meant for this, but no command read an answer back in. Call it once per
+  independent panel member; a new `aggregate_panel_decision()` (worst-
+  wins, same philosophy as `aggregate_jurisdiction_decision`) means one
+  dissenting member's RED/AMBER is never smoothed over by others' more
+  favourable view, and the command reports whether `panel_size`/
+  `panel_diversity_required` are actually satisfied yet (distinct
+  providers recorded so far). This does NOT change what
+  `cleanroom report`/`release` treat as the release-gating
+  `global_decision` -- that remains purely finding-based (deterministic
+  engine output), not the judicial panel's adjudication, which is
+  recorded as additional evidentiary context rather than silently made a
+  new gate.
 - **SLSA build provenance is now generated on release** (see
   "Competitive landscape" above) via `.github/workflows/release.yml`, and
   the evidence ledger can now export to the in-toto Link predicate shape

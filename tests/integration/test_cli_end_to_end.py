@@ -285,6 +285,127 @@ def test_legal_picks_up_sanitisation_blocked_history(tmp_path: Path):
     assert findings["confidentiality"]["decision_state"] == "RED"
 
 
+def _setup_project_through_judge(runner: CliRunner, project_dir: Path) -> None:
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    _run(runner, ["--project", str(project_dir), "jurisdiction"])
+    _run(runner, ["--project", str(project_dir), "legal", "--access-authority", "public"])
+    _run(runner, ["--project", str(project_dir), "judge"])
+
+
+def test_judge_adjudicate_merges_answer_into_matching_finding(tmp_path: Path):
+    """cleanroom judge previously only ever WROTE prompts -- there was no
+    command anywhere that read a completed judicial-review answer back
+    into the system, even though legal-finding.schema.json already has
+    for_release_argument/against_release_argument/adjudication/reviewer
+    fields clearly meant for exactly this. judge-adjudicate closes that
+    loop: ingest one panel member's answer and merge it into the matching
+    finding(s), matched by issue + the jurisdiction pack's real markets
+    (not the pack id itself, which is a different string from what
+    findings' own `jurisdiction` field holds -- see COUNTRY_TO_PACK)."""
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _setup_project_through_judge(runner, project_dir)
+
+    answer_file = project_dir / "answer.json"
+    answer_file.write_text(json.dumps([
+        {"issue": "lawful_access", "decision_state": "GREEN_WITH_CONDITIONS", "adjudication": "Panel agrees."},
+    ]), encoding="utf-8")
+
+    result = _run(runner, [
+        "--project", str(project_dir), "--json", "judge-adjudicate", "england-wales", str(answer_file),
+        "--panel-member", "member-1",
+    ])
+    payload = json.loads(result.output)
+    assert payload["issues_updated"] == ["lawful_access"]
+
+    findings = json.loads((project_dir / "evidence" / "legal-findings.json").read_text(encoding="utf-8"))
+    gb_lawful_access = next(f for f in findings if f["issue"] == "lawful_access" and f["jurisdiction"] == "gb")
+    assert gb_lawful_access["reviewer"] == "simulated-england-wales-judicial-panel"
+    assert gb_lawful_access["adjudication"] == "Panel agrees."
+    assert len(gb_lawful_access["panel_adjudications"]) == 1
+    # A market mapped to a DIFFERENT pack (US, not England & Wales) must
+    # not be touched by this pack's adjudication.
+    us_lawful_access = next(f for f in findings if f["issue"] == "lawful_access" and f["jurisdiction"] == "us")
+    assert "panel_adjudications" not in us_lawful_access
+
+
+def test_judge_adjudicate_worst_wins_across_disagreeing_panel_members(tmp_path: Path):
+    """Part LIV: a single dissenting panel member's worse decision_state
+    must never be smoothed over by another member's more favourable view,
+    regardless of submission order."""
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _setup_project_through_judge(runner, project_dir)
+
+    red_answer = project_dir / "red.json"
+    red_answer.write_text(json.dumps([{"issue": "copying", "decision_state": "RED", "adjudication": "Dissents."}]), encoding="utf-8")
+    green_answer = project_dir / "green.json"
+    green_answer.write_text(json.dumps([{"issue": "copying", "decision_state": "GREEN_WITH_CONDITIONS", "adjudication": "No issue."}]), encoding="utf-8")
+
+    _run(runner, ["--project", str(project_dir), "judge-adjudicate", "england-wales", str(red_answer), "--panel-member", "member-1"])
+    _run(runner, ["--project", str(project_dir), "judge-adjudicate", "england-wales", str(green_answer), "--panel-member", "member-2"])
+
+    findings = json.loads((project_dir / "evidence" / "legal-findings.json").read_text(encoding="utf-8"))
+    gb_copying = next(f for f in findings if f["issue"] == "copying" and f["jurisdiction"] == "gb")
+    assert gb_copying["decision_state"] == "RED"  # member-1's dissent wins, not averaged/overwritten
+    assert len(gb_copying["panel_adjudications"]) == 2
+
+
+def test_judge_adjudicate_resubmission_by_same_member_replaces_not_duplicates(tmp_path: Path):
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _setup_project_through_judge(runner, project_dir)
+
+    first = project_dir / "first.json"
+    first.write_text(json.dumps([{"issue": "copying", "decision_state": "RED", "adjudication": "Initial."}]), encoding="utf-8")
+    revised = project_dir / "revised.json"
+    revised.write_text(json.dumps([{"issue": "copying", "decision_state": "AMBER", "adjudication": "Revised down."}]), encoding="utf-8")
+
+    _run(runner, ["--project", str(project_dir), "judge-adjudicate", "england-wales", str(first), "--panel-member", "member-1"])
+    _run(runner, ["--project", str(project_dir), "judge-adjudicate", "england-wales", str(revised), "--panel-member", "member-1"])
+
+    findings = json.loads((project_dir / "evidence" / "legal-findings.json").read_text(encoding="utf-8"))
+    gb_copying = next(f for f in findings if f["issue"] == "copying" and f["jurisdiction"] == "gb")
+    assert len(gb_copying["panel_adjudications"]) == 1  # replaced, not appended as a second entry
+    assert gb_copying["decision_state"] == "AMBER"
+
+
+def test_judge_adjudicate_reports_diversity_and_panel_size_completeness(tmp_path: Path):
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _setup_project_through_judge(runner, project_dir)
+
+    answer_file = project_dir / "answer.json"
+    answer_file.write_text(json.dumps([{"issue": "lawful_access", "decision_state": "GREEN_WITH_CONDITIONS"}]), encoding="utf-8")
+
+    result = _run(runner, [
+        "--project", str(project_dir), "--json", "judge-adjudicate", "england-wales", str(answer_file),
+        "--panel-member", "member-1", "--model-provider", "anthropic",
+    ])
+    completeness = json.loads(result.output)["panel_completeness"]
+    # Default config: panel_size=1, panel_diversity_required=False.
+    assert completeness["panel_size_satisfied"] is True
+    assert completeness["diversity_satisfied"] is True
+    assert completeness["distinct_providers_recorded"] == ["anthropic"]
+
+
+def test_judge_adjudicate_rejects_unmatched_issue(tmp_path: Path):
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _setup_project_through_judge(runner, project_dir)
+
+    bad_answer = project_dir / "bad.json"
+    bad_answer.write_text(json.dumps([{"issue": "not_a_real_issue", "decision_state": "GREEN_WITH_CONDITIONS"}]), encoding="utf-8")
+
+    result = runner.invoke(main, ["--project", str(project_dir), "judge-adjudicate", "england-wales", str(bad_answer), "--panel-member", "member-1"])
+    assert result.exit_code != 0
+
+
 def test_legal_picks_up_similarity_and_requirement_graph_facts(tmp_path: Path):
     """Regression test: `cleanroom legal` previously never loaded
     evidence/similarity-findings.json or requirements.json into the

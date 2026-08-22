@@ -173,7 +173,11 @@ machine-readable output) over re-deriving its logic by hand.
     to `evidence/judicial-review/`. Read `references/legal-and-judicial-panels.md`
     before answering these prompts yourself (e.g. via the Task/Agent tool)
     -- you are role-playing a simulation for engineering triage, and must
-    say so if asked, and must not be sycophantic toward "release".
+    say so if asked, and must not be sycophantic toward "release". Feed a
+    completed answer back with `cleanroom judge-adjudicate <pack-id>
+    <answer-file> --panel-member <id>` (repeat with a distinct
+    `--panel-member` per independent reviewer if `providers.panel_size` >
+    1 -- worst-wins across members, never smoothed over).
 
 15. **Remediate** -- `cleanroom remediate` closes the loop: every RED
     legal finding and every suspicious/material similarity finding

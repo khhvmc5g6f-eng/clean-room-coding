@@ -25,13 +25,33 @@ one. If you are the one answering them:
   reasoning -- and say plainly wherever a real answer needs qualified human
   counsel rather than this simulation.
 
-Whatever you produce, it feeds back into `legal-finding.schema.json`
-records (via `human_override` if a real lawyer reviews it) -- it does not
-by itself change `CLEAN_ROOM_CERTIFICATE.json`'s `global_decision`, which
-`cleanroom report` computes deterministically from whatever finding records
-exist (`src/cleanroom/legal/panels.py::aggregate_jurisdiction_decision` /
+Whatever you produce, feed it back with `cleanroom judge-adjudicate
+<pack-id> <answer-file> --panel-member <id>` -- `answer-file` is a JSON
+list of `{issue, decision_state, for_release_argument,
+against_release_argument, adjudication}` objects, one per issue you
+adjudicated. This merges into the matching `legal-finding.schema.json`
+record(s) (matched by issue + which of that pack's real markets the
+finding is under, e.g. `gb`/`uk` for `england-wales` -- not the pack id
+itself, a different string). If `.cleanroom.yml`'s `providers.panel_size`
+is greater than 1 (provider diversity), call this once per independent
+panel member with a distinct `--panel-member` id (and `--model-provider`/
+`--model-id` if known) -- the finding's recorded `decision_state` always
+reflects the worst-wins aggregate across every panel member so far
+(`src/cleanroom/legal/panels.py::aggregate_panel_decision`), so one
+dissenting RED/AMBER member is never smoothed over by others' more
+favourable view. The command's own output reports whether `panel_size`/
+`panel_diversity_required` are actually satisfied yet.
+
+This does NOT by itself change `CLEAN_ROOM_CERTIFICATE.json`'s
+`global_decision`, which `cleanroom report` computes deterministically
+from the legal-issue engine's finding records
+(`src/cleanroom/legal/panels.py::aggregate_jurisdiction_decision` /
 `global_decision` -- worst-finding-wins, and a required market with `RED`
-blocks release outright regardless of other markets).
+blocks release outright regardless of other markets) -- a judicial
+panel's adjudication is recorded as additional evidentiary context on the
+finding, not silently made into a second release gate. A real lawyer's
+review still goes through the same finding's `human_override` field, as
+before.
 
 Read `legal-disclaimer.md` before writing any of this if you haven't
 already.

@@ -98,6 +98,21 @@ def aggregate_jurisdiction_decision(findings: list[dict[str, Any]]) -> str:
     return _normalise(worst["decision_state"])
 
 
+def aggregate_panel_decision(panel_adjudications: list[dict[str, Any]]) -> str:
+    """Parts XLV-LI, LIV: when `panel_size` > 1, a single finding can carry
+    more than one independent judicial-review panel member's adjudication
+    (`panel_adjudications`, see legal-finding.schema.json). The SAME
+    worst-wins, never-round-up rule `aggregate_jurisdiction_decision`
+    already applies across findings is applied here across panel members
+    -- a single dissenting RED/AMBER panel member is never smoothed over
+    by other members' more favourable view, matching this project's
+    standing rule against turning disagreement into a tidy consensus."""
+    if not panel_adjudications:
+        return "AMBER"
+    worst = max(panel_adjudications, key=lambda a: DECISION_RANK.get(a["decision_state"], 2))
+    return _normalise(worst["decision_state"])
+
+
 def global_decision(jurisdiction_decisions: dict[str, str], required_markets: list[str]) -> str:
     """Part LV: do not average jurisdictions. A RED in a required market
     cannot be smoothed over by GREEN elsewhere. A required market with no

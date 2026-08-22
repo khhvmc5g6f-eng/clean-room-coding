@@ -47,6 +47,26 @@
         "signed_utc": { "type": "string", "format": "date-time" }
       }
     },
-    "legal_review_as_of": { "type": "string", "format": "date" }
+    "legal_review_as_of": { "type": "string", "format": "date" },
+    "panel_adjudications": {
+      "type": "array",
+      "description": "Parts XLV-LI, LIV: one entry per independent judicial-review panel member who adjudicated this finding (via 'cleanroom judge-adjudicate'). The finding's own top-level decision_state/for_release_argument/against_release_argument/adjudication/reviewer fields always reflect the worst-wins aggregate across every entry here (Part LIV: never rounded up), so a caller reading only the top-level fields still sees the correct current state regardless of panel_size.",
+      "items": {
+        "type": "object",
+        "required": ["panel_member_id", "decision_state", "reviewer"],
+        "additionalProperties": false,
+        "properties": {
+          "panel_member_id": { "type": "string" },
+          "decision_state": { "type": "string", "enum": ["GREEN", "GREEN_WITH_CONDITIONS", "AMBER", "RED", "UNKNOWN"] },
+          "for_release_argument": { "type": "string" },
+          "against_release_argument": { "type": "string" },
+          "adjudication": { "type": "string" },
+          "reviewer": { "type": "string" },
+          "model_provider": { "type": "string" },
+          "model_id": { "type": "string" },
+          "submitted_utc": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
   }
 }

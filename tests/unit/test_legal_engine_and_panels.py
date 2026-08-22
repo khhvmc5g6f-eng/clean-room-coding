@@ -1,5 +1,5 @@
 from cleanroom.legal.engine import CaseBundle, ISSUES, run
-from cleanroom.legal.panels import aggregate_jurisdiction_decision, global_decision
+from cleanroom.legal.panels import aggregate_jurisdiction_decision, aggregate_panel_decision, global_decision
 
 
 def test_all_18_issues_covered():
@@ -352,3 +352,25 @@ def test_contractual_permissions_amber_for_unmapped_licence():
     bundle = CaseBundle(access_authority="public", licence_findings=[{"concluded": "Some-Unmapped-Licence"}])
     findings = {f["issue"]: f for f in run(bundle)}
     assert findings["contractual_permissions"]["decision_state"] == "AMBER"
+
+
+def test_aggregate_panel_decision_worst_wins():
+    panel = [
+        {"panel_member_id": "m1", "decision_state": "GREEN_WITH_CONDITIONS"},
+        {"panel_member_id": "m2", "decision_state": "RED"},
+    ]
+    assert aggregate_panel_decision(panel) == "RED"
+
+
+def test_aggregate_panel_decision_empty_is_amber_not_green():
+    assert aggregate_panel_decision([]) == "AMBER"
+
+
+def test_aggregate_panel_decision_never_returns_bare_green():
+    panel = [{"panel_member_id": "m1", "decision_state": "GREEN"}]
+    assert aggregate_panel_decision(panel) == "GREEN_WITH_CONDITIONS"
+
+
+def test_aggregate_panel_decision_unknown_folds_to_amber():
+    panel = [{"panel_member_id": "m1", "decision_state": "UNKNOWN"}]
+    assert aggregate_panel_decision(panel) == "AMBER"
