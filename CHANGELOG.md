@@ -441,4 +441,32 @@ detail:
   (default off), writing one `<sequence>-<action>.link.json` file per
   ledger event to `evidence/in-toto-links/`.
 
+### Added (eleventh pass — a minimal heartbeat harness, per explicit user direction)
+
+- `orchestration/heartbeat.py` was genuinely orphaned since v0.1 (0%
+  coverage, no caller anywhere) because its `diagnose()` needs a live
+  tick-by-tick observation stream this stateless CLI had no producer for.
+  Asked the user directly whether to leave it, remove it, or sketch a
+  minimal harness; they chose the last option. Added `append_tick()`/
+  `load_ticks()` (a small, real JSON-Lines persistence layer per agent,
+  `evidence/ticks/<agent_id>.jsonl`) and a new `cleanroom heartbeat
+  <agent-id> --action-signature ... --files-modified N [--test-result
+  pass|fail]` command that appends one tick, re-runs `diagnose()` over
+  that agent's real history, and -- only when the diagnosis actually
+  finds a problem (`STALLED`/`LOOPING`), never silently overwriting an
+  explicit `BLOCKED`/`WAITING`/terminal status set for unrelated reasons
+  -- calls `AgentRegistry.set_status()`, which itself had no caller
+  anywhere before this either.
+- This does not make `cleanroom` a multi-agent orchestrator: it still
+  never spawns, schedules, or supervises agents itself (Part LXV,
+  provider-agnostic) -- whatever is actually running multiple agents over
+  time (a script, CI, another framework) calls `cleanroom heartbeat` once
+  per meaningful tick.
+- Verified end-to-end via the real installed CLI binary, not just the
+  test suite: registered an agent, fed it three identical-signature
+  ticks, and confirmed both the `LOOPING` diagnosis and that
+  `cleanroom status`'s `orphaned_agents` picked it up afterward, before
+  writing the corresponding regression tests.
+- CLI command count: 25 -> 26.
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD

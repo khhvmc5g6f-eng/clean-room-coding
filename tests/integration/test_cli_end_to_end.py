@@ -192,6 +192,51 @@ def test_verify_export_in_toto_links_is_opt_in_and_writes_one_file_per_event(tmp
     assert statement["unsigned"] is True
 
 
+def test_heartbeat_detects_looping_agent_and_updates_registry(tmp_path: Path):
+    """End-to-end proof that heartbeat.py -- 0% covered and unreachable
+    from any CLI command before this -- is now real: register an agent,
+    feed it identical-action ticks via `cleanroom heartbeat`, and confirm
+    both the diagnosis and the actual registry status update."""
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    build_result = _run(runner, ["--project", str(project_dir), "--json", "build", "--role", "Implementation Team"])
+    agent_id = json.loads(build_result.output)["agent_id"]
+
+    for _ in range(2):
+        result = _run(runner, [
+            "--project", str(project_dir), "--json", "heartbeat", agent_id,
+            "--action-signature", "edit:same-file.py", "--files-modified", "1",
+        ])
+        assert json.loads(result.output)["status"] == "ACTIVE"
+
+    looping_result = _run(runner, [
+        "--project", str(project_dir), "--json", "heartbeat", agent_id,
+        "--action-signature", "edit:same-file.py", "--files-modified", "1",
+    ])
+    payload = json.loads(looping_result.output)
+    assert payload["status"] == "LOOPING"
+    assert payload["tick_count"] == 3
+    assert "Terminate" in payload["recommended_action"]
+
+    status_result = _run(runner, ["--project", str(project_dir), "--json", "status"])
+    status_payload = json.loads(status_result.output)
+    assert status_payload["orphaned_agents"] == [agent_id]
+    matching_agent = next(a for a in status_payload["agents"] if a["agent_id"] == agent_id)
+    assert matching_agent["status"] == "LOOPING"
+
+
+def test_heartbeat_rejects_unregistered_agent_id(tmp_path: Path):
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    result = runner.invoke(main, ["--project", str(project_dir), "heartbeat", "not-a-real-agent-id", "--action-signature", "x"])
+    assert result.exit_code != 0
+    assert "No agent registered" in str(result.exception) or "No agent registered" in result.output
+
+
 def test_legal_picks_up_similarity_and_requirement_graph_facts(tmp_path: Path):
     """Regression test: `cleanroom legal` previously never loaded
     evidence/similarity-findings.json or requirements.json into the

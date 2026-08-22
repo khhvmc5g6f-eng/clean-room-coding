@@ -38,6 +38,7 @@ from cleanroom.legal import remediation as remediation_module
 from cleanroom.licence import discovery as licence_discovery
 from cleanroom.licence import policy as licence_policy
 from cleanroom import maturity
+from cleanroom.orchestration import heartbeat as heartbeat_module
 from cleanroom.orchestration.agents import AgentRegistry
 from cleanroom.project import Project
 from cleanroom.provenance import intoto as intoto_module
@@ -652,6 +653,57 @@ def build(ctx: Ctx, role: str, model_provider: str | None, model_id: str | None)
         result="success",
     )
     ctx.emit(record.to_dict())
+
+
+# --------------------------------------------------------------------------- heartbeat
+
+_HEARTBEAT_TERMINAL_STATUSES = {"COMPLETE", "TERMINATED", "FAILED"}
+
+
+@main.command()
+@click.argument("agent_id")
+@click.option("--action-signature", required=True, help="Short string identifying the kind of action just taken (e.g. 'edit:src/foo.py', 'run-tests'). The same signature repeated across ticks is what LOOPING detects.")
+@click.option("--files-modified", type=int, default=0, help="Number of files this tick actually modified. Zero across several ticks is what STALLED detects.")
+@click.option("--test-result", type=click.Choice(["pass", "fail"]), default=None)
+@click.option("--repeat-threshold", type=int, default=3)
+@pass_ctx
+def heartbeat(ctx: Ctx, agent_id: str, action_signature: str, files_modified: int, test_result: str | None, repeat_threshold: int) -> None:
+    """Part XXVIII: record one observation tick for a registered agent and
+    diagnose ACTIVE/STALLED/LOOPING from its real tick history. This CLI is
+    stateless/one-shot -- whatever is actually orchestrating multiple
+    agents over time (a script, CI, another harness) should call this once
+    per meaningful action/tick so a stalled or looping agent is caught
+    deterministically rather than silently running forever."""
+    project = ctx.load_project()
+    registry = AgentRegistry(project.root / "evidence")
+    agents_by_id = {a.agent_id: a for a in registry.all()}
+    if agent_id not in agents_by_id:
+        raise click.ClickException(f"No agent registered with id {agent_id}. Register one first with 'cleanroom build'.")
+
+    evidence_dir = project.root / "evidence"
+    heartbeat_module.append_tick(
+        evidence_dir, agent_id,
+        heartbeat_module.Tick(action_signature=action_signature, files_modified=files_modified, test_result=test_result),
+    )
+    ticks = heartbeat_module.load_ticks(evidence_dir, agent_id)
+    status = heartbeat_module.diagnose(ticks, repeat_threshold=repeat_threshold)
+    recommended_action = heartbeat_module.recommend_action(status)
+
+    # diagnose() only ever returns ACTIVE/STALLED/LOOPING from the tick
+    # history alone -- it has no visibility into explicit statuses a human
+    # or the harness set for reasons outside this observation log (an
+    # explicit BLOCKED/WAITING dependency wait, or a terminal COMPLETE/
+    # TERMINATED/FAILED). Only overwrite the registry when the diagnosis
+    # actually found a problem, and never resurrect an agent already in a
+    # terminal state.
+    if status in ("STALLED", "LOOPING") and agents_by_id[agent_id].status not in _HEARTBEAT_TERMINAL_STATUSES:
+        registry.set_status(agent_id, status)
+
+    project.evidence.append(
+        actor=Actor(type="tool", id="cleanroom-heartbeat"), action="cleanroom heartbeat",
+        result="success", detail=f"agent={agent_id} status={status} tick_count={len(ticks)}",
+    )
+    ctx.emit({"agent_id": agent_id, "status": status, "recommended_action": recommended_action, "tick_count": len(ticks)})
 
 
 # --------------------------------------------------------------------------- test

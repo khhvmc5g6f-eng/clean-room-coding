@@ -121,7 +121,15 @@ machine-readable output) over re-deriving its logic by hand.
     own policy; never present one suggestion as "the" answer, this is a
     shortlist for a human decision. `cleanroom build --role "..."`
     registers each implementation agent in the evidence ledger, scoped to
-    Zones H+I only.
+    Zones H+I only. If something is actually orchestrating multiple such
+    agents over time, call `cleanroom heartbeat <agent-id>
+    --action-signature ... --files-modified N` once per meaningful tick --
+    it diagnoses `STALLED`/`LOOPING` from that agent's real tick history
+    (Part XXVIII) and updates its registry status accordingly, so a stuck
+    agent shows up in `cleanroom status`'s `orphaned_agents` instead of
+    silently running forever. `cleanroom` itself never spawns or
+    schedules agents (Part LXV: provider-agnostic) -- this only observes
+    ticks something else reports.
 
 11. **Test / Compare / Similarity** -- `cleanroom test` runs the
     behavioural suite (and Zone I's own pytest suite if present).

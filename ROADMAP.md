@@ -110,14 +110,14 @@ see "External review findings" and "Competitive landscape" below.
   fragile system-library dependency) covering what the project started
   with, what it did (derived from the evidence ledger), functional
   coverage, remediation status, jurisdictions, and outstanding issues.
-- 25-command CLI (`init`, `doctor`, `intake`, `inspect`, `licence`,
+- 26-command CLI (`init`, `doctor`, `intake`, `inspect`, `licence`,
   `jurisdiction`, `analyse`, `specify`, `sanitise`, `handoff`, `architect`,
-  `ai-suggest`, `build`, `test`, `compare`, `similarity`, `provenance`,
-  `audit`, `legal`, `judge`, `remediate`, `verify`, `report`, `release`,
-  `status`) with `--json`/`--quiet`/`--verbose`/`--project`/`--config`
-  (now actually wired to an explicit config path, not silently ignored)
-  and documented exit codes; Click-based `CliRunner` integration tests
-  drive the full pipeline end-to-end.
+  `ai-suggest`, `build`, `heartbeat`, `test`, `compare`, `similarity`,
+  `provenance`, `audit`, `legal`, `judge`, `remediate`, `verify`, `report`,
+  `release`, `status`) with `--json`/`--quiet`/`--verbose`/`--project`/
+  `--config` (now actually wired to an explicit config path, not silently
+  ignored) and documented exit codes; Click-based `CliRunner` integration
+  tests drive the full pipeline end-to-end.
 - The Agent Skill (`skills/clean-room-coding/SKILL.md` +
   progressive-disclosure `references/`).
 - Licensed under **BUSL-1.1** (Business Source License 1.1): free for
@@ -265,16 +265,27 @@ fact-check and a Skill-accuracy audit, found and this pass fixed:
   skill despite being real, shipped commands; the licence-pack count was
   stale at four in two places (BUSL-1.1 makes it five). All fixed.
 
-**Confirmed as genuinely orphaned, left as a documented decision rather
-than force-fixed:** `orchestration/heartbeat.py` (Part XXVIII stall/loop
-detection) has no caller anywhere in the codebase and 0% test coverage --
-unlike `differential.py`, it has no natural single-shot CLI hook (it's
-designed to consume a live tick-by-tick observation stream from an
-orchestration harness running multiple agents over time, which this
-stateless CLI doesn't have a producer for yet). It's well-written and
-documented, but not wired to anything real. Wiring it in properly needs an
-actual multi-agent orchestration harness to feed it ticks -- tracked as a
-roadmap item, not silently removed or silently claimed as functional.
+**Update (2026-08-22): a minimal harness now exists.**
+`orchestration/heartbeat.py` was genuinely orphaned (no caller anywhere,
+0% coverage) because it needs a live tick-by-tick observation stream this
+stateless CLI had no producer for. Rather than either force-fixing it
+into something it isn't or deleting well-written logic, a small, real,
+single-shot harness closes the loop: `cleanroom heartbeat <agent-id>
+--action-signature ... --files-modified N [--test-result pass|fail]`
+appends one tick to a per-agent JSON-Lines log
+(`evidence/ticks/<agent_id>.jsonl`, via new `heartbeat.py` functions
+`append_tick`/`load_ticks`), re-runs `diagnose()` over that agent's real
+tick history, and -- only when the diagnosis actually finds a problem
+(`STALLED`/`LOOPING`), never to silently overwrite an explicit `BLOCKED`/
+`WAITING`/terminal status set for unrelated reasons -- calls
+`AgentRegistry.set_status()`, which itself had no caller anywhere before
+this. Whatever is actually orchestrating multiple agents over time (a
+script, CI, another framework) calls this once per meaningful tick;
+`cleanroom` itself still doesn't spawn or schedule agents (Part LXV:
+provider-agnostic). Verified end-to-end via the real installed CLI
+binary, not just the test suite: registering an agent, feeding it three
+identical-signature ticks, and confirming both the `LOOPING` diagnosis
+and that `cleanroom status`'s `orphaned_agents` picks it up afterward.
 
 **Deferred (real, lower-priority findings from the same review):**
 ~~`similarity/negative_control.py`'s `background_scores` recomputes every
@@ -516,7 +527,7 @@ change that should be evaluated on its own.
    as an opt-in, separate artefact (`cleanroom provenance
    --resolve-transitive`); not yet merged into the SPDX/CycloneDX
    documents themselves.
-9. Decide `orchestration/heartbeat.py`'s fate: build a real multi-agent
-   orchestration harness that can feed it observation ticks, or remove it
-   -- it is currently well-written but genuinely unused (see "documented
-   decision" note above).
+9. ~~Decide `orchestration/heartbeat.py`'s fate~~ -- **done**: a minimal,
+   real single-shot harness (`cleanroom heartbeat`) now wires it in
+   without building a full multi-agent orchestrator (see "Update
+   (2026-08-22)" note above for what this does and doesn't do).

@@ -73,7 +73,7 @@ built. Currently ships:
   JSON/Markdown) covering what the project started with, what it did,
   functional coverage, remediation status, and the jurisdiction-by-
   jurisdiction decision.
-- A 25-command CLI (`cleanroom ...`) with `--json` output, an actually-wired
+- A 26-command CLI (`cleanroom ...`) with `--json` output, an actually-wired
   `--config` override, and documented exit codes for CI/CD.
 - An Agent Skill at [skills/clean-room-coding/SKILL.md](skills/clean-room-coding/SKILL.md)
   for use from Claude Code.
