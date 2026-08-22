@@ -1,0 +1,72 @@
+{
+  "repo": "clean-room-coding (~/clean-room-coding, github.com/khhvmc5g6f-eng/clean-room-coding)",
+  "lastUpdated": "2026-08-22",
+  "invariants": [
+    {
+      "rule": "policies/licences/*.yml is a generic glob (policy.py's available_packs()/load_pack()) -- adding a new pack requires no code change and no hardcoded list update anywhere in src/, only narrative doc/test-count updates.",
+      "confidence": 0.95,
+      "evidence": ["src/cleanroom/licence/policy.py:39-48"],
+      "confirmedRuns": 1
+    },
+    {
+      "rule": "licence/discovery.py's confidence (high vs medium) is driven entirely by license-expression's own SPDX known_symbols table (licence/spdx.py's KNOWN_IDENTIFIERS), completely independent of whether a policies/licences/<id>.yml pack exists for that id.",
+      "confidence": 0.95,
+      "evidence": ["src/cleanroom/licence/discovery.py:144,183", "src/cleanroom/licence/spdx.py:35", "verified directly: removing a pack does not change discover()'s confidence for an SPDX-recognised id"],
+      "confirmedRuns": 1
+    },
+    {
+      "rule": "A licence pack file existing only changes: (a) obligations surfaced by policy.py's evaluate(), (b) the legal-engine heuristics that call load_pack() (copyleft-driven distribution/linking/licence_obligations, patent_risk, trademark_risk, contractual_permissions). It never changes discovery confidence (see the discovery invariant above).",
+      "confidence": 0.9,
+      "evidence": ["src/cleanroom/legal/engine.py: 7 load_pack() call sites enumerated and checked this run"],
+      "confirmedRuns": 1
+    },
+    {
+      "rule": "CaseBundle.jurisdiction holds the RAW MARKET CODE (gb/uk/us/fr/de/jp/eu), never the jurisdiction PACK ID (england-wales/usa-federal/...) -- jurisdiction/resolver.py's COUNTRY_TO_PACK maps one to the other but CaseBundle itself never stores the pack id.",
+      "confidence": 0.95,
+      "evidence": ["src/cleanroom/legal/engine.py _DATABASE_RIGHT_JURISDICTIONS/_NO_DATABASE_RIGHT_JURISDICTIONS use market codes", "found and fixed as a real bug in an earlier session pass (database_rights heuristic)"],
+      "confirmedRuns": 2
+    },
+    {
+      "rule": "A licence term with NO matching policy pack must be treated as UNKNOWN by every legal/engine.py heuristic that reads load_pack() results, never silently folded into the same branch as a term confirmed non-copyleft/non-restrictive. The shared _licence_terms_with_packs() helper is the correct pattern (used by _licence_obligations, _patent_risk, _trademark_risk, _contractual_permissions).",
+      "confidence": 0.95,
+      "evidence": ["src/cleanroom/legal/engine.py:389-402 (_licence_terms_with_packs)", "fixed this run in _distribution and _linking, which had NOT followed this invariant before"],
+      "confirmedRuns": 1
+    },
+    {
+      "rule": "osi_approved/fsf_libre on a licence pack must be verified against a real primary source (SPDX's own license-list-data JSON at raw.githubusercontent.com/spdx/license-list-data, or the licence's own steward site e.g. opensource.org) before being written, never assumed from general recollection -- both fields were independently wrong-by-omission risks this run (EUPL-1.2 confirmed true/true; the 4 data licences confirmed false/not-present).",
+      "confidence": 0.9,
+      "evidence": ["this run's WebFetch verification of etalab-2.0, DL-DE-BY-2.0, DL-DE-ZERO-2.0, EUPL-1.2, OGL-UK-3.0 against SPDX license-list-data and/or opensource.org"],
+      "confirmedRuns": 1
+    }
+  ],
+  "contradictions": [
+    {
+      "description": "_distribution() and _linking() in legal/engine.py silently returned GREEN_WITH_CONDITIONS for a licence term with no matching policy pack, identical to a term confirmed non-copyleft -- inconsistent with _licence_obligations/_patent_risk/_trademark_risk/_contractual_permissions, which all correctly report AMBER 'unknown to this tool' for the same missing-pack case via the shared _licence_terms_with_packs() helper.",
+      "status": "resolved",
+      "sources": ["src/cleanroom/legal/engine.py (both functions fixed, commit 583e7a4)", "tests/unit/test_legal_engine_and_panels.py (2 regression tests added)"]
+    }
+  ],
+  "assumptions": [
+    {
+      "claim": "Japan has no SPDX-recognised government/public-sector open-data licence identifier, so no licence pack analogous to OGL-UK-3.0/etalab-2.0/DL-DE-* can be built for it without fabricating an spdx_id.",
+      "verified": true,
+      "blastRadius": "low"
+    },
+    {
+      "claim": "US federal government works are public domain by statute (17 U.S.C. Sec. 105), not by a licence -- SPDX only has narrower agency-specific identifiers (NIST-PD, NASA-1.3, NTIA-PD), no general 'US government work' licence pack is the right shape here.",
+      "verified": true,
+      "blastRadius": "low"
+    },
+    {
+      "claim": "EUPL-1.2's Article 5 'Compatible Licence' escape hatch (merging into a larger work, then redistributing under a different named licence) is NOT modelled by legal/engine.py -- the engine only reads the pack's own copyleft field, so a project that genuinely exercised this clause may see an AMBER/RED finding that a human reviewer could resolve differently.",
+      "verified": true,
+      "blastRadius": "medium"
+    }
+  ],
+  "loadBearingNodes": [
+    { "name": "src/cleanroom/licence/policy.py:load_pack", "score": 8.5 },
+    { "name": "src/cleanroom/legal/engine.py:_licence_terms_with_packs", "score": 8.0 },
+    { "name": "src/cleanroom/licence/spdx.py:KNOWN_IDENTIFIERS", "score": 7.5 },
+    { "name": "src/cleanroom/jurisdiction/resolver.py:COUNTRY_TO_PACK", "score": 7.0 }
+  ]
+}
