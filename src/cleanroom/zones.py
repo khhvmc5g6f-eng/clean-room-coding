@@ -11,24 +11,34 @@ to track on its own.
 That's now solved for a real, opt-in subset of commands: pass a global
 `--agent-id <id>` (an agent registered via `cleanroom build`, or directly
 via `AgentRegistry` for any other role) and `inspect`/`licence`/
-`similarity` (see `cli.py`'s `Ctx.enforce_zone_access`) genuinely call
-`PathGuard.check()` against that agent's real registered scope before
-reading the path given -- verified end-to-end against a real project, not
-just this module's own self-test, including both the deny path (a
-Zone-H+I-only `cleanroom build` agent denied `zone-r`) and the allow path
-(an `R`-scoped agent let through). Without `--agent-id`, every command's
-behaviour is exactly as before this existed -- this is additive, opt-in
-enforcement, not a default that could break an existing invocation.
+`similarity`/`sanitise` (see `cli.py`'s `Ctx.enforce_zone_access`)
+genuinely call `PathGuard.check()` against that agent's real registered
+scope before reading the path given -- verified end-to-end against a real
+project, not just this module's own self-test, including both the deny
+path (a Zone-H+I-only `cleanroom build` agent denied `zone-r`, and
+separately an R-only agent denied `cleanroom sanitise` of a Zone H
+document -- the actual R-to-H boundary-crossing gate PathGuard exists to
+police) and the allow path (an `R`-scoped agent let through `licence`, an
+`H`-scoped agent let through `sanitise`). Without `--agent-id`, every
+command's behaviour is exactly as before this existed -- this is
+additive, opt-in enforcement, not a default that could break an existing
+invocation.
 
 **This is still a real, narrower-than-total gap, not "solved":** only
-those three commands call `enforce_zone_access`, and only when
+those four commands call `enforce_zone_access`, and only when
 `--agent-id` is actually passed. Every other command, and any invocation
-that omits `--agent-id`, still reads files directly with no gate. Full
-coverage (every command, every invocation, mandatory rather than opt-in)
-remains future work -- see ROADMAP.md. Building `cleanroom` into a larger
-multi-agent orchestration harness can and should call
+that omits `--agent-id`, still reads files directly with no gate --
+notably `compare`, which doesn't load a `Project` at all today, so adding
+enforcement there would be a real behaviour change (forcing every
+invocation to run inside a clean-room project directory), not the
+purely-additive pattern used for the other four; and
+`similarity --negative-control` paths, which are deliberately meant to
+sit *outside* the three zones and so shouldn't be PathGuard-checked at
+all. Full coverage (every command, every invocation, mandatory rather
+than opt-in) remains future work -- see ROADMAP.md. Building `cleanroom`
+into a larger multi-agent orchestration harness can and should call
 `Ctx.enforce_zone_access` (or `PathGuard.check()` directly) for every file
-read its own subagents perform, the same way these three commands now do.
+read its own subagents perform, the same way these four commands now do.
 
 For a signal that IS specific to a real project regardless of
 `--agent-id`, see `check_agent_zone_consistency`: it cross-references the
@@ -136,9 +146,10 @@ def run_pathguard_self_test(zone_r: Path, zone_h: Path, zone_i: Path) -> tuple[b
     """Part LXXV Isolation Test -- but read this narrowly. This proves the
     PathGuard MECHANISM correctly denies an implementation-scoped access
     to Zone R when it is actually consulted, using a synthetic probe scope,
-    not a real registered agent. `cli.py`'s `inspect`/`licence`/`similarity`
-    commands now do route real reads through this same mechanism for real
-    registered agents, but only when the caller opts in with `--agent-id`
+    not a real registered agent. `cli.py`'s `inspect`/`licence`/`similarity`/
+    `sanitise` commands now do route real reads through this same
+    mechanism for real registered agents, but only when the caller opts in
+    with `--agent-id`
     (see `Ctx.enforce_zone_access` and this module's own docstring) -- every
     other command, and any invocation without `--agent-id`, is still
     unguarded. For a project-specific signal that doesn't depend on

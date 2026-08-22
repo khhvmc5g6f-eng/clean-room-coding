@@ -582,10 +582,22 @@ change that should be evaluated on its own.
 ## Likely next additions
 
 1. ~~Wire `PathGuard.check()` into a real per-agent file-access path~~ --
-   **partially done**: `inspect`/`licence`/`similarity` now do this via
-   opt-in `--agent-id`. Remaining: every other zone-touching command, and
-   making it the default (or otherwise mandatory) rather than opt-in, for
-   whatever orchestration harness this library is embedded in.
+   **partially done**: `inspect`/`licence`/`similarity`/`sanitise` now do
+   this via opt-in `--agent-id` -- `sanitise` matters most of these four,
+   since it's the actual R-to-H boundary-crossing gate PathGuard exists to
+   police. `compare`'s reference/implementation *output* files (not
+   source) were deliberately left unguarded: that command doesn't load a
+   `Project` at all today, and forcing one to add zone enforcement would
+   be a real behaviour change (it currently works standalone, outside any
+   clean-room project directory) rather than the purely-additive pattern
+   used for the other four. `similarity --negative-control` paths are also
+   deliberately unguarded -- those are explicitly meant to be *outside*
+   the three zones (unrelated background corpora), so PathGuard-checking
+   them would be semantically wrong, not just incomplete. Remaining:
+   `compare` (if a future pass decides the behaviour change is worth it)
+   and making enforcement the default (or otherwise mandatory) rather than
+   opt-in, for whatever orchestration harness this library is embedded
+   in.
 2. ~~Depend on `license-expression`~~ -- **done**: `spdx.py` is now backed
    by the real `license-expression` library. ScanCode Toolkit remains an
    option for a future optional `[licensecheck]` extra (not a base

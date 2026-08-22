@@ -493,6 +493,7 @@ def sanitise(ctx: Ctx, path: Path) -> None:
     sanitised-specification differential -- what would be removed, and
     why) rather than just the raw finding list."""
     project = ctx.load_project()
+    ctx.enforce_zone_access(project, path)
     text = path.read_text(encoding="utf-8", errors="replace")
     findings = sanitisation_scanner.scan(text)
     blocked = sanitisation_scanner.is_handoff_blocked(findings)

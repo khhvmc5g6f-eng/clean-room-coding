@@ -521,6 +521,34 @@ def test_agent_id_rejects_unregistered_id(tmp_path: Path):
     assert result.exit_code != 0
 
 
+def test_agent_id_denies_r_scoped_agent_sanitise_of_zone_h_document(tmp_path: Path):
+    """`sanitise` reads a candidate handoff document out of Zone H -- the
+    exact boundary-crossing point PathGuard exists to police -- but, like
+    every other zone-touching command before this pass, never routed its
+    file read through PathGuard per invocation. An R-only agent must now be
+    genuinely denied `cleanroom sanitise` of a Zone H document, not just
+    fail the self-test in isolation."""
+    from cleanroom.cli import main
+    from cleanroom.orchestration.agents import AgentRegistry
+
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    (project_dir / "zone-h" / "spec.md").write_text("GIVEN a list\nWHEN sorted\nTHEN it is ordered\n", encoding="utf-8")
+
+    registry = AgentRegistry(project_dir / "evidence")
+    r_only = registry.register(role="Analyst", permitted_zones=["R"])
+    h_scoped = registry.register(role="Handoff Reviewer", permitted_zones=["H"])
+
+    denied = runner.invoke(main, ["--agent-id", r_only.agent_id, "--project", str(project_dir), "--json", "sanitise", str(project_dir / "zone-h" / "spec.md")])
+    assert denied.exit_code == 4  # ContaminationFailure
+    assert "PathGuard denied" in json.loads(denied.output)["error"]
+
+    allowed = runner.invoke(main, ["--agent-id", h_scoped.agent_id, "--project", str(project_dir), "--json", "sanitise", str(project_dir / "zone-h" / "spec.md")])
+    assert "PathGuard" not in allowed.output
+
+
 def test_legal_picks_up_similarity_and_requirement_graph_facts(tmp_path: Path):
     """Regression test: `cleanroom legal` previously never loaded
     evidence/similarity-findings.json or requirements.json into the

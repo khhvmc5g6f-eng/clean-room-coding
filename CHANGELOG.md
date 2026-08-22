@@ -745,4 +745,24 @@ detail:
   other mechanism (e.g. an existing lockfile) -- `discover_dependencies()`
   itself doesn't fetch or hash anything.
 
+### Added (twentieth pass — extend --agent-id PathGuard enforcement to `sanitise`)
+
+- `cleanroom sanitise` now also calls `Ctx.enforce_zone_access` before
+  reading its target document, joining `inspect`/`licence`/`similarity`
+  from the eighteenth-preceding pass. This one matters most of the four:
+  `sanitise` reads a candidate document straight out of Zone H, which is
+  the actual R-to-H boundary-crossing gate `PathGuard` exists to police,
+  not just an incidental file read.
+- `compare` and `similarity --negative-control` were deliberately left
+  unguarded and are now documented as such rather than silently skipped:
+  `compare` doesn't load a `Project` at all today, so adding enforcement
+  would be a real behaviour change (forcing every invocation inside a
+  clean-room project directory), not the purely-additive pattern used
+  elsewhere; negative-control paths are explicitly meant to sit outside
+  the three zones, so PathGuard-checking them would be semantically
+  wrong.
+- 1 new CLI-level regression test covering both the deny path (an R-only
+  agent denied `sanitise` of a Zone H document) and the allow path (an
+  H-scoped agent let through).
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD
