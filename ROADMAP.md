@@ -97,15 +97,29 @@ original review/audit/research pass this roadmap was first extended from.
   unconditional `GREEN` automatically.
 - **Remediation feedback loop** (`cleanroom remediate`): every RED legal
   finding and every suspicious/material similarity finding is
-  automatically turned into a tracked task, routed back to the
-  implementation team as a `blocked` node in the requirement graph.
-  Re-running after an actual fix clears it automatically
-  (`resolved_by_rescan`); a human can instead explicitly accept residual
-  risk (`--override --by --notes`, recorded as `resolved_by_override` so
-  it's never confused with an actual fix). `cleanroom release` refuses to
-  proceed while any blocking task is open -- this is the concrete,
-  testable answer to "does a flagged legal concern get sent back to be
-  recoded before release."
+  automatically turned into a tracked, `blocking` task; every AMBER/
+  UNKNOWN legal finding and every suspicious similarity finding becomes a
+  non-blocking `review_required` task -- both routed back to the
+  implementation team as a node in the requirement graph
+  (`assigned_to: implementation-team`). Re-running after an actual fix
+  clears it automatically (`resolved_by_rescan`); a human can instead
+  explicitly accept residual risk (`--override --by --notes`, recorded as
+  `resolved_by_override` so it's never confused with an actual fix).
+  `cleanroom release` refuses to proceed while any blocking task is open.
+  **Update (2026-08-22): the same gate now also runs before
+  implementation starts, not only at release.** `cleanroom build`
+  (registering a fresh implementation agent) now re-derives
+  REMEDIATION_TASKS.json from whatever legal/similarity findings
+  currently exist first -- an AMBER/RED audit concern is never left for
+  the implementation team to discover on its own after the fact. If any
+  BLOCKING concern is open, `build` prints a real decision panel (every
+  open concern, blocking and review-required, listed by id/severity/
+  description) and asks explicitly whether to proceed anyway -- or
+  honours `--acknowledge-open-concerns`/`--no-acknowledge-open-concerns`
+  for non-interactive/CI use (same tri-state pattern as `ai-suggest`'s
+  `--want-ai/--no-ai`). This is the concrete, testable answer to "does a
+  flagged legal concern get sent back to be recoded" at BOTH ends of the
+  pipeline, not just at release.
 - Optional AI-model suggestion (`cleanroom ai-suggest`): asks explicitly
   whether AI/ML capability should be added, and if so searches the real
   Hugging Face Hub, classifying each candidate as `embeddable` (ships an

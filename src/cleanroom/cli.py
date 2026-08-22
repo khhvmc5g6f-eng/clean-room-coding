@@ -678,10 +678,60 @@ def ai_suggest(ctx: Ctx, want_ai: bool | None, capability: str | None, embeddabl
 @click.option("--tool", "tools", multiple=True, help="A tool/capability this agent has access to (e.g. 'pytest', 'ast-grep'). Repeatable. Purely a record of what this agent instance was actually equipped with -- registering a tool here does not itself grant zone access or any runtime permission.")
 @click.option("--model-provider", default=None)
 @click.option("--model-id", default=None)
+@click.option(
+    "--acknowledge-open-concerns/--no-acknowledge-open-concerns", "acknowledge_open_concerns", default=None,
+    help="Skip the interactive panel for open AMBER/RED remediation concerns (for CI/non-interactive use). "
+    "--acknowledge-open-concerns proceeds despite them; --no-acknowledge-open-concerns refuses without prompting.",
+)
 @pass_ctx
-def build(ctx: Ctx, role: str, tools: tuple[str, ...], model_provider: str | None, model_id: str | None) -> None:
-    """Part XXVI: register a fresh, source-blind implementation agent scoped to Zone H + Zone I only."""
+def build(
+    ctx: Ctx, role: str, tools: tuple[str, ...], model_provider: str | None, model_id: str | None,
+    acknowledge_open_concerns: bool | None,
+) -> None:
+    """Part XXVI: register a fresh, source-blind implementation agent scoped
+    to Zone H + Zone I only. Before doing so, re-derives REMEDIATION_TASKS.json
+    from whatever legal/similarity findings currently exist (see
+    'cleanroom remediate') -- an AMBER or RED concern is never silently
+    left behind for the implementation team to discover on its own; it is
+    always passed over as a real, assigned task before this command lets
+    implementation start. A BLOCKING concern (a RED legal finding, or a
+    material similarity finding) refuses to proceed without an explicit
+    human decision, interactively or via --acknowledge-open-concerns; a
+    review_required concern (AMBER/UNKNOWN, or a suspicious similarity
+    finding) is surfaced but never blocks on its own, matching how every
+    other gate in this project treats AMBER."""
     project = ctx.load_project()
+
+    tasks_path = project.root / "REMEDIATION_TASKS.json"
+    existing_tasks = jsonlib.loads(tasks_path.read_text(encoding="utf-8")) if tasks_path.is_file() else []
+    tasks = _reconcile_and_sync_remediation(project, existing_tasks)
+    open_blocking = remediation_module.open_blocking_tasks(tasks)
+    open_review_required = [t for t in tasks if t["status"] == "open" and t["severity"] == "review_required"]
+
+    if open_blocking or open_review_required:
+        if acknowledge_open_concerns is None and not ctx.json_output:
+            click.echo(f"\n{len(open_blocking)} BLOCKING and {len(open_review_required)} review-required concern(s) are open:")
+            for task in open_blocking + open_review_required:
+                click.echo(f"  [{task['severity']}] {task['id']}: {task['description']}")
+            try:
+                acknowledge_open_concerns = click.confirm(
+                    "\nThese remain assigned to the implementation team (REMEDIATION_TASKS.json) and blocking ones "
+                    "will still block 'cleanroom release' until resolved or overridden. Proceed with registering "
+                    "this implementation agent anyway?",
+                    default=False,
+                )
+            except click.Abort:
+                # No interactive terminal to answer from (e.g. stdin closed
+                # in a script/CI context that forgot --acknowledge-open-concerns)
+                # -- fail closed with a clear message, never a raw traceback.
+                acknowledge_open_concerns = False
+        if open_blocking and not acknowledge_open_concerns:
+            raise click.ClickException(
+                f"{len(open_blocking)} blocking remediation concern(s) are open (see {tasks_path}) -- resolve "
+                "them, obtain an override via 'cleanroom remediate --override', or pass "
+                "--acknowledge-open-concerns to proceed anyway."
+            )
+
     registry = AgentRegistry(project.root / "evidence")
     record = registry.register(
         role=role,
@@ -696,9 +746,16 @@ def build(ctx: Ctx, role: str, tools: tuple[str, ...], model_provider: str | Non
         actor=Actor(type="agent", id=record.agent_id, role=role, model_provider=model_provider, model_id=model_id),
         action="cleanroom build (agent registered)",
         zone="I",
+        detail=(
+            f"open_blocking_concerns={len(open_blocking)} open_review_required_concerns={len(open_review_required)} "
+            f"acknowledged={bool(acknowledge_open_concerns)}"
+        ) if (open_blocking or open_review_required) else None,
         result="success",
     )
-    ctx.emit(record.to_dict())
+    ctx.emit({
+        **record.to_dict(),
+        "open_remediation_concerns": {"blocking": len(open_blocking), "review_required": len(open_review_required)},
+    })
 
 
 # --------------------------------------------------------------------------- recruit
@@ -1188,34 +1245,27 @@ def judge_adjudicate(ctx: Ctx, pack_id: str, answer_file: Path, panel_member_id:
 
 # --------------------------------------------------------------------------- remediate
 
-@main.command()
-@click.option("--override", "override_id", default=None, help="Mark a specific open task resolved by human sign-off instead of a clean re-scan (Part LI).")
-@click.option("--by", "override_by", default=None, help="Required with --override: who is accepting this residual risk.")
-@click.option("--notes", "override_notes", default=None, help="Required with --override: why.")
-@pass_ctx
-def remediate(ctx: Ctx, override_id: str | None, override_by: str | None, override_notes: str | None) -> None:
-    """Routes RED legal findings and suspicious/material similarity findings
-    back to the implementation team as blocking requirement-graph nodes.
-    Idempotent: re-running after a fix clears the task automatically; a
-    fix that was never made stays open and blocks 'cleanroom release'."""
-    project = ctx.load_project()
-    tasks_path = project.root / "REMEDIATION_TASKS.json"
-    existing_tasks = jsonlib.loads(tasks_path.read_text(encoding="utf-8")) if tasks_path.is_file() else []
-
+def _load_legal_and_similarity_findings(project: Project) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     legal_path = project.root / "evidence" / "legal-findings.json"
     similarity_path = project.root / "evidence" / "similarity-findings.json"
     legal_findings = jsonlib.loads(legal_path.read_text(encoding="utf-8")) if legal_path.is_file() else []
     similarity_findings = jsonlib.loads(similarity_path.read_text(encoding="utf-8")) if similarity_path.is_file() else []
+    return legal_findings, similarity_findings
 
-    if override_id:
-        if not override_by or not override_notes:
-            raise click.ClickException("--override requires both --by and --notes.")
-        try:
-            existing_tasks = remediation_module.apply_override(existing_tasks, override_id, by=override_by, notes=override_notes)
-        except ValueError as e:
-            raise click.ClickException(str(e)) from e
 
+def _reconcile_and_sync_remediation(project: Project, existing_tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Re-derive REMEDIATION_TASKS.json from whatever legal/similarity
+    findings currently exist and sync the requirement graph's blocked/
+    remediation nodes to match -- the actual mechanism that passes a RED
+    or AMBER concern to the implementation team (`assigned_to` on the
+    task, a `blocked` node with `responsible_component` in the
+    requirement graph). Shared by `remediate` (`existing_tasks` may
+    already have a human override applied) and `build` (`existing_tasks`
+    loaded fresh, no override path -- registering a new implementation
+    agent is not itself a way to resolve an open concern)."""
+    legal_findings, similarity_findings = _load_legal_and_similarity_findings(project)
     tasks = remediation_module.reconcile(existing_tasks, legal_findings, similarity_findings)
+    tasks_path = project.root / "REMEDIATION_TASKS.json"
     tasks_path.write_text(jsonlib.dumps(tasks, indent=2, sort_keys=True), encoding="utf-8")
 
     graph_path = project.root / "requirements.json"
@@ -1241,6 +1291,35 @@ def remediate(ctx: Ctx, override_id: str | None, override_by: str | None, overri
             graph.nodes[node_id]["status"] = "implemented"
             graph.nodes[node_id].pop("blocker", None)
     graph.save(graph_path)
+    return tasks
+
+
+@main.command()
+@click.option("--override", "override_id", default=None, help="Mark a specific open task resolved by human sign-off instead of a clean re-scan (Part LI).")
+@click.option("--by", "override_by", default=None, help="Required with --override: who is accepting this residual risk.")
+@click.option("--notes", "override_notes", default=None, help="Required with --override: why.")
+@pass_ctx
+def remediate(ctx: Ctx, override_id: str | None, override_by: str | None, override_notes: str | None) -> None:
+    """Routes RED legal findings and suspicious/material similarity findings
+    back to the implementation team as blocking requirement-graph nodes
+    (AMBER/UNKNOWN and suspicious findings the same way, as non-blocking
+    review_required tasks). Idempotent: re-running after a fix clears the
+    task automatically; a fix that was never made stays open and blocks
+    'cleanroom release' (and, for blocking tasks, 'cleanroom build' -- see
+    that command)."""
+    project = ctx.load_project()
+    tasks_path = project.root / "REMEDIATION_TASKS.json"
+    existing_tasks = jsonlib.loads(tasks_path.read_text(encoding="utf-8")) if tasks_path.is_file() else []
+
+    if override_id:
+        if not override_by or not override_notes:
+            raise click.ClickException("--override requires both --by and --notes.")
+        try:
+            existing_tasks = remediation_module.apply_override(existing_tasks, override_id, by=override_by, notes=override_notes)
+        except ValueError as e:
+            raise click.ClickException(str(e)) from e
+
+    tasks = _reconcile_and_sync_remediation(project, existing_tasks)
 
     blocking_open = remediation_module.open_blocking_tasks(tasks)
     project.evidence.append(

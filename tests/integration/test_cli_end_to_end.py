@@ -674,6 +674,113 @@ def test_build_registers_tools_on_the_agent_record(tmp_path: Path):
     assert any(a["tools"] == ["pytest", "ruff"] for a in status_agents)
 
 
+def _setup_project_with_a_red_legal_finding(runner: CliRunner, project_dir: Path) -> None:
+    """A real, reproducible RED finding: AGPL-3.0-only reference material
+    plus a configured SaaS distribution model triggers
+    saas_network_provision RED (AGPL-3.0 s.13) in every convened
+    jurisdiction -- used to exercise the pre-build remediation panel."""
+    import yaml
+
+    project_dir.mkdir(exist_ok=True)
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    (project_dir / "zone-r" / "lib").mkdir(parents=True)
+    (project_dir / "zone-r" / "lib" / "package.json").write_text('{"name": "agpl-lib", "license": "AGPL-3.0-only"}', encoding="utf-8")
+
+    config_path = project_dir / ".cleanroom.yml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["implementation"]["distribution_model"] = ["saas"]
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    runner.invoke(main, ["--project", str(project_dir), "--json", "licence", str(project_dir / "zone-r")])
+    _run(runner, ["--project", str(project_dir), "intake", "--source", "lib", "--access-authority", "public"])
+    _run(runner, ["--project", str(project_dir), "--json", "legal", "--access-authority", "public"])
+
+
+def test_build_refuses_without_acknowledgment_when_a_blocking_concern_is_open(tmp_path: Path):
+    """'cleanroom build' is the pre-build gate the whole methodology needs:
+    a RED legal finding must be routed to REMEDIATION_TASKS.json (assigned
+    to the implementation team) automatically, and must refuse to
+    register a new implementation agent without an explicit human
+    decision -- no silent 'the audit found a RED but nobody noticed
+    before coding started'."""
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    _setup_project_with_a_red_legal_finding(runner, project_dir)
+
+    result = runner.invoke(main, ["--project", str(project_dir), "--json", "build", "--role", "Backend Team"])
+    assert result.exit_code != 0
+    assert "blocking remediation concern" in result.output
+
+    tasks = json.loads((project_dir / "REMEDIATION_TASKS.json").read_text(encoding="utf-8"))
+    blocking = [t for t in tasks if t["severity"] == "blocking" and t["status"] == "open"]
+    assert blocking and all(t["assigned_to"] == "implementation-team" for t in blocking)
+    assert any("saas_network_provision" in t["source_ref"] for t in blocking)
+
+    assert not (project_dir / "evidence" / "agents.json").is_file()  # no agent was registered
+
+
+def test_build_proceeds_with_explicit_acknowledge_flag(tmp_path: Path):
+    """The non-interactive escape hatch for CI/scripted use, mirroring
+    ai-suggest's --want-ai/--no-ai pattern."""
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    _setup_project_with_a_red_legal_finding(runner, project_dir)
+
+    result = _run(runner, ["--project", str(project_dir), "--json", "build", "--role", "Backend Team", "--acknowledge-open-concerns"])
+    payload = json.loads(result.output)
+    assert payload["open_remediation_concerns"]["blocking"] >= 1
+    assert payload["agent_id"]
+
+
+def test_build_interactive_panel_lists_concerns_and_honours_the_answer(tmp_path: Path):
+    """The actual 'panel': without --acknowledge-open-concerns and outside
+    --json mode, build must print every open concern and ask before
+    proceeding -- answering yes registers the agent, answering no (or no
+    input at all, e.g. a closed stdin in a forgotten script) refuses,
+    cleanly, never with a raw traceback."""
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    _setup_project_with_a_red_legal_finding(runner, project_dir)
+
+    declined = runner.invoke(main, ["--project", str(project_dir), "build", "--role", "Backend Team"], input="n\n")
+    assert declined.exit_code != 0
+    assert "BLOCKING and" in declined.output
+    assert "saas_network_provision" in declined.output
+
+    no_input_at_all = runner.invoke(main, ["--project", str(project_dir), "build", "--role", "Backend Team"], input="")
+    assert no_input_at_all.exit_code != 0
+    assert "Traceback" not in no_input_at_all.output
+
+    accepted = runner.invoke(main, ["--project", str(project_dir), "build", "--role", "Backend Team"], input="y\n")
+    assert accepted.exit_code == 0
+    agents = json.loads((project_dir / "evidence" / "agents.json").read_text(encoding="utf-8"))["agents"]
+    assert len(agents) == 1
+
+
+def test_build_surfaces_but_does_not_block_on_review_required_only_concerns(tmp_path: Path):
+    """AMBER/UNKNOWN concerns alone (no RED, no material similarity) must
+    never hard-block -- matching every other gate in this project, where
+    AMBER is advisory, not blocking. Uses a plain MIT reference with no
+    distribution model configured, which still yields several
+    review_required (UNKNOWN) concerns (protected_expression, copying/
+    substantiality with no similarity run, etc.) but zero blocking ones."""
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    (project_dir / "zone-r" / "lib").mkdir(parents=True)
+    (project_dir / "zone-r" / "lib" / "LICENSE").write_text("MIT License\n", encoding="utf-8")
+    runner.invoke(main, ["--project", str(project_dir), "--json", "licence", str(project_dir / "zone-r")])
+    _run(runner, ["--project", str(project_dir), "intake", "--source", "lib", "--access-authority", "public"])
+    _run(runner, ["--project", str(project_dir), "--json", "legal", "--access-authority", "public"])
+
+    result = _run(runner, ["--project", str(project_dir), "--json", "build", "--role", "Backend Team"])
+    payload = json.loads(result.output)
+    assert payload["open_remediation_concerns"]["blocking"] == 0
+    assert payload["open_remediation_concerns"]["review_required"] > 0
+    assert payload["agent_id"]  # registered without any acknowledgment needed
+
+
 def test_agent_id_rejects_unregistered_id(tmp_path: Path):
     from cleanroom.cli import main
 

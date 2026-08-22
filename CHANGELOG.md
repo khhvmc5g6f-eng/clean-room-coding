@@ -8,7 +8,39 @@ once it reaches 1.0.
 
 ## [Unreleased]
 
-Nothing yet — see [0.2.0] below for the current state.
+### Added (twenty-sixth pass — a real pre-build remediation panel)
+
+- `cleanroom build` now re-derives `REMEDIATION_TASKS.json` from
+  whatever legal/similarity findings currently exist (the same mechanism
+  `cleanroom remediate` already used, extracted into a shared
+  `_reconcile_and_sync_remediation()` helper) BEFORE registering a new
+  implementation agent -- an AMBER or RED audit concern is never
+  silently left for the implementation team to discover after the fact.
+- If any BLOCKING concern (a RED legal finding, or a material similarity
+  finding) is open, `build` prints a real panel -- every open concern,
+  blocking and review-required, listed by id/severity/description -- and
+  asks explicitly whether to proceed anyway (`click.confirm`, the same
+  interactive pattern `ai-suggest` already established). A closed/non-
+  interactive stdin (a script that forgot the flag below) now fails
+  closed with a clean message, not a raw `click.Abort` traceback.
+- A new `--acknowledge-open-concerns`/`--no-acknowledge-open-concerns`
+  tri-state flag (default unset, mirroring `ai-suggest`'s
+  `--want-ai/--no-ai`) lets CI/non-interactive callers skip the prompt
+  in either direction.
+- Review-required concerns (AMBER/UNKNOWN legal findings, suspicious
+  similarity findings) are always surfaced in the panel but never block
+  on their own -- matching how every other gate in this project treats
+  AMBER, not a new, stricter standard invented for this one command.
+- Fully backward-compatible: a project that has never run `cleanroom
+  legal`/`cleanroom similarity` (the overwhelming majority of existing
+  test fixtures and, most likely, most real usage before this point)
+  gets an empty task list and sees no change in `build`'s behaviour at
+  all.
+- 4 new end-to-end CLI tests: refusal without acknowledgment, the
+  `--acknowledge-open-concerns` bypass, the actual interactive panel
+  (both a declined and an accepted answer, plus a closed-stdin case
+  proving no traceback leaks), and confirming review-required-only
+  concerns never block.
 
 ## [0.2.0] - 2026-08-22
 

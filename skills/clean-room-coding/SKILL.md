@@ -130,7 +130,18 @@ machine-readable output) over re-deriving its logic by hand.
     [--tool NAME ...]` is its Reference-side counterpart, scoped to Zone
     R only. `--tool` (repeatable on both) records what the agent instance
     was actually equipped with -- a plain record, not itself a grant of
-    zone access. If something is actually orchestrating multiple such
+    zone access. Before registering, `build` re-derives REMEDIATION_TASKS.json
+    from whatever legal/similarity findings currently exist (same
+    mechanism as `cleanroom remediate`) -- an AMBER or RED audit concern
+    is never silently left behind for the implementation team to
+    discover on its own. If any BLOCKING concern (RED, or a material
+    similarity finding) is still open, `build` prints a panel listing
+    every open concern and asks for an explicit decision (or honours
+    `--acknowledge-open-concerns`/`--no-acknowledge-open-concerns` for
+    non-interactive use) before it will register the agent; review-required
+    (AMBER/UNKNOWN) concerns are surfaced the same way but never block on
+    their own, matching how every other gate in this project treats
+    AMBER. If something is actually orchestrating multiple such
     agents over time, call `cleanroom heartbeat <agent-id>
     --action-signature ... --files-modified N` once per meaningful tick --
     it diagnoses `STALLED`/`LOOPING` from that agent's real tick history
