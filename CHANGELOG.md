@@ -42,11 +42,11 @@ Initial v0.1.0 build. This is early, alpha software — see
   (`cleanroom judge`) for every convened jurisdiction panel — the
   reasoning itself is performed by whatever LLM harness runs the
   generated prompts; this library never calls one on its own.
-- A 22-command CLI (`cleanroom init`, `doctor`, `intake`, `licence`,
-  `jurisdiction`, `analyse`, `specify` (`add-requirement`, `report`,
-  `add-behavioral`), `sanitise`, `handoff`, `architect`, `build`, `test`,
-  `compare`, `provenance`, `audit`, `legal`, `judge`, `verify`, `report`,
-  `release`, `status`) with `--json` output and documented exit codes
+- A 22-command CLI (`cleanroom init`, `doctor`, `intake`, `inspect`,
+  `licence`, `jurisdiction`, `analyse`, `specify` (`add-requirement`,
+  `report`, `add-behavioral`), `sanitise`, `handoff`, `architect`, `build`,
+  `test`, `compare`, `provenance`, `audit`, `legal`, `judge`, `verify`,
+  `report`, `release`, `status`) with `--json` output and documented exit codes
   (`src/cleanroom/exit_codes.py`) for CI/CD consumption.
 - Project documentation: `CONTRIBUTING.md`, `SECURITY.md`,
   `GOVERNANCE.md`, `CODE_OF_CONDUCT.md`, `AGENTS.md`.

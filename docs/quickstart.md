@@ -28,9 +28,11 @@ cleanroom intake --source "upstream-lib v2.3, github.com/example/upstream-lib" \
   --access-authority public
 ```
 
-**2. Put the reference material in `zone-r/`**, then discover its licences:
+**2. Put the reference material in `zone-r/`**, take a quick deterministic
+look at it, then discover its licences:
 
 ```bash
+cleanroom inspect zone-r
 cleanroom licence zone-r
 ```
 

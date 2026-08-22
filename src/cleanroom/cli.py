@@ -44,6 +44,7 @@ from cleanroom.sanitisation import scanner as sanitisation_scanner
 from cleanroom.schema_registry import schema_dir
 from cleanroom.specification.behavioral import BehavioralSuite
 from cleanroom.specification.graph import RequirementGraph
+from cleanroom.util import hash_tree, sha256_json
 from cleanroom.zones import create_zones, run_isolation_test
 
 
@@ -204,6 +205,52 @@ def intake(ctx: Ctx, source: str, access_authority: str, reverse_engineering_res
     if access_authority == "unknown":
         ctx.echo("WARNING: access_authority is 'unknown'. Do not proceed to analysis until this is resolved (Part IX).")
     ctx.emit({"report": str(report_path), "access_authority": access_authority})
+
+
+# --------------------------------------------------------------------------- inspect
+
+@main.command()
+@click.argument("path", type=click.Path(exists=True, path_type=Path), required=False)
+@pass_ctx
+def inspect(ctx: Ctx, path: Path | None) -> None:
+    """A deterministic first look at reference material: file counts, sizes,
+    extension histogram and content hashes -- before the deeper `licence`
+    scan or any LLM-driven `analyse`. Never opens/reads file content beyond
+    what's needed to hash and size it."""
+    project = ctx.load_project()
+    target = path or project.zone_r
+    tree = hash_tree(target)
+    extensions: dict[str, int] = {}
+    total_bytes = 0
+    for rel in tree:
+        ext = Path(rel).suffix or "(none)"
+        extensions[ext] = extensions.get(ext, 0) + 1
+        full = target / rel
+        if full.is_file():
+            total_bytes += full.stat().st_size
+
+    summary = {
+        "path": str(target),
+        "file_count": len(tree),
+        "total_bytes": total_bytes,
+        "extensions": dict(sorted(extensions.items(), key=lambda kv: -kv[1])),
+        "tree_hash": sha256_json(tree),
+    }
+    project.evidence.append(
+        actor=Actor(type="tool", id="cleanroom-inspect"),
+        action="cleanroom inspect",
+        zone="R" if target == project.zone_r else "none",
+        result="success",
+        detail=f"{summary['file_count']} file(s), {summary['total_bytes']} bytes under {target}",
+    )
+    ctx.emit(
+        summary,
+        human=(
+            f"{summary['file_count']} file(s), {summary['total_bytes']} bytes under {target}\n"
+            f"Extensions: {summary['extensions']}\n"
+            f"Tree hash: {summary['tree_hash']}"
+        ),
+    )
 
 
 # --------------------------------------------------------------------------- licence

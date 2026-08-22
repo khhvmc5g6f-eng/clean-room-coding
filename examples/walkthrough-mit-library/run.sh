@@ -34,6 +34,9 @@ EOF
 echo "== intake =="
 cleanroom intake --source "upstream-sort-lib v1.0 (synthetic example)" --access-authority public
 
+echo "== inspect (deterministic first look) =="
+cleanroom inspect zone-r
+
 echo "== licence discovery =="
 cleanroom licence zone-r
 

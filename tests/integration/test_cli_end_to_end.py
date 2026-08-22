@@ -32,6 +32,12 @@ def test_full_pipeline(tmp_path: Path, monkeypatch):
         encoding="utf-8",
     )
 
+    inspect_result = _run(runner, ["--project", str(project_dir), "--json", "inspect", str(project_dir / "zone-r")])
+    inspect_payload = json.loads(inspect_result.output)
+    # zone-r/.gitkeep (from `init`) + zone-r/lib/LICENSE (just added) = 2 files.
+    assert inspect_payload["file_count"] == 2
+    assert inspect_payload["extensions"] == {"(none)": 2}
+
     result = _run(runner, ["--project", str(project_dir), "--json", "licence", str(project_dir / "zone-r")])
     payload = json.loads(result.output)
     assert payload["blocking"] is False

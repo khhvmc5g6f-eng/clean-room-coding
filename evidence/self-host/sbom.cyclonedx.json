@@ -32,7 +32,7 @@
       "type": "application",
       "version": "0.1.0"
     },
-    "timestamp": "2026-08-22T11:39:58.264Z",
+    "timestamp": "2026-08-22T11:43:39.769Z",
     "tools": [
       {
         "name": "cleanroom",
@@ -41,7 +41,7 @@
       }
     ]
   },
-  "serialNumber": "urn:uuid:29d30f3c-b637-4781-91c7-fa0217f80917",
+  "serialNumber": "urn:uuid:bc691756-2698-46d8-bc18-9c64effbdba0",
   "specVersion": "1.5",
   "version": 1
 }
