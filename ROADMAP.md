@@ -413,12 +413,19 @@ than a bare "worth considering":
    Framework's Link predicate shape (`cleanroom verify
    --export-in-toto-links` -> `provenance/intoto.py`), verified against
    the real spec fetched from `in-toto/attestation` directly rather than
-   assumed -- **but these exports are explicitly NOT cryptographically
-   signed attestations** (every file says so in an `unsigned`/
-   `unsigned_note` field): the ledger authenticates itself by hash-chaining,
-   not by each actor holding a signing key, so there is nothing to sign
-   with. Presented honestly as a structural interoperability export, not
-   overclaimed as equivalent to a real signed in-toto attestation.
+   assumed. **These exports now support real signing too**:
+   `--signer <gpg-key-id>` (the same mechanism `cleanroom handoff --signer`
+   already uses for the handoff manifest) produces a genuine, verifiable
+   detached GPG signature over each exported Statement -- not a full
+   in-toto-native DSSE/Sigstore envelope with per-actor signer
+   attribution (there is still no per-actor signing key; that would need
+   a much bigger multi-party key-management system), but a real
+   cryptographic attestation nonetheless, tied to whatever project-level
+   key the user configures. Without `--signer` (or if `gpg`/the key isn't
+   available), every export honestly stays `unsigned: true` --
+   `sign_statement()` never fabricates a signature, verified both ways
+   (mocked gpg success, and this environment's genuine lack of a `gpg`
+   binary producing an honest fallback).
 
 None of these four libraries are integrated yet -- each is a real
 dependency/architecture decision for the project's maintainer(s) to make
@@ -528,10 +535,13 @@ change that should be evaluated on its own.
 - **SLSA build provenance is now generated on release** (see
   "Competitive landscape" above) via `.github/workflows/release.yml`, and
   the evidence ledger can now export to the in-toto Link predicate shape
-  (`cleanroom verify --export-in-toto-links`) -- but those exports are
-  unsigned structural mappings, not real signed in-toto attestations (see
-  "Competitive landscape" for why: no per-actor signing key exists to
-  produce one).
+  (`cleanroom verify --export-in-toto-links`), optionally really signed
+  (`--signer <gpg-key-id>`, same mechanism as `cleanroom handoff
+  --signer`) -- see "Competitive landscape" above. There is still no
+  PER-ACTOR signing key (every actor -- human/agent/tool/CI -- signing
+  their own step with their own key), only a single project-level GPG
+  signer; genuine multi-actor attribution would need a materially bigger
+  key-management system.
 - **No web dashboard, no plugin architecture, no GitLab/Bitbucket
   adapters** -- the CLI/library API is the whole surface for v0.1;
   `docs/architecture.md` notes these as intentionally out of scope for a

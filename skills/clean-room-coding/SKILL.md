@@ -165,9 +165,12 @@ machine-readable output) over re-deriving its logic by hand.
     was altered after the fact (e.g. before `cleanroom report`, or if a
     file in Zone H looks like it might have changed since handoff).
     `--export-in-toto-links` additionally maps every ledger event to an
-    in-toto Link-predicate Statement -- an interoperability export, NOT a
-    signed attestation (no per-actor signing key exists; every file says
-    so explicitly).
+    in-toto Link-predicate Statement. Add `--signer <gpg-key-id>` (same
+    mechanism as `cleanroom handoff --signer`) to have each one really,
+    verifiably GPG-signed; without it, every export honestly stays
+    `unsigned: true` -- there is still no PER-ACTOR signing key (that
+    would need a bigger multi-party key-management system), only an
+    optional single project-level one.
 
 14. **Legal / Judge** -- `cleanroom legal --access-authority ...` runs the
     heuristic legal-issue engine (Part XLIV-style: 18 distinct questions,

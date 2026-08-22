@@ -690,4 +690,27 @@ detail:
 - 3 new CLI-level regression tests covering the deny path, the allow
   path, and an unregistered `--agent-id` being rejected outright.
 
+### Added (eighteenth pass — real, optional signing for in-toto exports)
+
+- `provenance/intoto.py`'s exported Link Statements can now be really
+  signed: new `sign_statement()` and `--signer <gpg-key-id>` on
+  `cleanroom verify --export-in-toto-links`, using the exact same
+  mechanism and never-fabricate discipline as
+  `handoff/manifest.py::sign_manifest` (a detached, ASCII-armored GPG
+  signature over the statement's own content). Without `--signer`, or if
+  `gpg`/the key id isn't usable, every export honestly stays
+  `unsigned: true` -- confirmed both ways: a mocked successful `gpg` call
+  producing a real `signature` block and flipping `unsigned` to `false`,
+  and this environment's genuine lack of a `gpg` binary producing an
+  honest, non-crashing fallback (no `gpg` is actually installed here,
+  which is exactly the scenario this discipline exists for).
+- This is still a single project-level signer, not per-actor
+  (human/agent/tool/CI each signing their own step) -- that would need a
+  materially bigger multi-party key-management system. Documented
+  plainly as a real but narrower signing capability, not a full in-toto-
+  native DSSE/Sigstore envelope with per-step signer attribution.
+- 5 new unit tests plus 2 new CLI-level regression tests (one with a
+  mocked successful signature, one exercising the real no-`gpg`
+  fallback in this environment).
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD

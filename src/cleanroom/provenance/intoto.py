@@ -3,27 +3,38 @@ attestations (https://in-toto.io/attestation/link/v0.3, wrapped in the
 in-toto Attestation Framework's Statement envelope,
 https://in-toto.io/Statement/v1).
 
-*** THESE ARE STRUCTURAL EXPORTS, NOT SIGNED IN-TOTO ATTESTATIONS. ***
+*** BY DEFAULT THESE ARE STRUCTURAL EXPORTS, NOT SIGNED IN-TOTO
+ATTESTATIONS -- unless a signer is configured (see `sign_statement`
+below). ***
 
 A genuine in-toto attestation's security value comes entirely from a
-DSSE-enveloped cryptographic signature over the Statement, verifiable
-against a specific signer's known public key. This project's evidence
-ledger authenticates its OWN integrity by hash-chaining every event
-(Part XLII, `evidence.py`'s `verify_chain`), not by having each individual
-actor (human/agent/tool/CI) sign their own step with a private key -- there
-is no such key here to sign with. This module maps each ledger event to
-the correct in-toto Link predicate *shape*, for interoperability with
-tooling that consumes that shape, and to make the ledger's existing
-hash-chain evidence (`event_hash`/`previous_hash`) visible in a format
-in-toto-aware tooling understands -- but importing one of these files into
-a real in-toto/SLSA verification workflow and treating it as equivalent to
-a signed attestation would be a false assurance. Every exported file
-records this plainly in an `unsigned` field; callers must not strip it.
+cryptographic signature over the Statement, verifiable against a
+specific signer's known public key. This project's evidence ledger
+authenticates its OWN integrity by hash-chaining every event (Part XLII,
+`evidence.py`'s `verify_chain`), not by having each individual actor
+(human/agent/tool/CI) sign their own step with a private key -- there is
+no PER-ACTOR key here (that would need a much bigger multi-party key-
+management system). What DOES exist, using the exact same mechanism
+`handoff/manifest.py::sign_manifest` already uses for the handoff
+manifest: an optional, project-level GPG signer
+(`cleanroom verify --export-in-toto-links --signer <gpg-key-id>`) that
+produces a real, standard, verifiable detached signature over each
+exported Statement -- a genuine cryptographic attestation, just not a
+full in-toto-native DSSE/Sigstore envelope with per-step signer
+attribution. Without `--signer` (or if `gpg` isn't available, or the key
+id is wrong), every exported file honestly stays `unsigned: true` --
+`sign_statement` never fabricates a signature, exactly like
+`sign_manifest` doesn't. Callers must not strip the `unsigned`/
+`unsigned_note`/`signature` fields, whichever way they come out.
 """
 
 from __future__ import annotations
 
+import shutil
+import subprocess
 from typing import Any
+
+from cleanroom.util import sha256_json
 
 STATEMENT_TYPE = "https://in-toto.io/Statement/v1"
 LINK_PREDICATE_TYPE = "https://in-toto.io/attestation/link/v0.3"
@@ -100,8 +111,52 @@ def event_to_link_statement(event: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def export_ledger_to_link_statements(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def sign_statement(statement: dict[str, Any], *, gpg_key_id: str | None = None) -> dict[str, Any]:
+    """Best-effort detached GPG signature over the statement's own
+    content, using the identical mechanism and discipline as
+    `handoff/manifest.py::sign_manifest`: never fabricates a signature.
+    If `gpg_key_id` is omitted or `gpg` isn't on PATH, `statement` is
+    returned unchanged (still `unsigned: true`). Only when a real
+    signature is actually produced does `unsigned` become `false` -- a
+    genuine, standard, verifiable PGP signature (the same mechanism
+    `git commit -S` and package-repository signing use), not a full
+    in-toto-native DSSE/Sigstore envelope, but real cryptographic
+    attestation nonetheless, tied to whatever key the caller configures."""
+    if not gpg_key_id or not shutil.which("gpg"):
+        return statement
+    payload = sha256_json({k: v for k, v in statement.items() if k not in ("unsigned", "unsigned_note", "signature")})
+    try:
+        result = subprocess.run(
+            ["gpg", "--batch", "--pinentry-mode", "error", "--local-user", gpg_key_id, "--detach-sign", "--armor", "--output", "-"],
+            input=payload.encode("utf-8"),
+            capture_output=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        return statement
+    if result.returncode == 0:
+        statement["signature"] = {
+            "algorithm": "gpg-detached-armor-over-statement-sha256",
+            "value": result.stdout.decode("utf-8"),
+            "signer_identity": gpg_key_id,
+            "signed_content_sha256": payload,
+        }
+        statement["unsigned"] = False
+        statement["unsigned_note"] = (
+            f"This statement IS cryptographically signed: a real detached GPG signature (key "
+            f"'{gpg_key_id}') over the sha256 of this statement's own content ('signed_content_sha256'), "
+            f"using the same mechanism 'cleanroom handoff --signer' already uses for the handoff "
+            f"manifest. This is a genuine, verifiable signature -- not a full in-toto-native "
+            f"DSSE/Sigstore envelope with per-step signer attribution."
+        )
+    return statement
+
+
+def export_ledger_to_link_statements(
+    events: list[dict[str, Any]], *, gpg_key_id: str | None = None,
+) -> list[dict[str, Any]]:
     """Maps every event in an evidence ledger (as returned by
     `EvidenceLedger.read_all()`) to its in-toto Link Statement, in the
-    ledger's own order."""
-    return [event_to_link_statement(event) for event in events]
+    ledger's own order. Pass `gpg_key_id` to have each one really signed
+    (see `sign_statement`) rather than left honestly `unsigned`."""
+    return [sign_statement(event_to_link_statement(event), gpg_key_id=gpg_key_id) for event in events]

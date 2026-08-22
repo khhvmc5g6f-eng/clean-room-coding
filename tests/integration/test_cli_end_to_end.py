@@ -205,6 +205,47 @@ def test_verify_export_in_toto_links_is_opt_in_and_writes_one_file_per_event(tmp
     assert statement["unsigned"] is True
 
 
+def test_verify_signer_produces_a_real_signature_on_exported_links(tmp_path: Path, monkeypatch):
+    """--signer wires through to intoto.sign_statement() for real -- with
+    gpg mocked as available and successful, every exported statement must
+    come out unsigned:false with a real signature block."""
+    import cleanroom.provenance.intoto as intoto_module
+
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+
+    fake_result = type("R", (), {"returncode": 0, "stdout": b"-----BEGIN PGP SIGNATURE-----\nfake\n-----END PGP SIGNATURE-----\n"})()
+    monkeypatch.setattr(intoto_module.shutil, "which", lambda name: "/usr/bin/gpg")
+    monkeypatch.setattr(intoto_module.subprocess, "run", lambda *a, **k: fake_result)
+
+    result = _run(runner, ["--project", str(project_dir), "--json", "verify", "--export-in-toto-links", "--signer", "ABCDEF1234567890"])
+    payload = json.loads(result.output)
+    assert payload["in_toto_links"]["signed_count"] == 1
+    assert payload["in_toto_links"]["unsigned_count"] == 0
+
+    link_dir = project_dir / "evidence" / "in-toto-links"
+    statement = json.loads(next(link_dir.glob("*.link.json")).read_text(encoding="utf-8"))
+    assert statement["unsigned"] is False
+    assert statement["signature"]["signer_identity"] == "ABCDEF1234567890"
+
+
+def test_verify_signer_falls_back_to_unsigned_without_real_gpg(tmp_path: Path):
+    """No mocking here -- this environment genuinely has no gpg installed
+    (or the key id is bogus), so --signer must not crash or fabricate a
+    signature; every statement stays honestly unsigned."""
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+
+    result = _run(runner, ["--project", str(project_dir), "--json", "verify", "--export-in-toto-links", "--signer", "not-a-real-key-id"])
+    payload = json.loads(result.output)
+    assert payload["in_toto_links"]["signed_count"] == 0
+    assert payload["in_toto_links"]["unsigned_count"] == 1
+
+
 def test_heartbeat_detects_looping_agent_and_updates_registry(tmp_path: Path):
     """End-to-end proof that heartbeat.py -- 0% covered and unreachable
     from any CLI command before this -- is now real: register an agent,

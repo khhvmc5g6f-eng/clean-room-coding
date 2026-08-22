@@ -1219,10 +1219,14 @@ def remediate(ctx: Ctx, override_id: str | None, override_by: str | None, overri
 @main.command()
 @click.option(
     "--export-in-toto-links", is_flag=True, default=False,
-    help="Also export every evidence-ledger event as an in-toto Link-predicate Statement (structural mapping only -- NOT a signed attestation; see provenance/intoto.py) to evidence/in-toto-links/.",
+    help="Also export every evidence-ledger event as an in-toto Link-predicate Statement to evidence/in-toto-links/. Structural mapping only, NOT a signed attestation, unless --signer is also given (see provenance/intoto.py).",
+)
+@click.option(
+    "--signer", "gpg_key_id", default=None,
+    help="GPG key id to really sign each exported in-toto Statement with (same mechanism as 'cleanroom handoff --signer'). Requires --export-in-toto-links. Never fabricates a signature if gpg or the key isn't available -- falls back to unsigned.",
 )
 @pass_ctx
-def verify(ctx: Ctx, export_in_toto_links: bool) -> None:
+def verify(ctx: Ctx, export_in_toto_links: bool, gpg_key_id: str | None) -> None:
     """Re-derive every hash this project has produced and compare against
     what was recorded -- proves nothing was silently altered."""
     project = ctx.load_project()
@@ -1237,7 +1241,7 @@ def verify(ctx: Ctx, export_in_toto_links: bool) -> None:
 
     if export_in_toto_links:
         events = project.evidence.read_all()
-        statements = intoto_module.export_ledger_to_link_statements(events)
+        statements = intoto_module.export_ledger_to_link_statements(events, gpg_key_id=gpg_key_id)
         out_dir = project.root / "evidence" / "in-toto-links"
         out_dir.mkdir(parents=True, exist_ok=True)
         written = []
@@ -1246,7 +1250,11 @@ def verify(ctx: Ctx, export_in_toto_links: bool) -> None:
             out_path = out_dir / f"{event['sequence']:06d}-{action_slug}.link.json"
             out_path.write_text(jsonlib.dumps(statement, indent=2, sort_keys=True), encoding="utf-8")
             written.append(str(out_path))
-        result["in_toto_links"] = {"count": len(written), "directory": str(out_dir)}
+        signed_count = sum(1 for s in statements if not s["unsigned"])
+        result["in_toto_links"] = {
+            "count": len(written), "directory": str(out_dir),
+            "signed_count": signed_count, "unsigned_count": len(statements) - signed_count,
+        }
 
     ctx.emit(result)
     if not ok:
