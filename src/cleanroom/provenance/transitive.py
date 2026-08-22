@@ -20,6 +20,7 @@ silently dropped or guessed at.
 
 from __future__ import annotations
 
+import base64
 import json
 import re
 import ssl
@@ -60,6 +61,15 @@ class TransitiveDependency:
     required_by: str
     version: str | None = None
     licence: str | None = None
+    # "<algorithm>:<hex>" for whatever digest the registry actually
+    # published for this resolved version -- PyPI gives sha256; npm gives
+    # sha512 (via its SRI `integrity` field, decoded to hex here) or,
+    # failing that, the older sha1 `shasum`. Deliberately not normalised
+    # to one algorithm across ecosystems (that would mean either
+    # re-hashing a fetched artefact ourselves, which this module doesn't
+    # download, or fabricating one) -- the algorithm actually used is part
+    # of the recorded fact, not silently discarded.
+    digest: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {"name": self.name, "ecosystem": self.ecosystem, "depth": self.depth, "required_by": self.required_by}
@@ -67,6 +77,8 @@ class TransitiveDependency:
             d["version"] = self.version
         if self.licence:
             d["licence"] = self.licence
+        if self.digest:
+            d["digest"] = self.digest
         return d
 
 
@@ -88,9 +100,22 @@ def _http_get_json(url: str) -> dict[str, Any] | None:
         return None
 
 
-def _pypi_lookup(name: str, version: str | None) -> tuple[str | None, list[str], str | None] | None:
-    """Returns (resolved_version, direct_dependency_names, licence), or
-    None if the PyPI JSON API lookup failed."""
+def _npm_integrity_to_digest(integrity: str | None) -> str | None:
+    """npm's SRI-format `integrity` (e.g. 'sha512-<base64>') decoded to
+    this module's own '<algorithm>:<hex>' shape. Returns None on any
+    unexpected shape rather than guessing."""
+    if not integrity or "-" not in integrity:
+        return None
+    algorithm, encoded = integrity.split("-", 1)
+    try:
+        return f"{algorithm}:{base64.b64decode(encoded).hex()}"
+    except (ValueError, TypeError):
+        return None
+
+
+def _pypi_lookup(name: str, version: str | None) -> tuple[str | None, list[str], str | None, str | None] | None:
+    """Returns (resolved_version, direct_dependency_names, licence,
+    digest), or None if the PyPI JSON API lookup failed."""
     url = f"https://pypi.org/pypi/{name}/{version}/json" if version else f"https://pypi.org/pypi/{name}/json"
     data = _http_get_json(url)
     if data is None:
@@ -109,12 +134,25 @@ def _pypi_lookup(name: str, version: str | None) -> tuple[str | None, list[str],
         match = _REQUIRES_DIST_NAME_RE.match(requirement.strip())
         if match:
             names.append(match.group(1))
-    return resolved_version, names, licence
+
+    # PyPI publishes a real sha256 digest per distributed file (wheel/
+    # sdist), not per release as a whole -- prefer the wheel (what pip
+    # actually installs in the common case), falling back to whatever
+    # file is listed first, rather than fabricating one when only an
+    # sdist exists.
+    digest = None
+    urls = data.get("urls") or []
+    wheel = next((u for u in urls if u.get("packagetype") == "bdist_wheel"), None)
+    chosen = wheel or (urls[0] if urls else None)
+    if chosen and chosen.get("digests", {}).get("sha256"):
+        digest = f"sha256:{chosen['digests']['sha256']}"
+
+    return resolved_version, names, licence, digest
 
 
-def _npm_lookup(name: str, version: str | None) -> tuple[str | None, list[str], str | None] | None:
-    """Returns (resolved_version, direct_dependency_names, licence), or
-    None if the npm registry lookup failed."""
+def _npm_lookup(name: str, version: str | None) -> tuple[str | None, list[str], str | None, str | None] | None:
+    """Returns (resolved_version, direct_dependency_names, licence,
+    digest), or None if the npm registry lookup failed."""
     data = _http_get_json(f"https://registry.npmjs.org/{name}")
     if data is None:
         return None
@@ -127,10 +165,19 @@ def _npm_lookup(name: str, version: str | None) -> tuple[str | None, list[str], 
     if isinstance(licence, dict):
         licence = licence.get("type")
     names = list((version_data.get("dependencies") or {}).keys())
-    return resolved_version, names, licence
+
+    dist = version_data.get("dist") or {}
+    digest = _npm_integrity_to_digest(dist.get("integrity"))
+    if digest is None and dist.get("shasum"):
+        # Older packages predating the `integrity` field only publish a
+        # legacy sha1 shasum -- a real, weaker-but-genuine digest, not
+        # fabricated as sha256.
+        digest = f"sha1:{dist['shasum']}"
+
+    return resolved_version, names, licence, digest
 
 
-def _lookup(ecosystem: str, name: str, version: str | None) -> tuple[str | None, list[str], str | None] | None:
+def _lookup(ecosystem: str, name: str, version: str | None) -> tuple[str | None, list[str], str | None, str | None] | None:
     # Dispatches by name through the module namespace (rather than a
     # dict bound to the functions at import time) so tests can monkeypatch
     # `_pypi_lookup`/`_npm_lookup` directly and have this pick up the
@@ -170,9 +217,12 @@ def resolve_transitive(deps: list[Any], *, max_depth: int = _MAX_DEPTH) -> Trans
             result.unresolved.append({"name": name, "ecosystem": ecosystem, "reason": "registry lookup failed (network error, unknown package, or rate limit)"})
             continue
 
-        resolved_version, child_names, licence = lookup
+        resolved_version, child_names, licence, digest = lookup
         result.resolved.append(
-            TransitiveDependency(name=name, ecosystem=ecosystem, depth=depth, required_by=required_by, version=resolved_version, licence=licence)
+            TransitiveDependency(
+                name=name, ecosystem=ecosystem, depth=depth, required_by=required_by,
+                version=resolved_version, licence=licence, digest=digest,
+            )
         )
         for child_name in child_names:
             queue.append((child_name, None, ecosystem, depth + 1, name))

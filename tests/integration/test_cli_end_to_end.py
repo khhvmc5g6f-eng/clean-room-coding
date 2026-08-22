@@ -160,8 +160,8 @@ def test_provenance_resolve_transitive_is_opt_in_and_writes_evidence(tmp_path: P
 
     def fake_lookup(name, version):
         if name == "click":
-            return (version or "8.1.7", ["colorama"], "BSD-3-Clause")
-        return ("0.4.6", [], "BSD-3-Clause")
+            return (version or "8.1.7", ["colorama"], "BSD-3-Clause", None)
+        return ("0.4.6", [], "BSD-3-Clause", "sha256:" + "d" * 64)
 
     monkeypatch.setattr(transitive_module, "_pypi_lookup", fake_lookup)
     resolved_result = _run(runner, ["--project", str(project_dir), "--json", "provenance", "--resolve-transitive"])
@@ -181,6 +181,14 @@ def test_provenance_resolve_transitive_is_opt_in_and_writes_evidence(tmp_path: P
     cdx_doc = json.loads(Path(payload["cyclonedx"]).read_text(encoding="utf-8"))
     assert {c["name"] for c in cdx_doc["components"]} == {"click", "colorama"}
     assert written["resolved"][0]["licence"] == "BSD-3-Clause"
+
+    # colorama's real registry-derived digest (see fake_lookup above) must
+    # be carried through into the actual SPDX/CycloneDX documents, not just
+    # the separate transitive-dependencies.json artefact.
+    colorama_pkg = next(p for p in spdx_doc["packages"] if p["name"] == "colorama")
+    assert colorama_pkg["checksums"] == [{"algorithm": "SHA256", "checksumValue": "d" * 64}]
+    colorama_component = next(c for c in cdx_doc["components"] if c["name"] == "colorama")
+    assert colorama_component["hashes"] == [{"alg": "SHA-256", "content": "d" * 64}]
 
 
 def test_verify_export_in_toto_links_is_opt_in_and_writes_one_file_per_event(tmp_path: Path):

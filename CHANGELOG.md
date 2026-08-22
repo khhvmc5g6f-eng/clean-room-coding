@@ -713,4 +713,36 @@ detail:
   mocked successful signature, one exercising the real no-`gpg`
   fallback in this environment).
 
+### Added (nineteenth pass — real checksums in transitive dependency resolution and SBOM output)
+
+- `provenance/transitive.py`'s resolved dependencies now carry a real
+  registry-published digest: PyPI's per-file `sha256` (preferring the
+  wheel, falling back to the sdist when no wheel exists), or npm's SRI
+  `integrity` field decoded to hex, falling back to the legacy `shasum`
+  (sha1) when `integrity` is absent. Never fabricated or re-hashed
+  locally -- only relays whatever digest the registry itself already
+  published for the resolved version, in whatever algorithm that
+  ecosystem actually used.
+- That digest is now wired all the way through into the real SBOM
+  documents, not just the standalone `evidence/sbom/transitive-
+  dependencies.json` artefact: SPDX packages get a real `checksums`
+  entry (`spdx_tools.spdx.model.checksum.Checksum`), CycloneDX
+  components get a real `hashes` entry, for both transitive and (where a
+  `sha256` is already known) direct dependencies.
+- Verified against the live PyPI registry: a real end-to-end
+  `cleanroom provenance --resolve-transitive` run against a project
+  depending on `click==8.1.7` produced `colorama`'s SBOM-embedded sha256
+  checksum matching PyPI's own published wheel digest byte-for-byte.
+- 5 new unit tests for digest extraction (`_pypi_lookup`/`_npm_lookup`/
+  `_npm_integrity_to_digest`), 4 new SBOM-level unit tests asserting real
+  checksums appear on SPDX packages and CycloneDX components (both
+  transitive and direct), and an extended CLI integration test asserting
+  a resolved transitive dependency's digest reaches the actual SPDX/
+  CycloneDX documents written to disk.
+- Direct dependencies parsed straight from a manifest
+  (`requirements.txt`/`pyproject.toml`/`package.json`) still have no
+  digest unless one was already set on the `Dependency` object by some
+  other mechanism (e.g. an existing lockfile) -- `discover_dependencies()`
+  itself doesn't fetch or hash anything.
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD

@@ -496,7 +496,18 @@ change that should be evaluated on its own.
   CycloneDX's own schema validator. Without the flag, `cleanroom
   provenance`'s behaviour is exactly as before (direct declared
   dependencies only, from `requirements.txt`/`pyproject.toml`/
-  `package.json`). No hash of resolved versions is captured yet.
+  `package.json`). Each resolved transitive dependency now also carries a
+  real registry-published digest (PyPI's per-file `sha256`; npm's SRI
+  `integrity`, decoded to hex, or its legacy `shasum` as a sha1 fallback),
+  wired all the way through into the SPDX `checksums` field and the
+  CycloneDX `hashes` field on that package/component -- not just the
+  standalone `transitive-dependencies.json` artefact. Verified against the
+  live PyPI registry (`colorama`'s SBOM-embedded sha256 matches PyPI's own
+  published wheel digest byte-for-byte). Direct dependencies still have no
+  digest unless one is already supplied on the `Dependency` object (e.g.
+  from an existing lockfile) -- this module doesn't download or hash
+  distributed files itself, only relays what the registry already
+  published for the resolved version.
 - **`cleanroom compare`** (functional equivalence engine) compares two
   already-captured output files under configurable tolerance; it does not
   itself run the reference and implementation programs side-by-side.

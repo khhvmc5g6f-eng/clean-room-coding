@@ -7,8 +7,8 @@ from cleanroom.provenance.transitive import TransitiveDependency, TransitiveReso
 _CHAIN_RESOLUTION = TransitiveResolution(
     resolved=[
         TransitiveDependency(name="click", ecosystem="pypi", depth=1, required_by="(direct)", version="8.1.7", licence="BSD-3-Clause"),
-        TransitiveDependency(name="colorama", ecosystem="pypi", depth=2, required_by="click", version="0.4.6", licence="BSD-3-Clause"),
-        TransitiveDependency(name="six", ecosystem="pypi", depth=3, required_by="colorama", version="1.16.0", licence="MIT"),
+        TransitiveDependency(name="colorama", ecosystem="pypi", depth=2, required_by="click", version="0.4.6", licence="BSD-3-Clause", digest="sha256:" + "c" * 64),
+        TransitiveDependency(name="six", ecosystem="pypi", depth=3, required_by="colorama", version="1.16.0", licence="MIT", digest="sha1:" + "6" * 40),
     ],
     unresolved=[{"name": "unreachable-pkg", "ecosystem": "pypi", "reason": "registry lookup failed"}],
 )
@@ -110,6 +110,35 @@ def test_to_spdx_merges_transitive_dependencies_with_correct_chain():
     assert (colorama_id, six_id) in edges  # colorama -> six, not click -> six or demo -> six
 
 
+def test_to_spdx_direct_dependency_sha256_becomes_a_real_checksum():
+    """A direct Dependency's sha256 field (a bare hex digest, no
+    'algorithm:' prefix) must be wired into the SPDX package's own
+    `checksums` field, not just left sitting unused on the Dependency
+    object."""
+    deps = [Dependency(name="click", version="8.1.7", purl="pkg:pypi/click", sha256="a" * 64)]
+    doc = to_spdx("demo", "0.1.0", deps)
+    click_pkg = next(p for p in doc["packages"] if p["name"] == "click")
+    assert click_pkg["checksums"] == [{"algorithm": "SHA256", "checksumValue": "a" * 64}]
+
+
+def test_to_spdx_merges_transitive_checksums_into_packages():
+    """Each transitive package's real registry-derived digest (see
+    provenance/transitive.py) must appear as a genuine SPDX checksum on
+    that package -- not just recorded in the separate
+    transitive-dependencies.json artefact."""
+    deps = [Dependency(name="click", version="8.1.7", purl="pkg:pypi/click", licence="BSD-3-Clause")]
+    doc = to_spdx("demo", "0.1.0", deps, transitive=_CHAIN_RESOLUTION)
+
+    colorama_pkg = next(p for p in doc["packages"] if p["name"] == "colorama")
+    assert colorama_pkg["checksums"] == [{"algorithm": "SHA256", "checksumValue": "c" * 64}]
+    six_pkg = next(p for p in doc["packages"] if p["name"] == "six")
+    assert six_pkg["checksums"] == [{"algorithm": "SHA1", "checksumValue": "6" * 40}]
+    # click is a direct dependency with no sha256 given here -- no checksum
+    # fabricated, correctly absent rather than an empty/placeholder value.
+    click_pkg = next(p for p in doc["packages"] if p["name"] == "click")
+    assert "checksums" not in click_pkg or click_pkg["checksums"] == []
+
+
 def test_to_spdx_unmatched_transitive_parent_still_includes_the_package():
     """If a transitive entry's parent isn't found (e.g. resolved against a
     different deps list), the package must still be included -- just
@@ -147,3 +176,10 @@ def test_to_cyclonedx_merges_transitive_dependencies_and_stays_schema_valid():
     six_ref = next(c["bom-ref"] for c in doc["components"] if c["name"] == "six")
     assert colorama_ref in dependency_by_ref[click_ref]  # click depends on colorama, not just root
     assert six_ref in dependency_by_ref[colorama_ref]  # colorama depends on six, not click
+
+    # Each transitive component's real registry-derived digest must also
+    # appear as a genuine CycloneDX hash on that component.
+    colorama_component = next(c for c in doc["components"] if c["name"] == "colorama")
+    assert colorama_component["hashes"] == [{"alg": "SHA-256", "content": "c" * 64}]
+    six_component = next(c for c in doc["components"] if c["name"] == "six")
+    assert six_component["hashes"] == [{"alg": "SHA-1", "content": "6" * 40}]

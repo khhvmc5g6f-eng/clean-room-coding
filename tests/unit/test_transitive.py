@@ -7,10 +7,10 @@ def test_resolve_transitive_walks_dependency_graph(monkeypatch):
     breadth-first walking, depth tracking, and dedup (nothing queried
     twice even though it's only reachable one way here)."""
     fake_pypi = {
-        "root": ("1.0", ["a", "b"], "MIT"),
-        "a": ("2.0", ["c"], "Apache-2.0"),
-        "b": ("3.0", [], None),
-        "c": ("4.0", [], "BSD-3-Clause"),
+        "root": ("1.0", ["a", "b"], "MIT", None),
+        "a": ("2.0", ["c"], "Apache-2.0", None),
+        "b": ("3.0", [], None, None),
+        "c": ("4.0", [], "BSD-3-Clause", "sha256:" + "c" * 64),
     }
     monkeypatch.setattr(transitive, "_pypi_lookup", lambda name, version: fake_pypi.get(name))
 
@@ -23,6 +23,7 @@ def test_resolve_transitive_walks_dependency_graph(monkeypatch):
     c_entry = next(d for d in result.resolved if d.name == "c")
     assert c_entry.required_by == "a"
     assert c_entry.licence == "BSD-3-Clause"
+    assert c_entry.digest == "sha256:" + "c" * 64
 
 
 def test_resolve_transitive_dedups_diamond_dependency(monkeypatch):
@@ -30,15 +31,15 @@ def test_resolve_transitive_dedups_diamond_dependency(monkeypatch):
     be resolved (and its registry queried) once."""
     call_count = {"shared": 0}
     fake_pypi = {
-        "root": ("1.0", ["a", "b"], None),
-        "a": ("1.0", ["shared"], None),
-        "b": ("1.0", ["shared"], None),
+        "root": ("1.0", ["a", "b"], None, None),
+        "a": ("1.0", ["shared"], None, None),
+        "b": ("1.0", ["shared"], None, None),
     }
 
     def lookup(name, version):
         if name == "shared":
             call_count["shared"] += 1
-            return ("9.0", [], None)
+            return ("9.0", [], None, None)
         return fake_pypi.get(name)
 
     monkeypatch.setattr(transitive, "_pypi_lookup", lookup)
@@ -64,7 +65,7 @@ def test_resolve_transitive_stops_at_max_depth_and_records_why(monkeypatch):
     # silently truncating the queue.
     def lookup(name, version):
         n = int(name[1:])
-        return (str(n), [f"a{n + 1}"], None)
+        return (str(n), [f"a{n + 1}"], None, None)
 
     monkeypatch.setattr(transitive, "_pypi_lookup", lookup)
     deps = [Dependency(name="a1", version=None, purl="pkg:pypi/a1")]
@@ -85,7 +86,7 @@ def test_npm_lookup_uses_dist_tags_latest_when_no_version_pinned(monkeypatch):
     }
     monkeypatch.setattr(transitive, "_http_get_json", lambda url: fake_registry_response)
     result = transitive._npm_lookup("some-package", None)
-    assert result == ("2.0.0", ["leftpad"], "MIT")
+    assert result == ("2.0.0", ["leftpad"], "MIT", None)
 
 
 def test_pypi_lookup_skips_extra_only_requirements(monkeypatch):
@@ -101,7 +102,60 @@ def test_pypi_lookup_skips_extra_only_requirements(monkeypatch):
         }
     }
     monkeypatch.setattr(transitive, "_http_get_json", lambda url: fake_response)
-    version, names, licence = transitive._pypi_lookup("demo", None)
+    version, names, licence, digest = transitive._pypi_lookup("demo", None)
     assert version == "1.2.3"
     assert names == ["click", "requests"]
     assert licence == "MIT"
+    assert digest is None
+
+
+def test_pypi_lookup_extracts_real_sha256_digest_preferring_wheel(monkeypatch):
+    fake_response = {
+        "info": {"version": "1.2.3", "license": "MIT", "requires_dist": []},
+        "urls": [
+            {"packagetype": "sdist", "digests": {"sha256": "s" * 64}},
+            {"packagetype": "bdist_wheel", "digests": {"sha256": "w" * 64}},
+        ],
+    }
+    monkeypatch.setattr(transitive, "_http_get_json", lambda url: fake_response)
+    _, _, _, digest = transitive._pypi_lookup("demo", None)
+    assert digest == "sha256:" + "w" * 64  # wheel preferred over sdist
+
+
+def test_pypi_lookup_falls_back_to_sdist_digest_when_no_wheel(monkeypatch):
+    fake_response = {
+        "info": {"version": "1.2.3", "license": "MIT", "requires_dist": []},
+        "urls": [{"packagetype": "sdist", "digests": {"sha256": "s" * 64}}],
+    }
+    monkeypatch.setattr(transitive, "_http_get_json", lambda url: fake_response)
+    _, _, _, digest = transitive._pypi_lookup("demo", None)
+    assert digest == "sha256:" + "s" * 64
+
+
+def test_npm_lookup_extracts_digest_from_sri_integrity_field(monkeypatch):
+    import base64
+
+    raw = b"\x01" * 64  # a fake sha512 digest's raw bytes
+    integrity = "sha512-" + base64.b64encode(raw).decode("ascii")
+    fake_registry_response = {
+        "dist-tags": {"latest": "1.0.0"},
+        "versions": {"1.0.0": {"dependencies": {}, "dist": {"integrity": integrity, "shasum": "deadbeef"}}},
+    }
+    monkeypatch.setattr(transitive, "_http_get_json", lambda url: fake_registry_response)
+    _, _, _, digest = transitive._npm_lookup("some-package", None)
+    assert digest == "sha512:" + raw.hex()
+
+
+def test_npm_lookup_falls_back_to_legacy_shasum_without_integrity(monkeypatch):
+    fake_registry_response = {
+        "dist-tags": {"latest": "1.0.0"},
+        "versions": {"1.0.0": {"dependencies": {}, "dist": {"shasum": "deadbeefcafe"}}},
+    }
+    monkeypatch.setattr(transitive, "_http_get_json", lambda url: fake_registry_response)
+    _, _, _, digest = transitive._npm_lookup("some-package", None)
+    assert digest == "sha1:deadbeefcafe"
+
+
+def test_npm_integrity_to_digest_returns_none_for_malformed_input():
+    assert transitive._npm_integrity_to_digest(None) is None
+    assert transitive._npm_integrity_to_digest("not-a-real-sri-string") is None

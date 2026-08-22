@@ -109,6 +109,24 @@ def _spdx_id(prefix: str, name: str) -> str:
     return f"{prefix}-{re.sub(r'[^A-Za-z0-9.-]', '-', name)}"
 
 
+# Algorithms provenance/transitive.py's registry-derived digests actually
+# use ("<algorithm>:<hex>", e.g. "sha256:..."/"sha512:..."/"sha1:...") --
+# an unrecognised algorithm is dropped from the SBOM rather than
+# fabricated as one of these.
+_SPDX_DIGEST_ALGORITHMS = {"sha256": "SHA256", "sha512": "SHA512", "sha1": "SHA1"}
+_CYCLONEDX_DIGEST_ALGORITHMS = {"sha256": "SHA_256", "sha512": "SHA_512", "sha1": "SHA_1"}
+
+
+def _parse_digest(digest: str | None) -> tuple[str, str] | None:
+    """Splits a "<algorithm>:<hex>" digest string (see
+    provenance/transitive.py) into (algorithm, hex), or None if `digest`
+    is absent or not in that shape."""
+    if not digest or ":" not in digest:
+        return None
+    algorithm, _, hex_value = digest.partition(":")
+    return algorithm.lower(), hex_value
+
+
 def _spdx_license_value(licence: str | None) -> Any:
     """A real SPDX license-expression object for `license_concluded`/
     `license_declared`, or SpdxNoAssertion() when `licence` is missing or
@@ -147,9 +165,16 @@ def to_spdx(
     from spdx_tools.spdx.model import (
         Actor, ActorType, CreationInfo, Document, Package, Relationship, RelationshipType,
     )
+    from spdx_tools.spdx.model.checksum import Checksum, ChecksumAlgorithm
     from spdx_tools.spdx.model.package import ExternalPackageRef, ExternalPackageRefCategory
     from spdx_tools.spdx.model.spdx_no_assertion import SpdxNoAssertion
     from spdx_tools.spdx.jsonschema.document_converter import DocumentConverter
+
+    def _spdx_checksums(digest: str | None) -> list[Any]:
+        parsed = _parse_digest(digest)
+        if parsed is None or parsed[0] not in _SPDX_DIGEST_ALGORITHMS:
+            return []
+        return [Checksum(ChecksumAlgorithm[_SPDX_DIGEST_ALGORITHMS[parsed[0]]], parsed[1])]
 
     root_id = _spdx_id("SPDXRef-Package", project_name)
     creation_info = CreationInfo(
@@ -178,6 +203,7 @@ def to_spdx(
                 download_location=SpdxNoAssertion(),
                 license_concluded=licence_value,
                 license_declared=licence_value,
+                checksums=_spdx_checksums(f"sha256:{dep.sha256}" if dep.sha256 else None),
                 external_references=(
                     [ExternalPackageRef(ExternalPackageRefCategory.PACKAGE_MANAGER, "purl", dep.purl)]
                     if dep.purl
@@ -200,6 +226,7 @@ def to_spdx(
                     spdx_id=tdep_id, name=tdep.name, version=tdep.version or "NOASSERTION",
                     download_location=SpdxNoAssertion(),
                     license_concluded=licence_value, license_declared=licence_value,
+                    checksums=_spdx_checksums(tdep.digest),
                 )
             )
             parent_id = id_by_key.get((tdep.ecosystem, tdep.required_by))
@@ -243,6 +270,12 @@ def to_cyclonedx(
     from cyclonedx.model.tool import ToolRepository
     from cyclonedx.output import make_outputter
     from cyclonedx.schema import OutputFormat, SchemaVersion
+
+    def _cyclonedx_hashes(digest: str | None) -> list[Any]:
+        parsed = _parse_digest(digest)
+        if parsed is None or parsed[0] not in _CYCLONEDX_DIGEST_ALGORITHMS:
+            return []
+        return [HashType(alg=HashAlgorithm[_CYCLONEDX_DIGEST_ALGORITHMS[parsed[0]]], content=parsed[1])]
 
     root_ref = BomRef(_spdx_id("cleanroom-root", project_name))
     root_component = Component(name=project_name, version=project_version, type=ComponentType.APPLICATION, bom_ref=root_ref)
@@ -290,6 +323,7 @@ def to_cyclonedx(
                 Component(
                     name=tdep.name, version=tdep.version or "unknown", type=ComponentType.LIBRARY, bom_ref=tdep_ref,
                     licenses=licences,
+                    hashes=_cyclonedx_hashes(tdep.digest),
                 )
             )
 
