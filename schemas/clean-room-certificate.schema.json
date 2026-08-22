@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroom.dev/schemas/clean-room-certificate.schema.json",
+  "title": "CLEAN_ROOM_CERTIFICATE.json",
+  "description": "Part LXXXV. A machine-readable record of process completion. NOT a legal certification unless an authorised certification scheme actually exists -- see docs/legal-disclaimer.md.",
+  "type": "object",
+  "required": [
+    "schema_version", "project", "version", "clean_room_level",
+    "global_decision", "generated_utc", "evidence_bundle_hash"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "project": { "type": "string" },
+    "version": { "type": "string" },
+    "reference": { "type": "string" },
+    "clean_room_level": { "type": "string", "enum": ["CR0", "CR1", "CR2", "CR3", "CR4", "CR5"] },
+    "tests": {
+      "type": "object",
+      "properties": {
+        "total": { "type": "integer" },
+        "passed": { "type": "integer" },
+        "failed": { "type": "integer" },
+        "not_tested": { "type": "integer" }
+      }
+    },
+    "requirement_traceability_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+    "provenance_status": { "type": "string", "enum": ["complete", "partial", "unknown"] },
+    "similarity_result": { "type": "string", "enum": ["no_material_findings", "material_findings_open", "material_findings_resolved", "not_run"] },
+    "jurisdictions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "jurisdiction": { "type": "string" },
+          "decision_state": { "type": "string", "enum": ["GREEN", "GREEN_WITH_CONDITIONS", "AMBER", "RED", "UNKNOWN"] },
+          "required_market": { "type": "boolean" }
+        }
+      }
+    },
+    "global_decision": { "type": "string", "enum": ["GREEN", "GREEN_WITH_CONDITIONS", "AMBER", "RED"] },
+    "outstanding_issues": { "type": "array", "items": { "type": "string" } },
+    "evidence_bundle_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "evidence_bundle_location": { "type": "string" },
+    "generated_utc": { "type": "string", "format": "date-time" },
+    "disclaimer": {
+      "const": "This certificate records process completion within the Clean Room Coding tool. It is not a legal opinion, a warranty of non-infringement, or certification by any accredited body. Findings from simulated legal/judicial panels are AI-generated heuristics for engineering triage and require qualified human legal review before any release decision with real legal consequence."
+    }
+  }
+}

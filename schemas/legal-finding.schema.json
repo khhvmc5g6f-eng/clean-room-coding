@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroom.dev/schemas/legal-finding.schema.json",
+  "title": "Legal Issue Finding",
+  "description": "Output of the heuristic legal-issue engine and jurisdiction-specific legal/judicial panels. THIS IS NOT LEGAL ADVICE -- see docs/legal-disclaimer.md. Every finding must preserve uncertainty rather than fabricate a conclusion.",
+  "type": "object",
+  "required": ["issue", "jurisdiction", "decision_state", "finding", "evidence", "confidence", "reviewer"],
+  "additionalProperties": false,
+  "properties": {
+    "issue": { "type": "string" },
+    "jurisdiction": { "type": "string" },
+    "decision_state": {
+      "type": "string",
+      "enum": ["GREEN", "GREEN_WITH_CONDITIONS", "AMBER", "RED", "UNKNOWN"],
+      "description": "Part LIV. UNKNOWN is required, not optional, when evidence is insufficient -- never coerced to GREEN."
+    },
+    "finding": { "type": "string" },
+    "evidence": { "type": "array", "items": { "type": "string" } },
+    "confidence": { "type": "string", "enum": ["high", "medium", "low", "insufficient_evidence"] },
+    "alternative_explanation": { "type": "string" },
+    "authority": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "jurisdiction": { "type": "string" },
+          "source_type": { "type": "string", "enum": ["legislation", "case_law", "regulator_guidance", "secondary_commentary"] },
+          "citation": { "type": "string" },
+          "url": { "type": "string" },
+          "accessed_utc": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "for_release_argument": { "type": "string" },
+    "against_release_argument": { "type": "string" },
+    "adjudication": { "type": "string" },
+    "reviewer": {
+      "type": "string",
+      "description": "Identifies the simulated panel/agent (e.g. 'simulated-ew-judicial-panel') or the human lawyer who reviewed/overrode this finding. Never a real person's name implying they authored an AI output."
+    },
+    "human_override": {
+      "type": "object",
+      "properties": {
+        "lawyer_name": { "type": "string" },
+        "action": { "type": "string", "enum": ["accepted", "rejected", "modified"] },
+        "notes": { "type": "string" },
+        "signed_utc": { "type": "string", "format": "date-time" }
+      }
+    },
+    "legal_review_as_of": { "type": "string", "format": "date" }
+  }
+}

@@ -1,0 +1,93 @@
+name: "Clean Room Coding"
+description: >-
+  Run Clean Room Coding's doctor/licence/audit/report checks against a
+  project and surface the results in CI. Never auto-approves a release --
+  MANUAL_REVIEW_REQUIRED (exit code 9) is treated as expected, not a
+  failure, because a human must always sign off before release.
+author: "Clean Room Coding Contributors"
+
+inputs:
+  project-path:
+    description: >-
+      Path (relative to the caller's checked-out repository) to the
+      Clean Room Coding project to check.
+    required: false
+    default: "."
+  policy:
+    description: >-
+      Placeholder for a future strict/standard/permissive release-policy
+      tier. Only one release-policy shape exists in v0.1 (see
+      .cleanroom.yml's release_policy section), so this input is not yet
+      wired into any behaviour -- it is accepted and recorded now so
+      workflows can start passing it without a breaking change once
+      policy tiers exist.
+    required: false
+    default: "standard"
+  cleanroom-ref:
+    description: >-
+      Git ref (branch, tag, or commit) of khhvmc5g6f-eng/clean-room-coding
+      to install cleanroom from. cleanroom is not yet published to PyPI,
+      so this action installs it directly from source via pip against
+      this ref. Once a PyPI release exists, this input can be dropped in
+      favour of a plain version pin.
+    required: false
+    default: "main"
+  python-version:
+    description: "Python version to run cleanroom under."
+    required: false
+    default: "3.11"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install cleanroom
+      shell: bash
+      run: |
+        # Installed from a git ref for now (no PyPI release yet). See the
+        # cleanroom-ref input description above.
+        pip install "git+https://github.com/khhvmc5g6f-eng/clean-room-coding.git@${{ inputs.cleanroom-ref }}"
+
+    - name: Run Clean Room Coding checks
+      shell: bash
+      run: |
+        PROJECT="${{ inputs.project-path }}"
+        POLICY="${{ inputs.policy }}"
+        echo "Project path: $PROJECT"
+        echo "Policy tier (placeholder, not yet enforced): $POLICY"
+
+        overall_failed=0
+
+        run_check() {
+          local subcommand="$1"
+          echo "::group::cleanroom $subcommand --json"
+          if cleanroom --project "$PROJECT" --json "$subcommand"; then
+            code=0
+          else
+            code=$?
+          fi
+          echo "::endgroup::"
+
+          if [ "$code" -eq 0 ]; then
+            echo "cleanroom $subcommand: PASS"
+          elif [ "$code" -eq 9 ]; then
+            echo "::warning::cleanroom $subcommand returned MANUAL_REVIEW_REQUIRED (exit 9) -- expected; a human must still sign off before release, this is not treated as a CI failure."
+          else
+            echo "::error::cleanroom $subcommand failed with exit code $code"
+            overall_failed=1
+          fi
+        }
+
+        run_check doctor
+        run_check licence
+        run_check audit
+        run_check report
+
+        if [ "$overall_failed" -ne 0 ]; then
+          echo "::error::One or more cleanroom checks failed with a non-zero, non-MANUAL_REVIEW_REQUIRED exit code."
+          exit 1
+        fi

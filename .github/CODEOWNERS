@@ -1,0 +1,18 @@
+# Part LIX: required review on this project's legal-content and contract
+# surface. Every path below is owned by the sole current maintainer,
+# @khhvmc5g6f-eng, because there is only one maintainer right now.
+#
+# As the project grows, distinct owners should be assigned per area
+# (e.g. a licensing-focused reviewer for /policies/, a jurisdiction
+# specialist per pack under /jurisdictions/, a schema/contract owner for
+# /schemas/) instead of one person owning everything below. Update this
+# file when that happens — do not let it silently keep listing one
+# person as the sole owner past the point where it stops being true.
+
+/policies/                    @khhvmc5g6f-eng
+/jurisdictions/                @khhvmc5g6f-eng
+/schemas/                      @khhvmc5g6f-eng
+/.github/                      @khhvmc5g6f-eng
+/src/cleanroom/legal/          @khhvmc5g6f-eng
+/src/cleanroom/sanitisation/   @khhvmc5g6f-eng
+/src/cleanroom/zones.py        @khhvmc5g6f-eng

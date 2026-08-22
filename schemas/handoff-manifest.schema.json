@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroom.dev/schemas/handoff-manifest.schema.json",
+  "title": "HANDOFF_MANIFEST.json",
+  "description": "Immutable, hashed, signable record of everything authorised to cross Zone R -> Zone H -> Zone I. Parts XXIV-XXV.",
+  "type": "object",
+  "required": ["schema_version", "project_id", "specification_version", "created_utc", "files", "sanitisation_report_hash", "manifest_hash"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "project_id": { "type": "string" },
+    "specification_version": { "type": "string" },
+    "created_utc": { "type": "string", "format": "date-time" },
+    "git_commit": { "type": "string" },
+    "signer": { "type": "string" },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "sha256", "contamination_level"],
+        "properties": {
+          "path": { "type": "string" },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "contamination_level": { "$ref": "contamination-level.schema.json" },
+          "requirement_ids": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "sanitisation_report_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "manifest_hash": {
+      "type": "string",
+      "description": "SHA-256 over the canonical JSON of this manifest excluding this field and 'signature'.",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "signature": {
+      "type": "object",
+      "properties": {
+        "algorithm": { "type": "string" },
+        "value": { "type": "string" },
+        "signer_identity": { "type": "string" }
+      }
+    }
+  }
+}

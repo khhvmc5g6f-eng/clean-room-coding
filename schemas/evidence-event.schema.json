@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroom.dev/schemas/evidence-event.schema.json",
+  "title": "Evidence Ledger Event",
+  "description": "One tamper-evident, hash-chained entry in a project's evidence ledger. See Part XLII.",
+  "type": "object",
+  "required": [
+    "event_id", "sequence", "timestamp_utc", "actor", "action",
+    "previous_hash", "event_hash"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "timestamp_utc": { "type": "string", "format": "date-time" },
+    "actor": {
+      "type": "object",
+      "required": ["type", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["human", "agent", "tool", "ci"] },
+        "id": { "type": "string" },
+        "role": { "type": "string" },
+        "model_provider": { "type": "string" },
+        "model_id": { "type": "string" }
+      }
+    },
+    "action": { "type": "string", "minLength": 1 },
+    "zone": { "type": "string", "enum": ["R", "H", "I", "none"] },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    },
+    "tool": { "type": "string" },
+    "git_commit": { "type": "string" },
+    "result": { "type": "string", "enum": ["success", "failure", "denied", "unknown"] },
+    "detail": { "type": "string" },
+    "previous_hash": {
+      "type": "string",
+      "description": "SHA-256 of the previous event in the chain, or 64 zeros for the genesis event.",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "event_hash": {
+      "type": "string",
+      "description": "SHA-256 over the canonical JSON of this event (excluding event_hash itself) chained to previous_hash.",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}

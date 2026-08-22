@@ -1,0 +1,19 @@
+version = 1
+SPDX-PackageName = "clean-room-coding"
+SPDX-PackageSupplier = "Clean Room Coding Contributors"
+SPDX-PackageDownloadLocation = "https://github.com/khhvmc5g6f-eng/clean-room-coding"
+
+# This project's own source, schemas, policy/jurisdiction packs, docs and
+# tests are Apache-2.0 (see LICENSE/NOTICE). Rather than stamping an
+# SPDX-FileCopyrightText/SPDX-License-Identifier header into every file
+# individually, this global annotation covers the whole tree per the
+# REUSE 3.x TOML format; per-file headers remain the more precise option
+# and are welcomed on new files if a contributor prefers them.
+[[annotations]]
+path = "**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Clean Room Coding Contributors"
+SPDX-License-Identifier = "Apache-2.0"
+
+# Anything vendored under a different licence must get its own, more
+# specific annotation below, added at the same time as the vendored file.

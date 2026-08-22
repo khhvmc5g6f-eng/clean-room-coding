@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroom.dev/schemas/config.schema.json",
+  "title": "Clean Room Coding Project Configuration (.cleanroom.yml)",
+  "type": "object",
+  "required": ["schema_version", "project", "zones", "clean_room_level", "jurisdiction", "release_policy"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "project": {
+      "type": "object",
+      "required": ["name", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,63}$" },
+        "description": { "type": "string" }
+      }
+    },
+    "reference": {
+      "type": "object",
+      "description": "The material being observed to derive functional requirements from. Zone R.",
+      "additionalProperties": false,
+      "properties": {
+        "repositories": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["url"],
+            "additionalProperties": false,
+            "properties": {
+              "url": { "type": "string" },
+              "ref": { "type": "string" },
+              "access_authority": {
+                "type": "string",
+                "enum": ["public", "licensed", "contractual", "unknown"],
+                "description": "Result of Part IX intake authority check. 'unknown' blocks analysis until resolved."
+              }
+            }
+          }
+        },
+        "documents": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Paths/URLs to reference documentation, manuals, screenshots."
+        }
+      }
+    },
+    "implementation": {
+      "type": "object",
+      "description": "The target repository being built. Zone I.",
+      "additionalProperties": false,
+      "properties": {
+        "repository_url": { "type": "string" },
+        "output_licence": { "type": "string", "description": "SPDX expression of the intended output licence." },
+        "distribution_model": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["source", "binary", "saas", "library", "container"] }
+        },
+        "target_markets": {
+          "type": "array",
+          "items": { "type": "string", "description": "ISO 3166-1 alpha-2 country code or 'eu'." }
+        }
+      }
+    },
+    "zones": {
+      "type": "object",
+      "required": ["reference_path", "handoff_path", "implementation_path"],
+      "additionalProperties": false,
+      "properties": {
+        "reference_path": { "type": "string" },
+        "handoff_path": { "type": "string" },
+        "implementation_path": { "type": "string" },
+        "strict_isolation": { "type": "boolean", "default": true }
+      }
+    },
+    "clean_room_level": {
+      "type": "string",
+      "enum": ["CR0", "CR1", "CR2", "CR3", "CR4", "CR5"],
+      "description": "Target maturity level per docs/clean-room-levels.md. Determines which gates are mandatory."
+    },
+    "dependency_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowed_licences": { "type": "array", "items": { "type": "string" } },
+        "denied_licences": { "type": "array", "items": { "type": "string" } },
+        "unknown_licence_action": { "type": "string", "enum": ["block", "warn", "allow"], "default": "block" }
+      }
+    },
+    "similarity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lexical_threshold": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.15 },
+        "structural_threshold": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.15 },
+        "negative_control_projects": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "jurisdiction": {
+      "type": "object",
+      "required": ["required_markets"],
+      "additionalProperties": false,
+      "properties": {
+        "required_markets": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "description": "Jurisdictions in which a RED finding blocks global release (Part LV)."
+        },
+        "informational_markets": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "providers": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "orchestration": { "type": "string", "default": "claude-code" },
+        "panel_diversity_required": { "type": "boolean", "default": false },
+        "panel_size": { "type": "integer", "minimum": 1, "default": 1 }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "retention_days": { "type": "integer", "minimum": 0, "default": 0, "description": "0 = retain indefinitely." },
+        "redact_secrets": { "type": "boolean", "default": true }
+      }
+    },
+    "approval_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "human_signoff_required_for_release": { "type": "boolean", "default": true },
+        "human_signoff_required_for_handoff": { "type": "boolean", "default": false }
+      }
+    },
+    "release_policy": {
+      "type": "object",
+      "required": ["require_technical_gate", "require_provenance_gate", "require_contamination_gate"],
+      "additionalProperties": false,
+      "properties": {
+        "require_technical_gate": { "type": "boolean" },
+        "require_provenance_gate": { "type": "boolean" },
+        "require_contamination_gate": { "type": "boolean" },
+        "block_on_red_required_jurisdiction": { "type": "boolean", "default": true }
+      }
+    }
+  }
+}

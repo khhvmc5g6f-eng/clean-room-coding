@@ -1,0 +1,43 @@
+# Licence policy pack: AGPL-3.0-only
+spdx_id: AGPL-3.0-only
+family: copyleft
+osi_approved: true
+fsf_libre: true
+copyleft: network-strong
+
+summary: >
+  All GPL-3.0-only obligations, plus section 13: if the covered work is
+  modified and the modified version is made available to users interacting
+  with it remotely over a network, the Corresponding Source of the
+  modified version must be made available to those users. This is the
+  "network use is distribution" trigger that plain GPL-3.0 does not have.
+
+key_obligations:
+  - "All GPL-3.0-only obligations (see GPL-3.0-only.yml) apply."
+  - "If users interact with a modified version remotely over a network, offer them the Corresponding Source of that modified version (AGPLv3 s.13)."
+  - "Preserve any 'Remote Network Interaction' notice already present in the work, or add one to the modified version's source."
+
+distribution_triggers: [source, binary, library, container, saas]
+network_use_triggers_obligations: true
+patent_grant: true
+patent_retaliation_clause: true
+trademark_grant: false
+
+clean_room_relevance: >
+  For a SaaS-distributed reimplementation, this is the single most
+  consequential licence fact in the whole platform: a project can avoid
+  every GPL-3.0 "distribution" trigger by never shipping a binary, and
+  still be squarely caught by AGPL-3.0 section 13 the moment the service
+  is offered to remote users. `.cleanroom.yml`'s
+  `implementation.distribution_model` must be checked against `saas`
+  specifically wherever an AGPL-3.0 reference is in scope.
+
+structured_issue_prompts:
+  - "Is the intended implementation offered as a network service (SaaS) to third parties?"
+  - "If so, has section 13's Corresponding Source offer been designed into the product, or is independence from the AGPL'd reference the basis for not needing to?"
+  - "Does any dependency (not just the reference under study) carry AGPL-3.0, silently pulling the whole service under section 13?"
+
+uncertainty_notes: >
+  As with GPL-3.0-only, whether the new implementation is in fact
+  independent of the AGPL'd reference (rather than a derivative of it) is
+  the operative legal question, and is not answered by this tool alone.

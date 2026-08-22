@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroom.dev/schemas/behavioral-test.schema.json",
+  "title": "Behavioural Specification (GIVEN/WHEN/THEN)",
+  "type": "object",
+  "required": ["id", "given", "when", "then", "requirement_ids"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^CR-BEH-[0-9]{6}$" },
+    "title": { "type": "string" },
+    "given": { "type": "string", "minLength": 1 },
+    "when": { "type": "string", "minLength": 1 },
+    "then": { "type": "string", "minLength": 1 },
+    "requirement_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "tolerance": {
+      "type": "object",
+      "description": "Functional Equivalence Engine tolerance rules (Part XXXI).",
+      "additionalProperties": false,
+      "properties": {
+        "floating_point_epsilon": { "type": "number" },
+        "ignore_timestamps": { "type": "boolean" },
+        "ignore_ordering": { "type": "boolean" },
+        "ignore_random_values": { "type": "boolean" }
+      }
+    },
+    "contractual_testing_gate": {
+      "type": "string",
+      "enum": ["not_applicable", "permitted", "prohibited", "unresolved"],
+      "description": "Part XXXII: whether automated black-box testing of the reference is contractually permitted."
+    },
+    "result": { "type": "string", "enum": ["pass", "fail", "not_tested", "blocked", "unknown"] }
+  }
+}

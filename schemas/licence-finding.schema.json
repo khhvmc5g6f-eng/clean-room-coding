@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroom.dev/schemas/licence-finding.schema.json",
+  "title": "Licence Discovery Finding",
+  "type": "object",
+  "required": ["path", "declared", "detected", "concluded", "confidence"],
+  "additionalProperties": false,
+  "properties": {
+    "path": { "type": "string" },
+    "declared": {
+      "type": ["string", "null"],
+      "description": "SPDX expression explicitly declared (e.g. package manifest, SPDX-License-Identifier header)."
+    },
+    "detected": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "SPDX identifiers matched by deterministic scanning (LICENSE/COPYING/NOTICE text, headers)."
+    },
+    "concluded": {
+      "type": ["string", "null"],
+      "description": "The engine's best-effort SPDX expression conclusion. Null if conflicting/insufficient evidence -- never fabricated."
+    },
+    "conflicting_evidence": { "type": "boolean", "default": false },
+    "confidence": { "type": "string", "enum": ["high", "medium", "low", "unknown"] },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source": { "type": "string", "description": "e.g. LICENSE file, source header, package.json, SPDX tag" },
+          "excerpt": { "type": "string" }
+        }
+      }
+    },
+    "policy_result": {
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["allowed", "denied", "unknown", "needs_review"] },
+        "obligations": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

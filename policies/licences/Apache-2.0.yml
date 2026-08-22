@@ -1,0 +1,44 @@
+# Licence policy pack: Apache-2.0
+spdx_id: Apache-2.0
+family: permissive
+osi_approved: true
+fsf_libre: true
+copyleft: none
+
+summary: >
+  Permissive licence with an express patent grant and patent-retaliation
+  (defensive termination) clause, plus a NOTICE-file mechanism and a
+  requirement to mark modified files.
+
+key_obligations:
+  - "Include a copy of the Apache-2.0 licence text with any distribution."
+  - "Retain all copyright, patent, trademark and attribution notices from the source form."
+  - "If a NOTICE file is present in the original work, reproduce its attribution contents in derivative distributions."
+  - "Mark any files that were modified from the original with a prominent notice."
+  - "State any changes made to the licensed files."
+
+distribution_triggers: [source, binary, saas, library, container]
+network_use_triggers_obligations: false
+patent_grant: true
+patent_retaliation_clause: true
+trademark_grant: false
+
+combination_notes: >
+  Apache-2.0 is compatible with GPL-3.0-or-later's stated compatibility
+  exception (GPLv3 permits combination with Apache-2.0 code; GPLv2 does
+  not, per the FSF's own published position at the time of writing --
+  confirm against current authority, do not treat as permanently fixed).
+  Compatibility with GPL-2.0-only specifically remains a commonly-cited
+  point of friction; treat as AMBER pending review, not a settled fact.
+
+structured_issue_prompts:
+  - "Is a NOTICE file present upstream, and if so has its content been carried forward?"
+  - "Have modified files been marked as changed, as the licence requires?"
+  - "Does the distribution model rely on any patent claim the licensor holds, engaging the express patent grant?"
+  - "If combining with GPL-2.0-only code, has this specific compatibility question been escalated to legal review rather than assumed compatible?"
+
+uncertainty_notes: >
+  The patent grant and retaliation clause are contract terms this engine
+  can flag as present, but their legal effect in a specific dispute is a
+  question for the applicable jurisdiction's contract and patent law, not
+  something this tool concludes on.

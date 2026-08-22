@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Project-instance working state — never commit a real project's evidence
+# ledger, reference material, or contamination-classified artefacts.
+projects/*/evidence/
+projects/*/.zone-r/
+projects/*/.zone-h/
+projects/*/.zone-i/
+*.cleanroom-evidence.zip
+
+.DS_Store
+.idea/
+.vscode/

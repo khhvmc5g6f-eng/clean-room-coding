@@ -1,0 +1,104 @@
+{
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "creationInfo": {
+    "created": "2026-08-22T11:39:58.263Z",
+    "creators": [
+      "Tool: clean-room-coding-0.1.0"
+    ]
+  },
+  "dataLicense": "CC0-1.0",
+  "documentNamespace": "https://cleanroom.dev/spdx/clean-room-coding-ba52de63-0399-4192-90d4-bcb0af087641",
+  "name": "clean-room-coding-sbom",
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package-clean-room-coding",
+      "downloadLocation": "NOASSERTION",
+      "licenseConcluded": "NOASSERTION",
+      "name": "clean-room-coding",
+      "versionInfo": "0.1.0"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-0-click",
+      "downloadLocation": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/click",
+          "referenceType": "purl"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "click",
+      "versionInfo": "8.1"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-1-PyYAML",
+      "downloadLocation": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/PyYAML",
+          "referenceType": "purl"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "PyYAML",
+      "versionInfo": "6.0"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-2-jsonschema",
+      "downloadLocation": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/jsonschema",
+          "referenceType": "purl"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "jsonschema",
+      "versionInfo": "4.20"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-3-rich",
+      "downloadLocation": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/rich",
+          "referenceType": "purl"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "rich",
+      "versionInfo": "13.7"
+    }
+  ],
+  "relationships": [
+    {
+      "relatedSpdxElement": "SPDXRef-Package-0-click",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-clean-room-coding"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-Package-1-PyYAML",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-clean-room-coding"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-Package-2-jsonschema",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-clean-room-coding"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-Package-3-rich",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-clean-room-coding"
+    }
+  ],
+  "spdxVersion": "SPDX-2.3"
+}

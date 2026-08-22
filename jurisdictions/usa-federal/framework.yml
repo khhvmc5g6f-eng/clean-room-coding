@@ -1,0 +1,88 @@
+# Jurisdiction pack: United States (federal)
+# Part LXIII. Facts and structured questions only -- NOT legal advice.
+# US copyright and patent law is federal; state law is relevant mainly for
+# contract/trade-secret questions, which vary by state and are out of
+# scope for this v0.1 federal-level pack (see ROADMAP.md).
+
+jurisdiction_id: usa-federal
+legal_system: common_law
+languages: [en]
+
+governing_statutes:
+  - name: "Copyright Act of 1976, as amended (17 U.S.C.)"
+    relevance: >
+      17 U.S.C. §102(a) extends copyright to "literary works", which by
+      §101 and case law includes computer programs; §102(b) excludes
+      "any idea, procedure, process, system, method of operation,
+      concept, principle, or discovery" from copyright protection,
+      regardless of the form in which it is described -- the core
+      idea/expression distinction underlying Part XVI.
+    url: "https://www.copyright.gov/title17/"
+  - name: "Digital Millennium Copyright Act (DMCA), 17 U.S.C. §1201"
+    relevance: >
+      §1201(f) provides a specific, conditions-attached exemption for
+      reverse engineering undertaken solely to achieve interoperability
+      of an independently created computer program with other programs.
+      Directly relevant to whether observation/analysis activity in
+      Zone R is lawful (Part IX, Part XXXII).
+  - name: "Defend Trade Secrets Act (DTSA), 18 U.S.C. §1836 et seq."
+    relevance: "Federal civil cause of action for trade secret misappropriation, relevant where reference material was obtained under confidentiality obligations."
+
+leading_case_law:
+  - citation: "Computer Associates International, Inc. v. Altai, Inc., 982 F.2d 693 (2d Cir. 1992)"
+    relevance: >
+      Established the "Abstraction-Filtration-Comparison" test: abstract
+      the program into levels, filter out unprotectable elements (ideas,
+      elements dictated by efficiency or external factors, elements taken
+      from the public domain), then compare only what remains for
+      substantial similarity. This is the closest US doctrinal analogue
+      to Part XVI's observable-requirement/source-implementation-detail
+      split and to the similarity classifier's REQUIRED/CONVENTIONAL/
+      CONSTRAINED categories (Part XXXV).
+  - citation: "Sega Enterprises Ltd. v. Accolade, Inc., 977 F.2d 1510 (9th Cir. 1992)"
+    relevance: >
+      Intermediate copying of object code during reverse engineering,
+      undertaken to gain access to unprotected functional elements
+      (interface specifications), was a fair use under §107 where there
+      was no other way to access those unprotected elements. Foundational
+      US authority for lawful reverse-engineering-for-interoperability.
+  - citation: "Oracle America, Inc. v. Google LLC, 593 U.S. ___ (2021)"
+    relevance: >
+      The Supreme Court assumed without deciding that the Java SE API
+      declaring code was copyrightable, but held Google's use of it to
+      reimplement the API in Android was fair use, emphasising the
+      functional, interface-like nature of the declaring code and the
+      transformative nature of the reimplementation. Highly relevant
+      where a "reference" is an API surface an implementation must be
+      compatible with.
+  - citation: "Lotus Development Corp. v. Borland International, Inc., 49 F.3d 807 (1st Cir. 1995), aff'd by an equally divided Court, 516 U.S. 233 (1996)"
+    relevance: "Held a menu command hierarchy was an uncopyrightable 'method of operation' under §102(b) -- relevant to UI/command surface reimplementation questions."
+
+conflicts_of_laws_notes: >
+  US copyright claims are generally governed by the law of the country
+  where infringement occurred (territoriality principle, cf. Subafilms
+  Ltd. v. MGM-Pathe Communications Co., 24 F.3d 1088 (9th Cir. 1994));
+  contract choice-of-law clauses are analysed separately from copyright
+  subsistence/infringement. Federal courts have exclusive jurisdiction
+  over copyright and patent claims (28 U.S.C. §1338); state law governs
+  most contract and trade secret claims absent the DTSA.
+
+court_terminology:
+  trial_court: "United States District Court"
+  appellate_court: "United States Court of Appeals (regional circuit, e.g. Federal Circuit for patent appeals)"
+  final_court: "Supreme Court of the United States"
+  simulated_judicial_role_title: "Simulated Federal District Court IP Reviewer"
+
+interoperability_permitted_acts:
+  summary: >
+    17 U.S.C. §1201(f) (DMCA) and the fair-use factors of §107 (as applied
+    in Sega v. Accolade and Oracle v. Google) are the operative frameworks.
+    Whether a specific analysis activity qualifies is fact-sensitive; the
+    fair-use analysis in particular is a case-by-case four-factor balancing
+    test, not a bright-line rule.
+
+questions_for_review:
+  - "Applying Altai's Abstraction-Filtration-Comparison approach: after filtering out ideas, efficiency-dictated elements and public-domain elements, what (if anything) remains as protectable expression, and does the implementation share it?"
+  - "Is any DMCA §1201(f) or §107 fair-use argument available for the reference-analysis activity that occurred in Zone R, and has that assessment been documented before analysis began (Part IX), not reconstructed afterward?"
+  - "Is a required distribution market the United States, and if so does any GPL/AGPL-triggering distribution occur from or into the US?"
+  - "Where the reference exposes an API/interface, has the analysis distinguished the interface (per Oracle v. Google / Lotus v. Borland) from any copyrightable implementation behind it?"

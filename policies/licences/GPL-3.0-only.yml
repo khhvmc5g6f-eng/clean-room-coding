@@ -1,0 +1,53 @@
+# Licence policy pack: GPL-3.0-only
+spdx_id: GPL-3.0-only
+family: copyleft
+osi_approved: true
+fsf_libre: true
+copyleft: strong
+
+summary: >
+  Strong copyleft. Distributing a work based on (a "derivative work" of) a
+  GPL-3.0 program generally requires the whole combined work to be
+  licensed under GPL-3.0 (or a compatible licence) and its Corresponding
+  Source made available under the same terms. This is exactly the licence
+  Clean Room Coding exists to help you avoid triggering through improper
+  copying, while still allowing genuinely independent reimplementation of
+  the *functionality* the GPL'd program exposes.
+
+key_obligations:
+  - "Provide the Corresponding Source (or a written offer for it) alongside any distributed object/executable form."
+  - "License the combined/derivative work as a whole under GPL-3.0-or-later-compatible terms."
+  - "Preserve copyright and licence notices, and a copy of the GPL-3.0 text."
+  - "Do not impose further restrictions beyond those the GPL itself permits (no additional restrictions clause)."
+  - "Convey Installation Information for User Products where the anti-Tivoization provisions apply (GPLv3 section 6)."
+
+distribution_triggers: [source, binary, library, container]
+network_use_triggers_obligations: false  # GPLv3 itself has no network-copyleft trigger; see AGPL-3.0-only.yml
+patent_grant: true
+patent_retaliation_clause: true
+trademark_grant: false
+
+clean_room_relevance: >
+  THE CENTRAL RISK THIS PACK EXISTS TO MANAGE: merely rewriting or
+  refactoring GPL-3.0 source does not remove the GPL's obligations if the
+  new work remains a derivative of the original expression. Clean Room
+  Coding's methodology (independent behavioural specification, sanitised
+  handoff, source-blind implementation, post-hoc similarity review) is
+  designed to support an argument of independent creation -- it is not
+  itself proof of independence, and does not "launder" a licence.
+
+structured_issue_prompts:
+  - "Was the reference implementation observed only to extract OBSERVABLE REQUIREMENTS (Part XVI), never SOURCE IMPLEMENTATION DETAIL, in the handoff bundle?"
+  - "Did the implementation team have zero read access to the GPL-3.0 source (Zone I has no path to Zone R)?"
+  - "Does the similarity report show any SUSPICIOUS or MATERIAL findings against this reference, and if so have they been resolved?"
+  - "Is the intended output licence compatible with GPL-3.0-only, or is independence from the GPL'd work the basis for a different output licence?"
+  - "Does the distribution model (SaaS vs. binary distribution vs. library linking) change which obligations are engaged?"
+
+uncertainty_notes: >
+  Whether a given implementation is legally a "derivative work" of the
+  GPL'd reference, versus an independently created work that happens to be
+  functionally compatible, is precisely the question a competent
+  clean-room process is built to support -- and precisely the question
+  this tool cannot answer by itself. It requires qualified legal judgement
+  informed by the evidence this tool produces (provenance, similarity
+  findings, isolation records).

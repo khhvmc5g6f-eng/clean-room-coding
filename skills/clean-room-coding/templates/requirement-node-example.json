@@ -1,0 +1,8 @@
+{
+  "id": "CR-REQ-000001",
+  "kind": "requirement",
+  "statement": "When the user selects ascending order, entries are returned sorted alphabetically by name.",
+  "classification": "observable_requirement",
+  "contamination_level": "C0",
+  "status": "proposed"
+}

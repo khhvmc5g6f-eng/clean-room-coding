@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroom.dev/schemas/jurisdiction-matrix.schema.json",
+  "title": "JURISDICTION_MATRIX.json",
+  "description": "Part XII-XIII: jurisdictions potentially applicable per legal issue, with confidence tiers -- never collapsed to a single assumed jurisdiction.",
+  "type": "object",
+  "required": ["schema_version", "project_id", "generated_utc", "issues"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "project_id": { "type": "string" },
+    "generated_utc": { "type": "string", "format": "date-time" },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["issue", "jurisdictions"],
+        "properties": {
+          "issue": {
+            "type": "string",
+            "enum": ["copyright", "licence_contract", "patents", "trademarks", "database_rights", "trade_secrets", "confidentiality", "consumer_law", "competition_law"]
+          },
+          "jurisdictions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["jurisdiction", "tier", "reasoning"],
+              "properties": {
+                "jurisdiction": { "type": "string" },
+                "tier": {
+                  "type": "string",
+                  "enum": ["primary", "secondary", "potential", "unlikely", "unknown"]
+                },
+                "reasoning": { "type": "string" },
+                "basis": {
+                  "type": "array",
+                  "items": { "type": "string", "enum": ["licence_terms", "parties", "conduct", "markets", "rights_nature"] }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "conflicts_of_law_panel_required": { "type": "boolean" },
+    "legal_panels_convened": { "type": "array", "items": { "type": "string" } }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "id": "CR-BEH-000001",
+  "title": "Ascending sort by name",
+  "given": "a project contains five entries",
+  "when": "the user chooses ascending order by name",
+  "then": "the entries are returned alphabetically ascending by name",
+  "requirement_ids": ["CR-REQ-000001"],
+  "result": "not_tested"
+}

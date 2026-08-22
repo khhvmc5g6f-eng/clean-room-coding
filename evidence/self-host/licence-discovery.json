@@ -1,0 +1,290 @@
+[
+  {
+    "concluded": "Apache-2.0",
+    "confidence": "high",
+    "conflicting_evidence": false,
+    "declared": null,
+    "detected": [
+      "Apache-2.0"
+    ],
+    "evidence": [
+      {
+        "excerpt": "Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.",
+        "source": "LICENSE"
+      }
+    ],
+    "path": "LICENSE",
+    "policy_result": {
+      "notes": "All terms in 'Apache-2.0' are explicitly allowed by project policy.",
+      "obligations": [
+        "Include a copy of the Apache-2.0 licence text with any distribution.",
+        "Retain all copyright, patent, trademark and attribution notices from the source form.",
+        "If a NOTICE file is present in the original work, reproduce its attribution contents in derivative distributions.",
+        "Mark any files that were modified from the original with a prominent notice.",
+        "State any changes made to the licensed files."
+      ],
+      "status": "allowed"
+    }
+  },
+  {
+    "concluded": "Apache-2.0",
+    "confidence": "high",
+    "conflicting_evidence": false,
+    "declared": null,
+    "detected": [
+      "Apache-2.0"
+    ],
+    "evidence": [
+      {
+        "excerpt": "Clean Room Coding\nCopyright 2026 Clean Room Coding Contributors\n\nThis product includes software developed by the Clean Room Coding project\n(https://github.com/khhvmc5g6f-eng/clean-room-coding).\n\nLicensed under the Apache License, Version 2.0 (the \"License\"); you may not\nuse this file except in compliance with the License. You may obtain a copy\nof the License at\n\n    http://www.apache.org/licenses/",
+        "source": "NOTICE"
+      }
+    ],
+    "path": "NOTICE",
+    "policy_result": {
+      "notes": "All terms in 'Apache-2.0' are explicitly allowed by project policy.",
+      "obligations": [
+        "Include a copy of the Apache-2.0 licence text with any distribution.",
+        "Retain all copyright, patent, trademark and attribution notices from the source form.",
+        "If a NOTICE file is present in the original work, reproduce its attribution contents in derivative distributions.",
+        "Mark any files that were modified from the original with a prominent notice.",
+        "State any changes made to the licensed files."
+      ],
+      "status": "allowed"
+    }
+  },
+  {
+    "concluded": "GPL-3.0-only",
+    "confidence": "high",
+    "conflicting_evidence": false,
+    "declared": null,
+    "detected": [
+      "GPL-3.0-only"
+    ],
+    "evidence": [
+      {
+        "excerpt": "GNU GENERAL PUBLIC LICENSE\nVersion 3, 29 June 2007\n\nCopyright (c) 2026 Clean Room Coding Contributors (synthetic benchmark fixture)\n\nThis program is free software: you can redistribute it and/or modify it\nunder the terms of the GNU General Public License as published by the\nFree Software Foundation, either version 3 of the License, or (at your\noption) any later version.",
+        "source": "LICENSE"
+      }
+    ],
+    "path": "tests/fixtures/benchmark/contaminated-clone/LICENSE",
+    "policy_result": {
+      "notes": "'GPL-3.0-only' is not fully covered by the project's allow/deny lists.",
+      "obligations": [
+        "Provide the Corresponding Source (or a written offer for it) alongside any distributed object/executable form.",
+        "License the combined/derivative work as a whole under GPL-3.0-or-later-compatible terms.",
+        "Preserve copyright and licence notices, and a copy of the GPL-3.0 text.",
+        "Do not impose further restrictions beyond those the GPL itself permits (no additional restrictions clause).",
+        "Convey Installation Information for User Products where the anti-Tivoization provisions apply (GPLv3 section 6)."
+      ],
+      "status": "needs_review"
+    }
+  },
+  {
+    "concluded": "GPL-3.0-only",
+    "confidence": "high",
+    "conflicting_evidence": false,
+    "declared": null,
+    "detected": [
+      "GPL-3.0-only"
+    ],
+    "evidence": [
+      {
+        "excerpt": "GNU GENERAL PUBLIC LICENSE\nVersion 3, 29 June 2007\n\nCopyright (c) 2026 Clean Room Coding Contributors (synthetic benchmark fixture)\n\nThis program is free software: you can redistribute it and/or modify it\nunder the terms of the GNU General Public License as published by the\nFree Software Foundation, either version 3 of the License, or (at your\noption) any later version.",
+        "source": "LICENSE"
+      }
+    ],
+    "path": "tests/fixtures/benchmark/gpl-app/LICENSE",
+    "policy_result": {
+      "notes": "'GPL-3.0-only' is not fully covered by the project's allow/deny lists.",
+      "obligations": [
+        "Provide the Corresponding Source (or a written offer for it) alongside any distributed object/executable form.",
+        "License the combined/derivative work as a whole under GPL-3.0-or-later-compatible terms.",
+        "Preserve copyright and licence notices, and a copy of the GPL-3.0 text.",
+        "Do not impose further restrictions beyond those the GPL itself permits (no additional restrictions clause).",
+        "Convey Installation Information for User Products where the anti-Tivoization provisions apply (GPLv3 section 6)."
+      ],
+      "status": "needs_review"
+    }
+  },
+  {
+    "concluded": "MIT",
+    "confidence": "high",
+    "conflicting_evidence": false,
+    "declared": null,
+    "detected": [
+      "MIT"
+    ],
+    "evidence": [
+      {
+        "excerpt": "MIT License\n\nCopyright (c) 2026 Clean Room Coding Contributors (synthetic benchmark fixture)\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell",
+        "source": "LICENSE"
+      }
+    ],
+    "path": "tests/fixtures/benchmark/independent-clone/LICENSE",
+    "policy_result": {
+      "notes": "All terms in 'MIT' are explicitly allowed by project policy.",
+      "obligations": [
+        "Reproduce the original copyright notice and the full MIT licence text in all copies or substantial portions of the software.",
+        "The software is provided \"as is\", without warranty -- do not represent otherwise."
+      ],
+      "status": "allowed"
+    }
+  },
+  {
+    "concluded": "MIT",
+    "confidence": "high",
+    "conflicting_evidence": false,
+    "declared": null,
+    "detected": [
+      "MIT"
+    ],
+    "evidence": [
+      {
+        "excerpt": "MIT License\n\nCopyright (c) 2026 Clean Room Coding Contributors (synthetic benchmark fixture)\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell",
+        "source": "LICENSE"
+      }
+    ],
+    "path": "tests/fixtures/benchmark/permissive-app/LICENSE",
+    "policy_result": {
+      "notes": "All terms in 'MIT' are explicitly allowed by project policy.",
+      "obligations": [
+        "Reproduce the original copyright notice and the full MIT licence text in all copies or substantial portions of the software.",
+        "The software is provided \"as is\", without warranty -- do not represent otherwise."
+      ],
+      "status": "allowed"
+    }
+  },
+  {
+    "concluded": null,
+    "confidence": "medium",
+    "conflicting_evidence": false,
+    "declared": "\\s*([^\\n\\r]+)\")",
+    "detected": [],
+    "evidence": [
+      {
+        "excerpt": "\\s*([^\\n\\r]+)\")",
+        "source": "SPDX-License-Identifier header"
+      }
+    ],
+    "path": "src/cleanroom/licence/discovery.py",
+    "policy_result": {
+      "notes": "No licence could be concluded from available evidence.",
+      "obligations": [],
+      "status": "unknown"
+    }
+  },
+  {
+    "concluded": "GPL-3.0-only",
+    "confidence": "high",
+    "conflicting_evidence": false,
+    "declared": "GPL-3.0-only",
+    "detected": [],
+    "evidence": [
+      {
+        "excerpt": "GPL-3.0-only",
+        "source": "SPDX-License-Identifier header"
+      }
+    ],
+    "path": "tests/fixtures/benchmark/contaminated-clone/sorter.py",
+    "policy_result": {
+      "notes": "'GPL-3.0-only' is not fully covered by the project's allow/deny lists.",
+      "obligations": [
+        "Provide the Corresponding Source (or a written offer for it) alongside any distributed object/executable form.",
+        "License the combined/derivative work as a whole under GPL-3.0-or-later-compatible terms.",
+        "Preserve copyright and licence notices, and a copy of the GPL-3.0 text.",
+        "Do not impose further restrictions beyond those the GPL itself permits (no additional restrictions clause).",
+        "Convey Installation Information for User Products where the anti-Tivoization provisions apply (GPLv3 section 6)."
+      ],
+      "status": "needs_review"
+    }
+  },
+  {
+    "concluded": "GPL-3.0-only",
+    "confidence": "high",
+    "conflicting_evidence": false,
+    "declared": "GPL-3.0-only",
+    "detected": [],
+    "evidence": [
+      {
+        "excerpt": "GPL-3.0-only",
+        "source": "SPDX-License-Identifier header"
+      }
+    ],
+    "path": "tests/fixtures/benchmark/gpl-app/wobble_sort.py",
+    "policy_result": {
+      "notes": "'GPL-3.0-only' is not fully covered by the project's allow/deny lists.",
+      "obligations": [
+        "Provide the Corresponding Source (or a written offer for it) alongside any distributed object/executable form.",
+        "License the combined/derivative work as a whole under GPL-3.0-or-later-compatible terms.",
+        "Preserve copyright and licence notices, and a copy of the GPL-3.0 text.",
+        "Do not impose further restrictions beyond those the GPL itself permits (no additional restrictions clause).",
+        "Convey Installation Information for User Products where the anti-Tivoization provisions apply (GPLv3 section 6)."
+      ],
+      "status": "needs_review"
+    }
+  },
+  {
+    "concluded": "MIT",
+    "confidence": "high",
+    "conflicting_evidence": false,
+    "declared": "MIT",
+    "detected": [],
+    "evidence": [
+      {
+        "excerpt": "MIT",
+        "source": "SPDX-License-Identifier header"
+      }
+    ],
+    "path": "tests/fixtures/benchmark/independent-clone/ordering.py",
+    "policy_result": {
+      "notes": "All terms in 'MIT' are explicitly allowed by project policy.",
+      "obligations": [
+        "Reproduce the original copyright notice and the full MIT licence text in all copies or substantial portions of the software.",
+        "The software is provided \"as is\", without warranty -- do not represent otherwise."
+      ],
+      "status": "allowed"
+    }
+  },
+  {
+    "concluded": "MIT",
+    "confidence": "high",
+    "conflicting_evidence": false,
+    "declared": "MIT",
+    "detected": [],
+    "evidence": [
+      {
+        "excerpt": "MIT",
+        "source": "SPDX-License-Identifier header"
+      }
+    ],
+    "path": "tests/fixtures/benchmark/permissive-app/queue.py",
+    "policy_result": {
+      "notes": "All terms in 'MIT' are explicitly allowed by project policy.",
+      "obligations": [
+        "Reproduce the original copyright notice and the full MIT licence text in all copies or substantial portions of the software.",
+        "The software is provided \"as is\", without warranty -- do not represent otherwise."
+      ],
+      "status": "allowed"
+    }
+  },
+  {
+    "concluded": null,
+    "confidence": "medium",
+    "conflicting_evidence": false,
+    "declared": "Apache-2.0\\nprint('hi')\\n\", encoding=\"utf-8\")",
+    "detected": [],
+    "evidence": [
+      {
+        "excerpt": "Apache-2.0\\nprint('hi')\\n\", encoding=\"utf-8\")",
+        "source": "SPDX-License-Identifier header"
+      }
+    ],
+    "path": "tests/unit/test_licence_discovery.py",
+    "policy_result": {
+      "notes": "No licence could be concluded from available evidence.",
+      "obligations": [],
+      "status": "unknown"
+    }
+  }
+]

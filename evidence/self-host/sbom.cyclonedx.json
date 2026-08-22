@@ -1,0 +1,47 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "name": "click",
+      "purl": "pkg:pypi/click",
+      "type": "library",
+      "version": "8.1"
+    },
+    {
+      "name": "PyYAML",
+      "purl": "pkg:pypi/PyYAML",
+      "type": "library",
+      "version": "6.0"
+    },
+    {
+      "name": "jsonschema",
+      "purl": "pkg:pypi/jsonschema",
+      "type": "library",
+      "version": "4.20"
+    },
+    {
+      "name": "rich",
+      "purl": "pkg:pypi/rich",
+      "type": "library",
+      "version": "13.7"
+    }
+  ],
+  "metadata": {
+    "component": {
+      "name": "clean-room-coding",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    "timestamp": "2026-08-22T11:39:58.264Z",
+    "tools": [
+      {
+        "name": "cleanroom",
+        "vendor": "Clean Room Coding",
+        "version": "0.1.0"
+      }
+    ]
+  },
+  "serialNumber": "urn:uuid:29d30f3c-b637-4781-91c7-fa0217f80917",
+  "specVersion": "1.5",
+  "version": 1
+}

@@ -1,0 +1,87 @@
+# Jurisdiction pack: England & Wales
+# Part LXIII. Facts and structured questions for the heuristic legal engine
+# and the simulated legal/judicial panels. NOT legal advice -- see
+# docs/legal-disclaimer.md. Primary authorities cited are foundational and
+# stable, but currency should always be re-checked (Part LIII) before relying
+# on this pack; legislation.gov.uk and BAILII are the canonical sources.
+
+jurisdiction_id: england-wales
+legal_system: common_law
+languages: [en]
+
+governing_statutes:
+  - name: "Copyright, Designs and Patents Act 1988"
+    short: "CDPA 1988"
+    url: "https://www.legislation.gov.uk/ukpga/1988/48"
+    relevance: >
+      Primary UK copyright statute. s.3(1) defines "literary work" to
+      include a computer program and preparatory design material. s.16-21
+      define the restricted acts (copying, adaptation). s.50B/50BA (as
+      amended, implementing the Software Directive) provide limited
+      permitted acts for decompilation/interoperability and observing,
+      studying and testing a program's functioning.
+  - name: "Copyright and Rights in Databases Regulations 1997 (SI 1997/3032)"
+    relevance: "Sui generis database right, separate from copyright in any underlying data or schema."
+  - name: "Directive 2009/24/EC on the legal protection of computer programs (retained/relevant as implemented in UK law)"
+    relevance: >
+      Article 1(2): copyright protects the expression of a computer
+      program; ideas and principles underlying any element, including
+      those underlying its interfaces, are not protected by copyright
+      under the Directive. This is the closest EU/UK analogue to the
+      US idea/expression and merger doctrines for software specifically.
+
+leading_case_law:
+  - citation: "Navitaire Inc v Easyjet Airline Co Ltd [2004] EWHC 1725 (Ch)"
+    relevance: >
+      Held that copying the "look and feel" / business logic of a system
+      by independent implementation, without copying source code or
+      design documents, did not infringe copyright in the source code --
+      command names and the overall functionality were not protected
+      expression in that case. A key authority for why re-implementing
+      observed FUNCTIONALITY is a materially different question from
+      copying EXPRESSION.
+  - citation: "SAS Institute Inc v World Programming Ltd [2013] EWCA Civ 1482 (following CJEU C-406/10)"
+    relevance: >
+      Confirmed that programming languages, interfaces and functionality of
+      a computer program are not protected by copyright as such; only the
+      particular expression of a program is protected. Directly relevant to
+      Part XVI's observable-requirement/source-implementation-detail split.
+  - citation: "IBCOS Computers Ltd v Barclays Highland Finance Ltd [1994] FSR 275"
+    relevance: >
+      Found substantial copying where a former employee's new program
+      shared distinctive structure, error corrections and idiosyncrasies
+      with the original -- illustrative of what a similarity/provenance
+      review (Parts XXXIV-XXXVI) should be alert to: not just literal
+      text copying but shared idiosyncratic design choices.
+  - citation: "Cantor Fitzgerald International v Tradition (UK) Ltd [2000] RPC 95"
+    relevance: "Non-textual copying of program architecture/structure can infringe; supports treating structural similarity, not only lexical similarity, as evidentially relevant."
+
+conflicts_of_laws_notes: >
+  Rome I/Rome II-derived rules (as retained in UK law post-Brexit) govern
+  choice of law for contractual and non-contractual obligations
+  respectively; copyright subsistence and infringement questions are
+  generally governed by the law of the country for which protection is
+  sought (lex loci protectionis), which may differ from the law governing
+  a licence contract. Treat these as distinct questions -- do not resolve
+  "governing law of the licence" and "applicable copyright law" as the
+  same analysis.
+
+court_terminology:
+  trial_court: "High Court of Justice (Business and Property Courts, Intellectual Property List / IPEC for lower-value claims)"
+  appellate_court: "Court of Appeal (Civil Division)"
+  final_court: "Supreme Court of the United Kingdom"
+  simulated_judicial_role_title: "Simulated Senior High Court (Business and Property Courts, IP) Reviewer"
+
+interoperability_permitted_acts:
+  summary: >
+    CDPA 1988 s.50B (decompilation) and s.50BA (observing, studying and
+    testing) provide narrow, non-excludable-by-contract permitted acts
+    for achieving interoperability. Whether a specific analysis activity
+    falls within them is fact-sensitive and must be assessed per Part
+    XXXII (contractual testing gate) before relying on them.
+
+questions_for_review:
+  - "Is the reference material's copyright owner identifiable, and has access to it been on a lawful basis (Part IX)?"
+  - "Does any contract term purport to exclude the s.50B/50BA permitted acts, and if so is that term itself excluded by s.296A (no contractual override)?"
+  - "Are the similarities identified in the similarity report of the kind found infringing in IBCOS/Cantor Fitzgerald (idiosyncratic structure/errors), or the kind found non-infringing in Navitaire/SAS v WPL (functionality, interfaces, look-and-feel)?"
+  - "Is UK a required distribution market, and if so does any GPL/AGPL-triggering distribution occur from or into the UK?"

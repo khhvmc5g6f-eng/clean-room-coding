@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroom.dev/schemas/contamination-level.schema.json",
+  "title": "Contamination Level",
+  "description": "C0-C5 classification of an artefact's exposure risk. See docs/concepts.md#contamination.",
+  "type": "string",
+  "enum": ["C0", "C1", "C2", "C3", "C4", "C5"],
+  "meta:enum-meaning": {
+    "C0": "Public factual material or independent standards.",
+    "C1": "Public documentation carrying minimal expressive risk.",
+    "C2": "Reference documentation containing potentially expressive material.",
+    "C3": "Original source implementation.",
+    "C4": "Highly sensitive implementation detail, private source or confidential material.",
+    "C5": "Legally restricted material or material whose permissible use has not been established."
+  }
+}

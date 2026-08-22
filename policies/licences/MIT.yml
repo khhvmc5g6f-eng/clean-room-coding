@@ -1,0 +1,42 @@
+# Licence policy pack: MIT
+# Part LXIV. This file states FACTS and COMMONLY-CITED obligations plus
+# structured questions for human/legal review. It does not, and cannot,
+# replace legal interpretation -- see docs/legal-disclaimer.md.
+
+spdx_id: MIT
+family: permissive
+osi_approved: true
+fsf_libre: true
+copyleft: none
+
+summary: >
+  A short permissive licence. Requires preservation of the copyright notice
+  and licence text; imposes no copyleft (share-alike) obligation and no
+  requirement to disclose source of derivative or combined works.
+
+key_obligations:
+  - "Reproduce the original copyright notice and the full MIT licence text in all copies or substantial portions of the software."
+  - "The software is provided \"as is\", without warranty -- do not represent otherwise."
+
+distribution_triggers: [source, binary, saas, library, container]
+network_use_triggers_obligations: false
+patent_grant: false
+trademark_grant: false
+
+combination_notes: >
+  Widely treated as compatible with essentially all other OSI-approved
+  licences for the purpose of combination, subject to the combined work's
+  own licence still discharging MIT's notice-preservation obligation.
+  Whether a specific combination is compliant depends on how the code is
+  combined and distributed -- this is not stated as a universal rule.
+
+structured_issue_prompts:
+  - "Has the upstream copyright notice been preserved in the resulting NOTICE/LICENSE file?"
+  - "Is the full MIT licence text included alongside any distributed binary?"
+  - "If this MIT-licensed component is a reference (not a dependency), does clean-room analysis correctly distinguish the licence of the reference material from the licence intended for the new implementation?"
+
+uncertainty_notes: >
+  Facts here are engine-verifiable (declared licence, presence of notice
+  files). Whether a particular combination or distribution model fully
+  discharges the notice obligation is a judgement call left to the
+  jurisdiction-specific legal panel and, ultimately, qualified counsel.

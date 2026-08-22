@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroom.dev/schemas/requirement.schema.json",
+  "title": "Requirement Graph Node",
+  "description": "A single node in the specification graph (Part XIX): Requirement -> Feature -> Screen/API -> Acceptance Test -> Implementation -> Verification -> Evidence.",
+  "type": "object",
+  "required": ["id", "kind", "statement", "classification", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^CR-(REQ|FEAT|SCR|API|BEH|IMPL|VER)-[0-9]{6}$" },
+    "kind": { "type": "string", "enum": ["requirement", "feature", "screen", "api", "acceptance_test", "implementation", "verification"] },
+    "statement": { "type": "string", "minLength": 1 },
+    "classification": {
+      "type": "string",
+      "enum": ["observable_requirement", "source_implementation_detail"],
+      "description": "Part XVI. Only observable_requirement nodes may cross into the handoff bundle."
+    },
+    "contamination_level": { "$ref": "contamination-level.schema.json" },
+    "parents": { "type": "array", "items": { "type": "string" } },
+    "children": { "type": "array", "items": { "type": "string" } },
+    "source_panel": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": ["proposed", "sanitised", "handed_off", "implemented", "verified", "blocked", "excluded"]
+    },
+    "blocker": {
+      "type": "object",
+      "properties": {
+        "reason": { "type": "string" },
+        "responsible_component": { "type": "string" },
+        "attempted_resolution": { "type": "string" },
+        "next_required_action": { "type": "string" }
+      }
+    },
+    "implementation_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "file": { "type": "string" },
+          "commit": { "type": "string" },
+          "test_id": { "type": "string" },
+          "test_result": { "type": "string", "enum": ["pass", "fail", "not_tested", "unknown"] },
+          "reviewer": { "type": "string" }
+        }
+      }
+    }
+  }
+}

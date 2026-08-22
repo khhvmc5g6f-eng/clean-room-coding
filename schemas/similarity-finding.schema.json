@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroom.dev/schemas/similarity-finding.schema.json",
+  "title": "Similarity Finding",
+  "description": "Parts XXXIV-XXXVI: a detected similarity between reference and implementation, with an explanation category -- similarity is never automatically treated as copying.",
+  "type": "object",
+  "required": ["id", "method", "reference_ref", "implementation_ref", "score", "classification"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string" },
+    "method": { "type": "string", "enum": ["lexical", "structural", "semantic", "textual"] },
+    "reference_ref": { "type": "string" },
+    "implementation_ref": { "type": "string" },
+    "score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "background_score": {
+      "type": ["number", "null"],
+      "description": "Score against negative-control projects for the same method/location, if available (Part XXXVI)."
+    },
+    "classification": {
+      "type": "string",
+      "enum": ["required", "conventional", "constrained", "coincidental", "suspicious", "material"]
+    },
+    "explanation": { "type": "string" },
+    "requires_finding": { "type": "boolean", "description": "true for suspicious/material per Part XXXV." }
+  }
+}
