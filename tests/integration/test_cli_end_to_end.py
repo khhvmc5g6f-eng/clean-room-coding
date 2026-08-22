@@ -237,6 +237,18 @@ def test_heartbeat_rejects_unregistered_agent_id(tmp_path: Path):
     assert "No agent registered" in str(result.exception) or "No agent registered" in result.output
 
 
+def test_benchmark_command_does_not_require_a_cleanroom_project():
+    """`cleanroom benchmark` evaluates the tool itself against its own
+    fixture corpus, like `cleanroom doctor` -- no .cleanroom.yml/--project
+    needed, unlike every other command in this file."""
+    runner = CliRunner()
+    result = runner.invoke(main, ["--json", "benchmark"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["case_count"] == 8
+    assert 0.0 <= payload["precision"] <= 1.0
+
+
 def test_legal_picks_up_similarity_and_requirement_graph_facts(tmp_path: Path):
     """Regression test: `cleanroom legal` previously never loaded
     evidence/similarity-findings.json or requirements.json into the

@@ -110,14 +110,14 @@ see "External review findings" and "Competitive landscape" below.
   fragile system-library dependency) covering what the project started
   with, what it did (derived from the evidence ledger), functional
   coverage, remediation status, jurisdictions, and outstanding issues.
-- 26-command CLI (`init`, `doctor`, `intake`, `inspect`, `licence`,
+- 27-command CLI (`init`, `doctor`, `intake`, `inspect`, `licence`,
   `jurisdiction`, `analyse`, `specify`, `sanitise`, `handoff`, `architect`,
   `ai-suggest`, `build`, `heartbeat`, `test`, `compare`, `similarity`,
   `provenance`, `audit`, `legal`, `judge`, `remediate`, `verify`, `report`,
-  `release`, `status`) with `--json`/`--quiet`/`--verbose`/`--project`/
-  `--config` (now actually wired to an explicit config path, not silently
-  ignored) and documented exit codes; Click-based `CliRunner` integration
-  tests drive the full pipeline end-to-end.
+  `release`, `status`, `benchmark`) with `--json`/`--quiet`/`--verbose`/
+  `--project`/`--config` (now actually wired to an explicit config path,
+  not silently ignored) and documented exit codes; Click-based
+  `CliRunner` integration tests drive the full pipeline end-to-end.
 - The Agent Skill (`skills/clean-room-coding/SKILL.md` +
   progressive-disclosure `references/`).
 - Licensed under **BUSL-1.1** (Business Source License 1.1): free for
@@ -355,6 +355,20 @@ than a bare "worth considering":
    variant -- this is real, not just reputation. **Recommendation: make it
    an optional `[licensecheck]` extra, not a base dependency; effort ~1-2
    days for a thin adapter + tests.**
+   **Update (2026-08-22): attempted this and hit a real, concrete
+   blocker, not just the transitive-dep-count concern above.**
+   `scancode.api` transitively imports `typecode`, which requires a
+   native `libmagic` shared library; the bundled `typecode-libmagic`
+   plugin (the only PyPI package that provides one) has no working
+   binary for arm64 macOS + Python 3.14 -- confirmed by installing both
+   packages in a clean scratch venv and hitting `NoMagicLibError` on the
+   very first `import scancode.api`, with no libmagic dylib anywhere on
+   the system to point it at instead. Making this work would require
+   installing system-level native software (e.g. `brew install libmagic`)
+   on every machine that runs `cleanroom`, which is a materially bigger
+   ask than "one more optional Python extra" and wasn't something to do
+   unilaterally just to chase this one integration. Left unbuilt rather
+   than writing adapter code that couldn't be verified to actually run.
 3. **`spdx-tools`** (PyPI `spdx-tools`, v0.8.5, Apache-2.0) and
    **`cyclonedx-python-lib`** (PyPI `cyclonedx-python-lib`, v11.12.0,
    Apache-2.0 -- note this is the *library*, distinct from the
@@ -487,8 +501,18 @@ change that should be evaluated on its own.
   `docs/architecture.md` notes these as intentionally out of scope for a
   narrow-but-real first release, not abandoned.
 - **Benchmark suite / precision-recall measurement** (Parts LXXVI-LXXVII)
-  is limited to `tests/fixtures/benchmark/` -- a small hand-built set, not
-  yet a measured precision/recall report.
+  now has a real measured report: `cleanroom benchmark` runs the
+  similarity engine against 8 hand-built ground-truth cases (Python,
+  JavaScript, Go) and computes precision/recall/F1 for real
+  (`src/cleanroom/benchmark.py`, `tests/fixtures/benchmark/manifest.yml`).
+  Current measured result: precision 0.80, recall 1.00, F1 0.89 at the
+  default threshold -- with one real, undisguised false positive
+  (`js-independent-clone`, an honest limitation of the default
+  structural threshold for JS's tree-sitter node-kind vocabulary, not
+  papered over). Still a small, hand-built, synthetic corpus, not a
+  large-scale or statistically representative benchmark -- treat the
+  numbers as a real signal on these specific cases, not a general
+  accuracy claim.
 - **Only Python + Node manifests** are parsed by licence discovery and SBOM
   generation; `Cargo.toml`/`composer.json` are read for licence discovery
   only, not yet for SBOM dependency listing.
@@ -531,3 +555,20 @@ change that should be evaluated on its own.
    real single-shot harness (`cleanroom heartbeat`) now wires it in
    without building a full multi-agent orchestrator (see "Update
    (2026-08-22)" note above for what this does and doesn't do).
+10. ~~Benchmark suite / measured precision-recall report~~ -- **done**
+    (`cleanroom benchmark`, 8 ground-truth cases across Python/JS/Go); see
+    "Benchmark suite" above for the measured 0.80 precision / 1.00 recall
+    result and its one real documented false positive.
+11. Investigate the false positive `cleanroom benchmark` found: the
+    default 0.15 structural threshold is too sensitive for at least one
+    genuinely-independent JavaScript reimplementation in this corpus
+    (scores ~0.18). Worth exploring whether tree-sitter's JS node-kind
+    vocabulary needs a higher default threshold than Python's `ast`, or a
+    larger corpus to tell whether this is a real per-language pattern or
+    one fixture's idiosyncrasy -- not yet investigated.
+12. Attempted **ScanCode Toolkit** as an optional `[licensecheck]` extra
+    and hit a real, concrete blocker (a native `libmagic` dependency with
+    no working plugin for arm64 macOS + Python 3.14) -- see "Competitive
+    landscape" above. Revisit only if a way to make this reliably
+    installable across platforms materialises, or if the maintainer is
+    willing to require a system-level `libmagic` install.

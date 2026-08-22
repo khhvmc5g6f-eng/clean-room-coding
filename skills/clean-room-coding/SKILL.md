@@ -198,6 +198,13 @@ machine-readable output) over re-deriving its logic by hand.
     never tell a user "release approved" on the strength of this tool
     alone.
 
+17. **Benchmark** -- `cleanroom benchmark` (no project needed, like
+    `doctor`) runs the similarity engine against its own small,
+    hand-built, synthetic ground-truth corpus and reports real precision/
+    recall/F1 -- not a large-scale benchmark, but a genuine measured
+    result, including one documented false positive. Use it to check the
+    engine's current measured behaviour, not to claim general accuracy.
+
 ## Exit codes
 
 See `references/exit-codes.md` for the full table. The two a calling agent

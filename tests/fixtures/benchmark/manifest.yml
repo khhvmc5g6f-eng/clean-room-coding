@@ -1,0 +1,65 @@
+# Part LXXVI-LXXVII: ground truth for the benchmark suite's measured
+# precision/recall report (src/cleanroom/benchmark.py, `cleanroom
+# benchmark`). Each case is a (reference, implementation) pair with a
+# human-assigned ground_truth: "positive" means a real human reviewer
+# would expect the similarity engine to flag this pair (suspicious/
+# material); "negative" means a human reviewer would expect it NOT to be
+# flagged (coincidental/conventional). Small and hand-built, synthetic and
+# wholly owned by this project -- not a large-scale or academic benchmark;
+# see README.md in this directory.
+cases:
+  - id: py-contaminated-clone
+    reference: gpl-app/wobble_sort.py
+    implementation: contaminated-clone/sorter.py
+    language: python
+    ground_truth: positive
+    description: Byte-for-byte copy of gpl-app with only cosmetic renaming.
+
+  - id: py-independent-clone
+    reference: gpl-app/wobble_sort.py
+    implementation: independent-clone/ordering.py
+    language: python
+    ground_truth: negative
+    description: Independent reimplementation of the same observable behaviour, different structure.
+
+  - id: py-paraphrased-clone
+    reference: gpl-app/wobble_sort.py
+    implementation: paraphrased-clone/reorder.py
+    language: python
+    ground_truth: positive
+    description: Lightly reworked names/layout but the same underlying algorithm/structure -- a partially-disguised clone.
+
+  - id: py-common-idiom
+    reference: common-idiom/reference_stack.py
+    implementation: common-idiom/independent_stack.py
+    language: python
+    ground_truth: negative
+    description: Two independently-written stacks -- structurally different, similar only because a stack is a stack.
+
+  - id: js-contaminated-clone
+    reference: js-app/filterUtils.js
+    implementation: js-contaminated-clone/filterHelpers.js
+    language: javascript
+    ground_truth: positive
+    description: Byte-for-byte copy of js-app with only cosmetic renaming.
+
+  - id: js-independent-clone
+    reference: js-app/filterUtils.js
+    implementation: js-independent-clone/selectItems.js
+    language: javascript
+    ground_truth: negative
+    description: Independent reimplementation using functional array methods instead of manual loops.
+
+  - id: go-contaminated-clone
+    reference: go-app/dedupe.go
+    implementation: go-contaminated-clone/dedupe_copy.go
+    language: go
+    ground_truth: positive
+    description: Byte-for-byte copy of go-app with only cosmetic renaming.
+
+  - id: go-independent-clone
+    reference: go-app/dedupe.go
+    implementation: go-independent-clone/unique.go
+    language: go
+    ground_truth: negative
+    description: Independent reimplementation using a struct+methods instead of free functions.

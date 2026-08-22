@@ -19,6 +19,7 @@ import click
 import yaml
 
 from cleanroom import __version__
+from cleanroom import benchmark as benchmark_module
 from cleanroom.config import default_config, load_config
 from cleanroom.contamination import Contamination
 from cleanroom.evidence import Actor
@@ -1260,6 +1261,31 @@ def status(ctx: Ctx) -> None:
         "orphaned_agents": [a.agent_id for a in registry.orphaned()],
         "ledger_events": len(project.evidence.read_all()),
     })
+
+
+# --------------------------------------------------------------------------- benchmark
+
+@main.command()
+@click.option("--threshold", type=float, default=0.15, help="Structural-similarity classification threshold to benchmark against.")
+@click.option("--markdown", "markdown_path", type=click.Path(path_type=Path), default=None, help="Also write a Markdown report to this path.")
+@pass_ctx
+def benchmark(ctx: Ctx, threshold: float, markdown_path: Path | None) -> None:
+    """Parts LXXVI-LXXVII: measured precision/recall for the similarity
+    engine against this project's own small, hand-built, synthetic
+    ground-truth corpus (tests/fixtures/benchmark/). Does not operate on
+    a .cleanroom.yml project -- this benchmarks the tool itself, like
+    'cleanroom doctor'."""
+    fixtures_dir = benchmark_module.default_fixtures_dir()
+    if fixtures_dir is None:
+        raise click.ClickException(
+            "Could not find tests/fixtures/benchmark/ -- this command only works from a git checkout "
+            "of the clean-room-coding repository, not a bare 'pip install cleanroom'."
+        )
+    report = benchmark_module.run_benchmark(fixtures_dir, threshold=threshold)
+    if markdown_path:
+        markdown_path.write_text(benchmark_module.render_markdown(report), encoding="utf-8")
+        report["markdown_written_to"] = str(markdown_path)
+    ctx.emit(report)
 
 
 def main_entry() -> None:

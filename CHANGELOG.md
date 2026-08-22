@@ -469,4 +469,36 @@ detail:
   writing the corresponding regression tests.
 - CLI command count: 25 -> 26.
 
+### Added (twelfth pass — measured precision/recall benchmark, and a real ScanCode Toolkit finding)
+
+- New `src/cleanroom/benchmark.py` + `cleanroom benchmark` (no
+  `.cleanroom.yml` project needed, like `cleanroom doctor`): runs the
+  similarity engine against a new, expanded 8-case ground-truth corpus
+  (`tests/fixtures/benchmark/manifest.yml`) and computes real precision/
+  recall/F1/accuracy -- Part LXXVII was previously an unmeasured claim.
+  Added 6 new fixture pairs (a partially-disguised Python paraphrase, a
+  same-concept-different-structure Python pair to test against false
+  positives from ordinary shared idiom, and matched contaminated/
+  independent pairs in JavaScript and Go to exercise the real tree-sitter
+  structural path, not just Python's `ast`) alongside the original 2.
+- **Measured result: precision 0.80, recall 1.00, F1 0.89, accuracy
+  0.875** at the default 0.15 threshold -- with one real, deliberately
+  undisguised false positive (`js-independent-clone`, ~0.18 structural
+  score despite being a genuinely independent reimplementation). Kept in
+  the corpus and documented plainly as a real limitation of the default
+  structural threshold for JavaScript's tree-sitter node-kind vocabulary,
+  rather than loosened until the number looked clean -- a benchmark that
+  can't produce a false positive isn't measuring anything.
+- Investigated whether ScanCode Toolkit could be added as the previously-
+  recommended optional `[licensecheck]` extra and found a real, concrete
+  blocker beyond the already-known "~40 transitive deps" concern:
+  `scancode.api` requires a native `libmagic` library, and the only PyPI
+  plugin that provides one (`typecode-libmagic`) has no working binary
+  for arm64 macOS + Python 3.14 -- confirmed by installing both in a
+  clean scratch venv and hitting `NoMagicLibError` on the very first
+  import, with no system libmagic available to fall back to either. Left
+  unbuilt rather than writing adapter code that couldn't be verified to
+  actually run.
+- CLI command count: 26 -> 27.
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD
