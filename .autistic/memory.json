@@ -3,6 +3,24 @@
   "lastUpdated": "2026-08-22",
   "invariants": [
     {
+      "rule": "AMBER/UNKNOWN legal findings and suspicious similarity findings were ALREADY routed to non-blocking review_required remediation tasks by remediation.py's reconcile() before this run -- the initial assumption that only RED/material findings were remediated was wrong; only the interactive pre-build gate (cleanroom build checking this before registering an agent) was actually missing, not the underlying routing mechanism itself.",
+      "confidence": 0.95,
+      "evidence": ["src/cleanroom/legal/remediation.py:34,44 (AMBER_LIKE, _legal_task_source)", "verified via real end-to-end CLI run: an AGPL-3.0-only + SaaS RED finding produced 2 blocking + 11 review_required tasks, all assigned_to=implementation-team, before cleanroom build was ever touched"],
+      "confirmedRuns": 1
+    },
+    {
+      "rule": "click.confirm()/click.prompt() calls in cli.py run inside main_entry's main(standalone_mode=False), which only catches click.ClickException and CleanRoomError -- click.Abort (raised when stdin is closed/non-interactive) propagates as a RAW, unhandled traceback unless the call site wraps it itself. ai_suggest's pre-existing click.confirm() call has this same latent bug (not fixed, flagged separately); build()'s new call site catches Abort explicitly.",
+      "confidence": 0.9,
+      "evidence": ["src/cleanroom/cli.py main_entry() only catches ClickException/CleanRoomError", "reproduced directly: `cleanroom build ... </dev/null` raised a raw click.exceptions.Abort traceback before the try/except fix"],
+      "confirmedRuns": 1
+    },
+    {
+      "rule": "The repo's own local working tree can contain untracked, unrelated project-analysis workspaces under projects/<name>/ (e.g. projects/openaccountants-openaccountants/) from a concurrent session running cleanroom against a different target -- these pollute a local `reuse lint` run with thousands of unrelated findings and are NOT gitignored if the zone-r directory lacks the leading dot .gitignore expects (projects/*/.zone-r/ vs a real zone-r/). Always check for this contamination (git status showing untracked projects/ content, or a reuse-lint missing-license count far exceeding this repo's own ~176 tracked files) before treating a reuse-lint failure as caused by your own changes.",
+      "confidence": 0.9,
+      "evidence": ["reuse lint locally reported 8621+ lines referencing projects/openaccountants-openaccountants/ out of ~8623 total, vs 0 for any file this session actually touched", "flagged via spawn_task rather than fixed directly (not this session's work to touch)"],
+      "confirmedRuns": 1
+    },
+    {
       "rule": "AgentRegistry.register() has exactly one CLI caller path per zone scope: cleanroom build (H+I) and, since this run, cleanroom recruit (R only). Both set prohibited_paths as an explicit belt-and-suspenders denial of the OTHER zones, not just omission from permitted_zones -- match this pattern for any future agent-registration command.",
       "confidence": 0.9,
       "evidence": ["src/cleanroom/cli.py build()/recruit()", "tests/integration/test_cli_end_to_end.py:test_recruit_registers_an_r_scoped_agent_explicitly_denied_zone_h_and_i"],
