@@ -363,4 +363,29 @@ detail:
   before trusting the corresponding regression test
   (`test_computed_maturity_level_advances_with_real_project_state`).
 
+### Added (eighth pass — opt-in transitive dependency resolution)
+
+- New `src/cleanroom/provenance/transitive.py`: `resolve_transitive()`
+  walks a project's real dependency graph via read-only registry metadata
+  calls (PyPI's JSON API for pip/pyproject dependencies, the npm registry
+  API for package.json dependencies) -- it never installs a package or
+  runs any of its code, so it's safe to run against dependency names
+  taken from an untrusted reference project's manifest. Breadth-first,
+  deduplicated by (ecosystem, name) so a diamond dependency is only
+  queried once, depth-capped (default 5) against pathological graphs, and
+  every failed lookup is recorded as `unresolved` with a reason rather
+  than silently dropped.
+- Wired into a new opt-in `cleanroom provenance --resolve-transitive`
+  flag (default off, so the command's existing offline behaviour is
+  unchanged unless asked) that writes
+  `evidence/sbom/transitive-dependencies.json` alongside the existing
+  SPDX/CycloneDX documents. Deliberately kept as a separate artefact
+  rather than merged into the SBOM documents themselves this pass, to
+  avoid changing their existing direct-deps-only scope/behaviour for
+  anyone not opting in.
+- Tests mock the registry HTTP layer (`_pypi_lookup`/`_npm_lookup`/
+  `_http_get_json`) throughout, including a CLI-level regression test
+  (`test_provenance_resolve_transitive_is_opt_in_and_writes_evidence`) --
+  no test in this suite makes a real network call.
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD

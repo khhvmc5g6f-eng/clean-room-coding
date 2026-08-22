@@ -41,6 +41,7 @@ from cleanroom import maturity
 from cleanroom.orchestration.agents import AgentRegistry
 from cleanroom.project import Project
 from cleanroom.provenance import sbom as sbom_module
+from cleanroom.provenance import transitive as transitive_module
 from cleanroom.report import (
     build_certificate,
     release_allowed,
@@ -758,8 +759,12 @@ def similarity(ctx: Ctx, reference_path: Path, implementation_path: Path, negati
 # --------------------------------------------------------------------------- provenance
 
 @main.command()
+@click.option(
+    "--resolve-transitive", is_flag=True, default=False,
+    help="Also resolve the real transitive dependency graph via PyPI/npm registry metadata (read-only network calls; never installs anything). Opt-in: off by default so this command stays offline unless asked.",
+)
 @pass_ctx
-def provenance(ctx: Ctx) -> None:
+def provenance(ctx: Ctx, resolve_transitive: bool) -> None:
     """Parts XXXVII-XXXVIII: generate SPDX + CycloneDX SBOMs for Zone I."""
     project = ctx.load_project()
     deps = sbom_module.discover_dependencies(project.zone_i)
@@ -768,8 +773,22 @@ def provenance(ctx: Ctx) -> None:
     out_dir = project.root / "evidence" / "sbom"
     sbom_module.save(spdx_doc, out_dir / "sbom.spdx.json")
     sbom_module.save(cdx_doc, out_dir / "sbom.cyclonedx.json")
-    project.evidence.append(actor=Actor(type="tool", id="cleanroom-sbom"), action="cleanroom provenance", zone="I", result="success", detail=f"{len(deps)} declared dependencies")
-    ctx.emit({"dependencies": len(deps), "spdx": str(out_dir / "sbom.spdx.json"), "cyclonedx": str(out_dir / "sbom.cyclonedx.json")})
+
+    result: dict[str, Any] = {"dependencies": len(deps), "spdx": str(out_dir / "sbom.spdx.json"), "cyclonedx": str(out_dir / "sbom.cyclonedx.json")}
+    detail = f"{len(deps)} declared dependencies"
+    if resolve_transitive:
+        resolution = transitive_module.resolve_transitive(deps)
+        transitive_path = out_dir / "transitive-dependencies.json"
+        transitive_path.parent.mkdir(parents=True, exist_ok=True)
+        transitive_path.write_text(jsonlib.dumps(resolution.to_dict(), indent=2, sort_keys=True), encoding="utf-8")
+        result["transitive"] = {
+            "resolved": len(resolution.resolved), "unresolved": len(resolution.unresolved),
+            "path": str(transitive_path),
+        }
+        detail += f", {len(resolution.resolved)} transitive resolved, {len(resolution.unresolved)} unresolved"
+
+    project.evidence.append(actor=Actor(type="tool", id="cleanroom-sbom"), action="cleanroom provenance", zone="I", result="success", detail=detail)
+    ctx.emit(result)
 
 
 # --------------------------------------------------------------------------- audit

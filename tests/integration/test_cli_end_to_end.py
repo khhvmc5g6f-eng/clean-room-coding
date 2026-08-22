@@ -141,6 +141,35 @@ def test_computed_maturity_level_advances_with_real_project_state(tmp_path: Path
     assert counsel_criterion["met"] is False  # never auto-granted, even though CR4 is fully satisfied
 
 
+def test_provenance_resolve_transitive_is_opt_in_and_writes_evidence(tmp_path: Path, monkeypatch):
+    """--resolve-transitive must be opt-in (plain `cleanroom provenance`
+    stays offline, no transitive-dependencies.json) and, when passed,
+    actually wire discovered direct dependencies through to
+    resolve_transitive() and persist the result."""
+    from cleanroom.provenance import transitive as transitive_module
+
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    (project_dir / "zone-i" / "requirements.txt").write_text("click==8.1.7\n", encoding="utf-8")
+
+    plain_result = _run(runner, ["--project", str(project_dir), "--json", "provenance"])
+    assert "transitive" not in json.loads(plain_result.output)
+    assert not (project_dir / "evidence" / "sbom" / "transitive-dependencies.json").is_file()
+
+    monkeypatch.setattr(transitive_module, "_pypi_lookup", lambda name, version: (version or "8.1.7", [], "BSD-3-Clause"))
+    resolved_result = _run(runner, ["--project", str(project_dir), "--json", "provenance", "--resolve-transitive"])
+    payload = json.loads(resolved_result.output)
+    assert payload["transitive"] == {
+        "resolved": 1, "unresolved": 0,
+        "path": str(project_dir / "evidence" / "sbom" / "transitive-dependencies.json"),
+    }
+    written = json.loads((project_dir / "evidence" / "sbom" / "transitive-dependencies.json").read_text(encoding="utf-8"))
+    assert written["resolved"][0]["name"] == "click"
+    assert written["resolved"][0]["licence"] == "BSD-3-Clause"
+
+
 def test_legal_picks_up_similarity_and_requirement_graph_facts(tmp_path: Path):
     """Regression test: `cleanroom legal` previously never loaded
     evidence/similarity-findings.json or requirements.json into the

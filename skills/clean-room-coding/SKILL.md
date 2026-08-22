@@ -135,7 +135,10 @@ machine-readable output) over re-deriving its logic by hand.
     common framework boilerplate isn't mistaken for copying.
 
 12. **Provenance** -- `cleanroom provenance` generates SPDX + CycloneDX
-    SBOMs for Zone I's declared dependencies.
+    SBOMs for Zone I's declared dependencies. `--resolve-transitive`
+    additionally walks the real dependency graph via PyPI/npm registry
+    metadata (read-only, opt-in, never installs anything) into a separate
+    `evidence/sbom/transitive-dependencies.json`.
 
 13. **Audit / Verify** -- `cleanroom audit` re-runs the `PathGuard`
     self-test, a project-specific agent/zone consistency cross-check (do
