@@ -26,6 +26,8 @@ dependencies = [
   "rich>=13.7",
   "license-expression>=30.4",
   "ast-grep-py>=0.45",
+  "spdx-tools>=0.8.5",
+  "cyclonedx-python-lib>=11.12",
 ]
 
 [project.optional-dependencies]

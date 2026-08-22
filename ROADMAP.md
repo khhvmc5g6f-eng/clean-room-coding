@@ -59,7 +59,11 @@ see "External review findings" and "Competitive landscape" below.
   <ref-dir> <impl-dir>`, which exits `SIMILARITY_FAILURE` (7) on an
   unresolved suspicious/material finding.
 - SBOM generation (SPDX 2.3 + CycloneDX 1.5 JSON) from direct declared
-  dependencies.
+  dependencies, serialized via the real `spdx-tools`/`cyclonedx-python-lib`
+  libraries' own model/converter instead of hand-typed JSON -- confirmed
+  schema-conformant with each library's own validator
+  (`validate_full_spdx_document`, `make_schemabased_validator`), including
+  a fix-up for a real spdx-tools 0.8.5 quirk (see "Fixed" below).
 - A heuristic legal-issue engine covering 10 of Part XLIV's 18 issues with
   real deterministic logic (`lawful_access`, `copyright_subsistence`,
   `permitted_acts`, `copying`/`substantiality`, `saas_network_provision`,
@@ -463,25 +467,16 @@ change that should be evaluated on its own.
    with `interoperability_provisions`. The remaining 8 issues each need
    facts this tool cannot compute deterministically (see "Documented
    limitations").
-5. spdx-tools / cyclonedx-python-lib to replace the hand-rolled SBOM
-   serialization in `provenance/sbom.py` (both Apache-2.0; not yet
-   started this pass).
+5. ~~`spdx-tools`/`cyclonedx-python-lib` to replace the hand-rolled SBOM
+   serialization in `provenance/sbom.py`~~ -- **done**, confirmed schema-
+   valid against each library's own validator.
 6. SLSA build provenance via `actions/attest-build-provenance` in a
    release workflow (confirmed buildable; not yet built).
 7. Automatic clean-room-level (CR0-CR5) computation from project state
    (not yet started).
-5. A third jurisdiction pack (EU, as the design brief's next most-requested).
-6. `spdx-tools`/`cyclonedx-python-lib` for spec-valid, schema-validated SBOM
-   output in place of the hand-rolled serialisation (~1.5-2 days combined).
-7. Transitive dependency resolution for SBOM generation.
-8. Automatic clean-room-level computation from project state.
-9. SLSA build provenance via `actions/attest-build-provenance` in the
-   release workflow.
-10. Cache `similarity/negative_control.py`'s background scores per
-    implementation file rather than recomputing per (reference,
-    implementation) pair, and make `classify()` down-weight findings whose
-    `structural_method` is `generic_fallback` rather than real AST
-    comparison.
-11. Decide `orchestration/heartbeat.py`'s fate: build a real multi-agent
-    orchestration harness that can feed it observation ticks, or remove it
-    -- it is currently well-written but genuinely unused.
+8. Transitive dependency resolution for SBOM generation (still not
+   started -- separate from the serialization work just done).
+9. Decide `orchestration/heartbeat.py`'s fate: build a real multi-agent
+   orchestration harness that can feed it observation ticks, or remove it
+   -- it is currently well-written but genuinely unused (see "documented
+   decision" note above).

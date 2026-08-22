@@ -85,10 +85,11 @@ combines process-separation (reference/handoff/implementation zones, an
 evidence ledger, jurisdiction resolution) with licence/similarity/SBOM
 tooling the way this project does — see
 [ROADMAP.md](ROADMAP.md#competitive-landscape-researched-2026-08-22) for
-the full write-up, including concrete, real libraries this project could
-depend on instead of some of its hand-rolled logic (`license-expression`,
-ScanCode Toolkit, `spdx-tools`/`cyclonedx-python`, tree-sitter) rather than
-reinventing them badly.
+the full write-up. Since then, `license-expression`, `ast-grep-py`
+(tree-sitter) and `spdx-tools`/`cyclonedx-python-lib` have all been
+integrated in place of earlier hand-rolled logic; ScanCode Toolkit
+remains a possible future optional extra for deeper licence-text
+detection.
 
 ## Quick start
 

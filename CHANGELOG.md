@@ -295,4 +295,36 @@ detail:
   `cleanroom legal`, and asserts both are reflected as `AMBER` rather than
   `UNKNOWN`.
 
+### Added (fifth pass — real SBOM library integration)
+
+- `provenance/sbom.py`'s `to_spdx()`/`to_cyclonedx()` now build real
+  `spdx_tools`/`cyclonedx-python-lib` model objects and serialize through
+  each library's own converter/outputter, replacing hand-typed JSON that
+  only resembled the format. Both are confirmed genuinely schema-valid
+  with each library's own validator
+  (`validate_full_spdx_document`/`make_schemabased_validator`), including
+  for a real dependency with an MIT licence concluded/declared via the
+  existing `license-expression`-backed `licence/spdx.py` parser (an
+  unrecognised licence string now honestly falls back to
+  `NOASSERTION`/is omitted rather than being forced into an invalid
+  document). `discover_dependencies()` and the `Dependency` dataclass are
+  unchanged — only the serialization half these libraries replace.
+- CycloneDX output uses the modern CycloneDX 1.5 `metadata.tools` pattern
+  (a `Component` inside a `ToolRepository`) rather than the deprecated
+  flat `Tool` list, confirmed by direct testing that the legacy form
+  raises `SchemaDeprecationWarning1Dot5` under `SchemaVersion.V1_5` and
+  the new form doesn't.
+
+### Fixed (fifth pass)
+
+- **spdx-tools 0.8.5 serializes `externalRefs[].referenceCategory` as the
+  raw Python enum name (`PACKAGE_MANAGER`, underscore) instead of the
+  hyphenated value the real SPDX 2.3 JSON schema requires
+  (`PACKAGE-MANAGER`)** — confirmed by fetching and inspecting
+  `spdx/spdx-spec`'s own `spdx-schema-2-3.json` directly rather than
+  assuming, since this is a claim about a third-party library's
+  correctness. Fixed with a narrow, documented post-processing step in
+  `to_spdx()` rather than silently shipping non-conformant output;
+  covered by `test_spdx_output_is_schema_valid`.
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD
