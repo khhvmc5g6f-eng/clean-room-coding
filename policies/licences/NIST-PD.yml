@@ -1,0 +1,55 @@
+# Licence policy pack: NIST-PD (NIST Public Domain Notice)
+# Verified against SPDX's own license-list-data (`isOsiApproved: false`,
+# full `licenseText` field returned verbatim) -- not a document fetched
+# from NIST's own site, since SPDX's canonical dataset already carries
+# the full, exact notice text.
+#
+# Genuinely different in kind from every other pack in this directory
+# except NTIA-PD.yml: this is not really a "licence" being granted at
+# all. It is a NOTICE confirming that, under 17 U.S.C. Sec. 105, works
+# created by NIST employees are already public domain in the United
+# States by statute -- no licence is legally required to use them. See
+# NASA-1.3.yml's header comment for the contrasting case (NASA software
+# that IS copyrighted, e.g. contractor-authored, and needs a real
+# licence).
+
+spdx_id: NIST-PD
+family: public_domain
+osi_approved: false
+fsf_libre: false  # SPDX's license-list-data does not record an isFsfLibre value for this entry; set false here as "not found", not a claim it was rejected
+copyleft: none
+
+summary: >
+  A notice (not a licence granting rights) confirming that software
+  developed by NIST employees is, under 17 U.S.C. Sec. 105, not subject
+  to copyright protection in the United States and is therefore in the
+  public domain there -- "a formal license is not needed to use this
+  software." Provided "AS IS" with no warranty of any kind.
+
+key_obligations:
+  - "None are imposed by this notice within the United States -- it confirms the software is already public domain there, not that a licence with conditions is being granted."
+  - "This public-domain status is a US-law fact (17 U.S.C. Sec. 105); it does not itself establish the software's copyright status in other countries, which may differ."
+
+distribution_triggers: [source, binary, saas, library, container]
+network_use_triggers_obligations: false
+patent_grant: false
+trademark_grant: false
+reverse_engineering_restriction: false
+
+clean_room_relevance: >
+  "No licence obligations" is not the same fact as "no rights issues at
+  all" -- outside the United States, this software's copyright status may
+  differ (this notice makes no representation about non-US jurisdictions),
+  and this project's `database_rights` heuristic is a separate question
+  from copyright entirely. Do not let a NIST-PD notice be read as a
+  blanket "nothing to check here" signal.
+
+structured_issue_prompts:
+  - "Is the reference material actually a pure NIST-employee work (making this notice's US public-domain statement apply), or does it include contributions from contractors/others whose authorship this notice does not address?"
+  - "If the implementation targets a non-US jurisdiction, has that jurisdiction's own copyright status for this material been checked separately, since this notice speaks only to US law?"
+
+uncertainty_notes: >
+  This is a public-domain notice, not a software licence in the OSI/FSF
+  sense -- "osi_approved"/"fsf_libre" are set false here as an honest
+  "not applicable/not found," not a comment on the software's genuine
+  public-domain status under US law.

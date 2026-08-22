@@ -81,6 +81,7 @@ class CaseBundle:
     isolation_test_passed: bool | None = None
     similarity_findings: list[dict[str, Any]] | None = None
     output_distribution_model: list[str] | None = None
+    output_licence_id: str | None = None  # SPDX expression of the implementation's intended output licence (.cleanroom.yml's implementation.output_licence)
     reference_licence_ids: list[str] | None = None
     requirement_classifications: dict[str, int] | None = None
     interoperability_permitted_acts: list[Any] | None = None
@@ -310,12 +311,26 @@ def _distribution(bundle: CaseBundle) -> dict[str, Any]:
         if pack and pack.get("copyleft") in _COPYLEFT_LEVELS and acts & set(pack.get("distribution_triggers", [])):
             triggered.add(term)
     if triggered:
+        overlap = _compatible_licence_overlap(triggered, bundle.output_licence_id)
+        alt = "This flags an overlap only; whether the distributed work is actually a derivative/combined work under that licence is a separate, human question (see 'derivative_work_question')."
+        evidence = [f"output_distribution_model = {bundle.output_distribution_model}", f"reference_licence_ids = {bundle.reference_licence_ids}"]
+        if overlap:
+            alt += (
+                f" Note: the configured output licence ({bundle.output_licence_id}) is listed as a documented"
+                f" compatible licence in {sorted(overlap.keys())}'s own policy pack ({overlap}) -- if this project's"
+                " distribution genuinely qualifies as a merge into a larger work under that licence's own"
+                " compatibility clause (e.g. EUPL-1.2 Article 5), that clause may be the applicable compliance path"
+                " instead of plain copyleft continuation. This still requires human confirmation of the actual"
+                " merge/redistribution circumstances -- it is not treated as an automatic pass."
+            )
+            evidence.append(f"output_licence_id = {bundle.output_licence_id}")
+            evidence.append(f"compatible_licence overlap = {overlap}")
         return _finding(
             "distribution", bundle.jurisdiction, "AMBER",
             f"Configured distribution act(s) {sorted(acts)} overlap with the copyleft distribution triggers of reference/dependency licence(s) {sorted(triggered)}; obligations under those licences may apply to the distributed work.",
-            [f"output_distribution_model = {bundle.output_distribution_model}", f"reference_licence_ids = {bundle.reference_licence_ids}"],
+            evidence,
             "medium",
-            alternative_explanation="This flags an overlap only; whether the distributed work is actually a derivative/combined work under that licence is a separate, human question (see 'derivative_work_question').",
+            alternative_explanation=alt,
         )
     if unknown:
         # A term with no matching policy pack must never be silently
@@ -416,6 +431,28 @@ def _licence_terms_with_packs(licence_ids: list[str]) -> tuple[list[str], list[s
     return sorted(known), sorted(unknown)
 
 
+def _compatible_licence_overlap(triggered_terms: set[str], output_licence_id: str | None) -> dict[str, list[str]]:
+    """For each triggered copyleft term, which of that term's OWN pack-
+    documented `compatible_licences` (a real, licence-text-specified
+    interoperability mechanism -- e.g. EUPL-1.2's Article 5 "Compatibility
+    clause", not this tool's own guess at compatibility) match the
+    project's configured output licence. Returns {term: [matched output
+    terms]} only for terms where a real overlap was found; a term with no
+    `compatible_licences` field, or no match, is simply absent from the
+    result -- never fabricated as a false negative or false positive."""
+    if not output_licence_id:
+        return {}
+    output_terms = set(licence_policy.split_terms(output_licence_id))
+    overlaps: dict[str, list[str]] = {}
+    for term in triggered_terms:
+        pack = licence_policy.load_pack(term)
+        compatible = set((pack or {}).get("compatible_licences", []))
+        matched = sorted(output_terms & compatible)
+        if matched:
+            overlaps[term] = matched
+    return overlaps
+
+
 def _patent_risk(bundle: CaseBundle) -> dict[str, Any]:
     if bundle.reference_licence_ids is None:
         return _finding(
@@ -495,12 +532,25 @@ def _linking(bundle: CaseBundle) -> dict[str, Any]:
         if pack and pack.get("copyleft") in _STRONG_COPYLEFT_LEVELS:
             strong_copyleft_refs.add(term)
     if strong_copyleft_refs:
+        overlap = _compatible_licence_overlap(strong_copyleft_refs, bundle.output_licence_id)
+        alt = "Whether linking against this specific library actually creates a derivative work under the applicable licence (some licences, e.g. LGPL, have an explicit linking exception not modelled by any pack in this installation) is a question for qualified counsel, not resolved here."
+        evidence = [f"output_distribution_model includes library", f"strong-copyleft reference licences: {sorted(strong_copyleft_refs)}"]
+        if overlap:
+            alt += (
+                f" Note: the configured output licence ({bundle.output_licence_id}) is listed as a documented"
+                f" compatible licence in {sorted(overlap.keys())}'s own policy pack ({overlap}) -- if the combined"
+                " work genuinely qualifies for that licence's own compatibility clause (e.g. EUPL-1.2 Article 5),"
+                " that may be the applicable compliance path instead of plain linking-extension copyleft. This"
+                " still requires human confirmation, not an automatic pass."
+            )
+            evidence.append(f"output_licence_id = {bundle.output_licence_id}")
+            evidence.append(f"compatible_licence overlap = {overlap}")
         return _finding(
             "linking", bundle.jurisdiction, "AMBER",
             f"The implementation is distributed as a library (other software will link against it), and reference/dependency licence(s) {sorted(strong_copyleft_refs)} carry strong copyleft -- unlike a standalone binary, a library that is a derivative work can extend copyleft obligations to whatever combines/links with it (the GPL family's 'derivative work via linking' theory), separately from whether the library itself is merely distributed.",
-            [f"output_distribution_model includes library", f"strong-copyleft reference licences: {sorted(strong_copyleft_refs)}"],
+            evidence,
             "medium",
-            alternative_explanation="Whether linking against this specific library actually creates a derivative work under the applicable licence (some licences, e.g. LGPL, have an explicit linking exception not modelled by any pack in this installation) is a question for qualified counsel, not resolved here.",
+            alternative_explanation=alt,
         )
     if unknown:
         # Same fix as `_distribution`: a term with no matching pack must

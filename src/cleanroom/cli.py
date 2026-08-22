@@ -989,6 +989,7 @@ def legal(ctx: Ctx, access_authority: str) -> None:
             isolation_test_passed=isolation_ok,
             similarity_findings=similarity_findings,
             output_distribution_model=project.config.data.get("implementation", {}).get("distribution_model"),
+            output_licence_id=project.config.data.get("implementation", {}).get("output_licence"),
             reference_licence_ids=[f.get("concluded") for f in licence_findings if f.get("concluded")],
             requirement_classifications=requirement_classifications,
             interoperability_permitted_acts=pack.get("interoperability_permitted_acts") if pack else None,

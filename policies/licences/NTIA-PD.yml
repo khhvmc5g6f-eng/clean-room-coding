@@ -1,0 +1,58 @@
+# Licence policy pack: NTIA-PD (NTIA Public Domain Notice)
+# Verified against SPDX's own license-list-data (`isOsiApproved: false`,
+# full `licenseText` field returned verbatim).
+#
+# Companion to NIST-PD.yml -- same statutory public-domain basis (17
+# U.S.C. Sec. 105), but with two real differences confirmed in the actual
+# text: an explicit grant of rights for any non-US jurisdictions where
+# NTIA might hold rights (not just a US-law statement), and a
+# non-binding "please" request for acknowledgment. Kept as its own pack
+# rather than merged with NIST-PD.yml because these are real, distinct
+# terms, not a duplicate notice.
+
+spdx_id: NTIA-PD
+family: public_domain
+osi_approved: false
+fsf_libre: false  # SPDX's license-list-data does not record an isFsfLibre value for this entry; set false here as "not found", not a claim it was rejected
+copyleft: none
+
+summary: >
+  A notice (not a licence granting rights in the US) confirming that
+  software developed by NTIA employees is not subject to copyright
+  protection in the United States under 17 U.S.C. Sec. 105. Unlike
+  NIST-PD, it goes further: "to the extent that NTIA holds rights in
+  countries other than the United States," it separately grants a
+  non-exclusive, irrevocable, unconditional, royalty-free worldwide right
+  to print, publish, prepare derivative works of, and distribute the
+  software (or authorise others to do so). Provided "AS IS" with no
+  warranty of any kind.
+
+key_obligations:
+  - "None are legally required within the United States -- the notice confirms the software is already public domain there."
+  - "Outside the United States, where NTIA may hold rights, this notice's own express grant applies instead (see summary) -- it is broad and royalty-free, but is a real grant, not a restatement of public-domain status."
+  - "Modified works should carry a notice stating that the software was changed, plus the date and nature of the change -- stated as a should, not framed as a binding condition."
+  - "The notice asks (\"please provide\") appropriate acknowledgment of NTIA's creation of the software in copies or derivative works -- a non-binding courtesy request, not an enforceable attribution obligation like OGL-UK-3.0/etalab-2.0/DL-DE-BY-2.0's."
+
+distribution_triggers: [source, binary, saas, library, container]
+network_use_triggers_obligations: false
+patent_grant: false
+trademark_grant: false
+reverse_engineering_restriction: false
+
+clean_room_relevance: >
+  Like NIST-PD, "no US licence obligations" is not the same fact as "no
+  rights issues anywhere" -- this notice's own text draws exactly that
+  distinction for non-US jurisdictions (it grants rights there precisely
+  because copyright IS possible outside the US), so a project targeting a
+  non-US market should read that express grant as the operative fact
+  there, not assume public domain applies globally.
+
+structured_issue_prompts:
+  - "Is the reference material actually a pure NTIA-employee work (making the US public-domain statement apply), or does it include other contributions this notice does not address?"
+  - "If the implementation targets a non-US jurisdiction, has the notice's own express non-US rights grant been read as the operative permission there, rather than assuming blanket public domain?"
+  - "Has the non-binding acknowledgment request been honoured anyway, even though it is not an enforceable condition?"
+
+uncertainty_notes: >
+  This is a public-domain notice with a supplementary non-US rights
+  grant, not a software licence in the OSI/FSF sense -- "osi_approved"/
+  "fsf_libre" are set false here as an honest "not applicable/not found."

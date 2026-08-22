@@ -582,3 +582,35 @@ def test_legal_picks_up_similarity_and_requirement_graph_facts(tmp_path: Path):
     assert findings["copying"]["decision_state"] == "AMBER"
     assert findings["copying"]["confidence"] != "insufficient_evidence"
     assert findings["derivative_work_question"]["decision_state"] == "AMBER"
+
+
+def test_legal_surfaces_eupl_compatible_licence_overlap_from_config(tmp_path: Path):
+    """`.cleanroom.yml`'s `implementation.output_licence` must reach the
+    legal engine's `_distribution`/`_linking` heuristics: a project whose
+    reference material concludes as EUPL-1.2 and whose OWN configured
+    output licence is one of EUPL-1.2's Article 5 Compatible Licences
+    must get that specific overlap named in the finding, not just a
+    generic copyleft warning."""
+    import yaml
+
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    (project_dir / "zone-r" / "lib").mkdir(parents=True)
+    (project_dir / "zone-r" / "lib" / "package.json").write_text('{"name": "eu-lib", "license": "EUPL-1.2"}', encoding="utf-8")
+
+    config_path = project_dir / ".cleanroom.yml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config.setdefault("implementation", {})["distribution_model"] = ["binary"]
+    config["implementation"]["output_licence"] = "MPL-2.0"
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    runner.invoke(main, ["--project", str(project_dir), "--json", "licence", str(project_dir / "zone-r")])
+    _run(runner, ["--project", str(project_dir), "intake", "--source", "lib", "--access-authority", "public"])
+
+    legal_result = _run(runner, ["--project", str(project_dir), "--json", "legal", "--access-authority", "public"])
+    findings = {f["issue"]: f for f in json.loads(legal_result.output)["findings"] if f["jurisdiction"] == "gb"}
+    assert findings["distribution"]["decision_state"] == "AMBER"
+    assert "MPL-2.0" in findings["distribution"]["alternative_explanation"]
+    assert "compatible licence" in findings["distribution"]["alternative_explanation"]

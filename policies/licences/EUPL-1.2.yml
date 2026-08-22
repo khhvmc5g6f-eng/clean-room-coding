@@ -46,19 +46,51 @@ patent_retaliation_clause: false  # Article 12 has a general "terminates automat
 trademark_grant: false  # the "Attribution right" clause requires PRESERVING existing trademark notices; it grants no right to USE the Licensor's trade names/trademarks/service marks
 reverse_engineering_restriction: false  # the licence text imposes no reverse-engineering/study restriction
 
+# Article 5's own published Compatible Licences list, expanded from its
+# "GPL v2 and v3"/"LGPL v2.1 and v3" style wording into the real SPDX
+# identifiers for both the "-only" and "-or-later" variant of each (the
+# published text does not itself distinguish these two variants, so this
+# expansion is this pack's own mapping of that wording onto verifiable
+# SPDX ids, not a claim that Article 5's authors drew this precise
+# distinction). Every id below was checked against
+# `license-expression`'s own known-symbols table before being written.
+compatible_licences:
+  - GPL-2.0-only
+  - GPL-2.0-or-later
+  - GPL-3.0-only
+  - GPL-3.0-or-later
+  - AGPL-3.0-only
+  - AGPL-3.0-or-later
+  - OSL-2.1
+  - OSL-3.0
+  - EPL-1.0
+  - CECILL-2.0
+  - CECILL-2.1
+  - MPL-2.0
+  - LGPL-2.1-only
+  - LGPL-2.1-or-later
+  - LGPL-3.0-only
+  - LGPL-3.0-or-later
+  - CC-BY-SA-3.0  # for non-software works only, per Article 5's own text
+  - EUPL-1.1
+  - EUPL-1.2
+  - LiLiQ-R-1.1
+  - LiLiQ-Rplus-1.1
+
 combination_notes: >
-  Article 5's Compatible Licences list (as published) includes: GPL v2 and
-  v3, AGPL v3, OSL v2.1 and v3.0, EPL v1.0, CeCILL v2.0 and v2.1, MPL v2,
-  LGPL v2.1 and v3, CC BY-SA 3.0 (for non-software works), EUPL v1.1 and
-  v1.2, and LiLiQ-R/LiLiQ-R+. This project's `legal/engine.py` heuristics
-  only check this pack's own `copyleft` field (a project-wide "is this
-  term copyleft" classification) -- they do not model the Article 5
-  escape hatch itself, so a EUPL-referencing project that has genuinely
-  exercised that clause (merged into, and redistributed under, one of the
-  listed Compatible Licences) may see an AMBER/RED finding from this tool
-  that a human reviewer, aware of the actual redistribution licence used,
-  can resolve differently. This is a real, documented limitation, not
-  something the engine currently distinguishes.
+  Article 5's "Compatibility clause" lets a Derivative Work merging EUPL
+  code with code under one of the `compatible_licences` above be
+  distributed under THAT licence instead of the EUPL -- a genuine
+  licence-text-specified interoperability mechanism, not an accidental
+  loophole. `legal/engine.py`'s `_distribution`/`_linking` heuristics now
+  cross-reference this list against the project's own configured
+  `implementation.output_licence`: when they overlap, the AMBER finding's
+  `alternative_explanation` names the specific compatible licence in play
+  rather than leaving it as a generic "may apply" note. This does NOT
+  auto-resolve the finding to GREEN -- confirming the work genuinely
+  qualifies as a merge into a larger work under Article 5 (rather than a
+  bare EUPL derivative) remains a human determination this tool does not
+  make on its own.
 
 clean_room_relevance: >
   Before this pack existed, a project whose reference material concluded
@@ -76,7 +108,7 @@ clean_room_relevance: >
 structured_issue_prompts:
   - "Was the reference implementation observed only to extract observable requirements, never source implementation detail, in the handoff bundle (Part XVI)?"
   - "Did the implementation team have zero read access to the EUPL-licensed source (Zone I has no path to Zone R)?"
-  - "If the output is merged into a larger work with code under one of Article 5's listed Compatible Licences, is redistribution actually happening under that Compatible Licence rather than plain EUPL -- and has that been recorded, since this tool does not model that distinction itself?"
+  - "If `implementation.output_licence` overlaps this pack's `compatible_licences`, has a human actually confirmed the output genuinely qualifies as a merge into a larger work under Article 5, rather than a bare EUPL derivative -- this tool surfaces the overlap, it does not confirm the merge itself?"
   - "Has the Source Code (or an accessible repository reference to it) actually been made available alongside any distributed Executable Code, as Article 3 requires?"
   - "Does the similarity report show any SUSPICIOUS or MATERIAL findings against this reference, and if so have they been resolved?"
 

@@ -898,4 +898,57 @@ detail:
   four -- SPDX only has narrower agency-specific identifiers (`NIST-PD`,
   `NASA-1.3`, `NTIA-PD`) for this.
 
+### Added (twenty-fourth pass — EUPL's compatibility clause, and the US-agency licences)
+
+- `CaseBundle.output_licence_id`, wired from `.cleanroom.yml`'s
+  `implementation.output_licence` (a field the config schema already
+  declared but which nothing previously consumed -- a partially-wired
+  gap closed, not a from-scratch feature).
+- `EUPL-1.2.yml` gained a structured `compatible_licences` field (Article
+  5's own published list, expanded from its "GPL v2 and v3" style wording
+  into 21 real SPDX ids, each checked against `license-expression`'s
+  known-symbols table before being written) and a new
+  `_compatible_licence_overlap()` helper that `_distribution`/`_linking`
+  call whenever a copyleft trigger fires. This never auto-resolves a
+  finding to GREEN -- confirming the work genuinely qualifies as an
+  Article-5 merge into a larger work remains a human question this tool
+  does not make on its own -- but the AMBER finding's
+  `alternative_explanation` now names the specific overlap (e.g. an
+  output licence of `MPL-2.0` against a `EUPL-1.2` reference) instead of
+  staying generic.
+- 6 new/updated tests: unit tests for the overlap/no-overlap cases on
+  both `_distribution` and `_linking`, a pack-level test confirming every
+  `compatible_licences` entry is a real SPDX id, and a real end-to-end
+  CLI integration test proving `.cleanroom.yml`'s configured
+  `output_licence` actually reaches the finding.
+- Re-verified (exhaustively this time -- all 2,447 `license-expression`
+  known identifiers searched, plus several government-portal fetch
+  attempts) that Japan genuinely has no SPDX-recognised government/
+  public-sector licence to build a pack around.
+- Added `NASA-1.3.yml`, `NIST-PD.yml`, and `NTIA-PD.yml` after all --
+  these were previously skipped only for not fitting the "one general
+  pack per country" pattern, not because they were unverifiable. Turned
+  out to be more substantial and varied than first assumed:
+  - `NASA-1.3` (verified by fetching and searching the actual licence
+    text) is genuinely NOT a public-domain instrument despite covering
+    US government software -- a real, OSI-approved, copyleft-shaped
+    licence (`family: copyleft`, `copyleft: strong`) with redistribution/
+    source-disclosure obligations and a distinctive indemnification
+    clause with no equivalent in this project's other copyleft packs. It
+    exists precisely because NASA software is often contractor-authored,
+    so real copyright can subsist in it, unlike a pure civil-servant
+    work.
+  - `NIST-PD`/`NTIA-PD` (verified against SPDX's own license-list-data,
+    full licence text) ARE genuine 17 U.S.C. Sec. 105 public-domain
+    notices (new `family: public_domain`), but not identical: NTIA-PD's
+    text additionally grants rights for non-US jurisdictions where NTIA
+    might hold copyright, and asks for a non-binding attribution
+    courtesy, neither of which NIST-PD's text contains -- kept as two
+    separate packs since the difference is real, not cosmetic.
+- 6 new/updated tests, including a real end-to-end `cleanroom licence`
+  run for NASA-1.3 and a comparison test proving NASA-1.3 triggers the
+  same AMBER copyleft-distribution finding as any other strong-copyleft
+  licence while NIST-PD genuinely resolves to a confirmed GREEN (not
+  just an unpacked-unknown one).
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD

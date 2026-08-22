@@ -41,13 +41,15 @@ built. Currently ships:
   evidence ledger that degrades gracefully rather than crashing on a
   corrupted/interrupted write.
 - Deterministic licence discovery (LICENSE/NOTICE files, SPDX headers,
-  package manifests, with symlink/non-regular-file safety) plus policy
-  packs for MIT, Apache-2.0, GPL-3.0-only, AGPL-3.0-only, BUSL-1.1
-  (this project's own licence), EUPL-1.2 (the EU's own strong-copyleft
-  software licence), and three public sector data/information licences
-  for reference material that includes government open data: OGL-UK-3.0
-  (UK), etalab-2.0 (France), and Germany's DL-DE-BY-2.0/DL-DE-ZERO-2.0
-  pair.
+  package manifests, with symlink/non-regular-file safety) plus 13 policy
+  packs: MIT, Apache-2.0, GPL-3.0-only, AGPL-3.0-only, BUSL-1.1 (this
+  project's own licence), EUPL-1.2 (the EU's own strong-copyleft software
+  licence), NASA-1.3 (a real, substantive copyleft-shaped US-agency
+  licence -- not a public-domain notice), NIST-PD/NTIA-PD (genuine
+  US public-domain notices), and four public sector data/information
+  licences for reference material that includes government open data:
+  OGL-UK-3.0 (UK), etalab-2.0 (France), and Germany's
+  DL-DE-BY-2.0/DL-DE-ZERO-2.0 pair.
 - A jurisdiction resolution engine with real, independently fact-checked
   packs for England & Wales, US federal, EU, France, Germany and Japan
   (facts + primary authorities + structured questions, not legal

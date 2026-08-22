@@ -158,6 +158,45 @@ def test_distribution_amber_with_specific_trigger_when_eupl_pack_exists():
     assert "strong copyleft" in findings2["linking"]["finding"]
 
 
+def test_distribution_still_amber_but_names_the_compatible_licence_overlap():
+    """EUPL-1.2's Article 5 compatibility clause is a real, licence-text-
+    specified interoperability mechanism (a named list of OTHER licences
+    a EUPL-derived work may be redistributed under instead). When the
+    project's configured output licence overlaps that list, the finding
+    must still be AMBER (this tool never auto-resolves it to GREEN -- the
+    actual merge-into-a-larger-work circumstance is a human question) but
+    the alternative_explanation must name the specific overlap rather than
+    staying generic, so a reviewer isn't left to rediscover it by hand."""
+    bundle = CaseBundle(
+        output_distribution_model=["binary"], reference_licence_ids=["EUPL-1.2"], output_licence_id="MPL-2.0",
+    )
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["distribution"]["decision_state"] == "AMBER"  # never auto-green
+    assert "MPL-2.0" in findings["distribution"]["alternative_explanation"]
+    assert "compatible licence" in findings["distribution"]["alternative_explanation"]
+
+
+def test_distribution_no_compatible_licence_note_when_output_licence_is_unrelated():
+    """The overlap note must not appear when the configured output
+    licence isn't actually in the reference licence's own compatible
+    list -- never a false claim of compatibility."""
+    bundle = CaseBundle(
+        output_distribution_model=["binary"], reference_licence_ids=["EUPL-1.2"], output_licence_id="MIT",
+    )
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["distribution"]["decision_state"] == "AMBER"
+    assert "compatible licence" not in findings["distribution"]["alternative_explanation"]
+
+
+def test_linking_names_the_compatible_licence_overlap_too():
+    bundle = CaseBundle(
+        output_distribution_model=["library"], reference_licence_ids=["EUPL-1.2"], output_licence_id="GPL-3.0-only",
+    )
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["linking"]["decision_state"] == "AMBER"
+    assert "GPL-3.0-only" in findings["linking"]["alternative_explanation"]
+
+
 def test_derivative_work_question_unknown_without_requirement_graph():
     bundle = CaseBundle(requirement_classifications=None)
     findings = {f["issue"]: f for f in run(bundle)}
