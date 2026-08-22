@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import re
+import ssl
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -30,6 +31,23 @@ from typing import Any
 _TIMEOUT_SECONDS = 10
 _MAX_DEPTH = 5  # guards against pathological or (in principle) circular dependency graphs
 _USER_AGENT = "clean-room-coding/0.1.0 (+https://github.com/khhvmc5g6f-eng/clean-room-coding)"
+
+
+def _ssl_context() -> ssl.SSLContext | None:
+    """Prefer `certifi`'s CA bundle over whatever `ssl.create_default_context()`
+    finds on its own -- confirmed by direct reproduction that a real
+    Python install can have no usable local trust store at all
+    (`CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate`),
+    which would otherwise make every lookup fail as "network error" with
+    no indication it's actually a local cert-store problem. `certifi` is
+    optional (not a base dependency) -- None falls through to urllib's
+    own default context when it isn't installed."""
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return None
 
 _REQUIRES_DIST_NAME_RE = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)")
 
@@ -64,7 +82,7 @@ class TransitiveResolution:
 def _http_get_json(url: str) -> dict[str, Any] | None:
     try:
         request = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
-        with urllib.request.urlopen(request, timeout=_TIMEOUT_SECONDS) as response:  # noqa: S310 -- fixed https registry hosts only
+        with urllib.request.urlopen(request, timeout=_TIMEOUT_SECONDS, context=_ssl_context()) as response:  # noqa: S310 -- fixed https registry hosts only
             return json.loads(response.read().decode("utf-8"))
     except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError, OSError):
         return None

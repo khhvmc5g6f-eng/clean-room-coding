@@ -822,14 +822,11 @@ def provenance(ctx: Ctx, resolve_transitive: bool) -> None:
     """Parts XXXVII-XXXVIII: generate SPDX + CycloneDX SBOMs for Zone I."""
     project = ctx.load_project()
     deps = sbom_module.discover_dependencies(project.zone_i)
-    spdx_doc = sbom_module.to_spdx(project.config.project_id, "0.0.0", deps)
-    cdx_doc = sbom_module.to_cyclonedx(project.config.project_id, "0.0.0", deps)
     out_dir = project.root / "evidence" / "sbom"
-    sbom_module.save(spdx_doc, out_dir / "sbom.spdx.json")
-    sbom_module.save(cdx_doc, out_dir / "sbom.cyclonedx.json")
 
-    result: dict[str, Any] = {"dependencies": len(deps), "spdx": str(out_dir / "sbom.spdx.json"), "cyclonedx": str(out_dir / "sbom.cyclonedx.json")}
+    result: dict[str, Any] = {"dependencies": len(deps)}
     detail = f"{len(deps)} declared dependencies"
+    resolution = None
     if resolve_transitive:
         resolution = transitive_module.resolve_transitive(deps)
         transitive_path = out_dir / "transitive-dependencies.json"
@@ -840,6 +837,17 @@ def provenance(ctx: Ctx, resolve_transitive: bool) -> None:
             "path": str(transitive_path),
         }
         detail += f", {len(resolution.resolved)} transitive resolved, {len(resolution.unresolved)} unresolved"
+
+    # When --resolve-transitive was requested, the SPDX/CycloneDX
+    # documents include those resolved dependencies too (each nested
+    # under its real parent, not flattened under the root) -- otherwise
+    # they stay direct-deps-only, exactly as before this flag existed.
+    spdx_doc = sbom_module.to_spdx(project.config.project_id, "0.0.0", deps, transitive=resolution)
+    cdx_doc = sbom_module.to_cyclonedx(project.config.project_id, "0.0.0", deps, transitive=resolution)
+    sbom_module.save(spdx_doc, out_dir / "sbom.spdx.json")
+    sbom_module.save(cdx_doc, out_dir / "sbom.cyclonedx.json")
+    result["spdx"] = str(out_dir / "sbom.spdx.json")
+    result["cyclonedx"] = str(out_dir / "sbom.cyclonedx.json")
 
     project.evidence.append(actor=Actor(type="tool", id="cleanroom-sbom"), action="cleanroom provenance", zone="I", result="success", detail=detail)
     ctx.emit(result)

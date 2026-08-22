@@ -2,6 +2,16 @@ import json
 from pathlib import Path
 
 from cleanroom.provenance.sbom import Dependency, discover_dependencies, to_cyclonedx, to_spdx
+from cleanroom.provenance.transitive import TransitiveDependency, TransitiveResolution
+
+_CHAIN_RESOLUTION = TransitiveResolution(
+    resolved=[
+        TransitiveDependency(name="click", ecosystem="pypi", depth=1, required_by="(direct)", version="8.1.7", licence="BSD-3-Clause"),
+        TransitiveDependency(name="colorama", ecosystem="pypi", depth=2, required_by="click", version="0.4.6", licence="BSD-3-Clause"),
+        TransitiveDependency(name="six", ecosystem="pypi", depth=3, required_by="colorama", version="1.16.0", licence="MIT"),
+    ],
+    unresolved=[{"name": "unreachable-pkg", "ecosystem": "pypi", "reason": "registry lookup failed"}],
+)
 
 
 def test_discover_requirements_txt(tmp_path: Path):
@@ -70,3 +80,70 @@ def test_cyclonedx_output_is_schema_valid():
     assert error is None, error
     assert doc["components"][0]["licenses"][0]["expression"] == "MIT"
     assert doc["components"][0]["hashes"][0]["alg"] == "SHA-256"
+
+
+def test_to_spdx_without_transitive_is_unchanged():
+    """Backward compatibility: omitting `transitive` (the default) must
+    produce exactly the direct-deps-only document as before."""
+    deps = [Dependency(name="click", version="8.1.7", purl="pkg:pypi/click")]
+    doc = to_spdx("demo", "0.1.0", deps)
+    assert len(doc["packages"]) == 2
+
+
+def test_to_spdx_merges_transitive_dependencies_with_correct_chain():
+    """A 3-level real dependency chain (demo -> click -> colorama -> six)
+    must appear as packages with DEPENDS_ON edges reflecting each node's
+    REAL parent -- not just added as a flat list under the root, and not
+    duplicating the depth-1 entry (click) that's already added from
+    `deps` above."""
+    deps = [Dependency(name="click", version="8.1.7", purl="pkg:pypi/click", licence="BSD-3-Clause")]
+    doc = to_spdx("demo", "0.1.0", deps, transitive=_CHAIN_RESOLUTION)
+
+    names = [p["name"] for p in doc["packages"]]
+    assert names == ["demo", "click", "colorama", "six"]  # click appears once, not twice
+
+    edges = {(r["spdxElementId"], r["relatedSpdxElement"]) for r in doc["relationships"] if r["relationshipType"] == "DEPENDS_ON"}
+    click_id = next(p["SPDXID"] for p in doc["packages"] if p["name"] == "click")
+    colorama_id = next(p["SPDXID"] for p in doc["packages"] if p["name"] == "colorama")
+    six_id = next(p["SPDXID"] for p in doc["packages"] if p["name"] == "six")
+    assert (click_id, colorama_id) in edges  # click -> colorama, not demo -> colorama
+    assert (colorama_id, six_id) in edges  # colorama -> six, not click -> six or demo -> six
+
+
+def test_to_spdx_unmatched_transitive_parent_still_includes_the_package():
+    """If a transitive entry's parent isn't found (e.g. resolved against a
+    different deps list), the package must still be included -- just
+    without that one relationship edge -- rather than silently dropped."""
+    orphan = TransitiveResolution(
+        resolved=[TransitiveDependency(name="mystery-dep", ecosystem="pypi", depth=2, required_by="never-registered", version="1.0")],
+        unresolved=[],
+    )
+    doc = to_spdx("demo", "0.1.0", [], transitive=orphan)
+    assert "mystery-dep" in [p["name"] for p in doc["packages"]]
+
+
+def test_to_cyclonedx_without_transitive_is_unchanged():
+    deps = [Dependency(name="click", version="8.1.7", purl="pkg:pypi/click")]
+    doc = to_cyclonedx("demo", "0.1.0", deps)
+    assert len(doc["components"]) == 1
+
+
+def test_to_cyclonedx_merges_transitive_dependencies_and_stays_schema_valid():
+    from cyclonedx.schema import OutputFormat, SchemaVersion
+    from cyclonedx.validation import make_schemabased_validator
+
+    deps = [Dependency(name="click", version="8.1.7", purl="pkg:pypi/click", licence="BSD-3-Clause")]
+    doc = to_cyclonedx("demo", "0.1.0", deps, transitive=_CHAIN_RESOLUTION)
+
+    error = make_schemabased_validator(OutputFormat.JSON, SchemaVersion.V1_5).validate_str(json.dumps(doc))
+    assert error is None, error
+
+    names = {c["name"] for c in doc["components"]}
+    assert names == {"click", "colorama", "six"}  # click appears once, not twice
+
+    dependency_by_ref = {d["ref"]: d.get("dependsOn", []) for d in doc["dependencies"]}
+    click_ref = next(c["bom-ref"] for c in doc["components"] if c["name"] == "click")
+    colorama_ref = next(c["bom-ref"] for c in doc["components"] if c["name"] == "colorama")
+    six_ref = next(c["bom-ref"] for c in doc["components"] if c["name"] == "six")
+    assert colorama_ref in dependency_by_ref[click_ref]  # click depends on colorama, not just root
+    assert six_ref in dependency_by_ref[colorama_ref]  # colorama depends on six, not click

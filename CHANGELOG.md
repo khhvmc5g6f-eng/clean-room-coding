@@ -501,4 +501,35 @@ detail:
   actually run.
 - CLI command count: 26 -> 27.
 
+### Added (thirteenth pass — merge transitive dependencies into the SBOM documents themselves)
+
+- `provenance/sbom.py`'s `to_spdx()`/`to_cyclonedx()` now accept an
+  optional `transitive` parameter (a `TransitiveResolution`, unused/`None`
+  by default -- fully backward compatible). When given, every non-direct
+  resolved dependency is added as its own package/component, nested under
+  its *real* parent in the dependency graph (not flattened under the
+  root) -- a depth-3 chain like `demo -> click -> colorama -> six` gets
+  three separate `DEPENDS_ON`/`dependsOn` edges reflecting exactly that,
+  not three edges from the root. An entry whose parent can't be matched
+  (e.g. resolved against a different `deps` list) is still included as a
+  package, just without that one edge, rather than dropped.
+- `cleanroom provenance --resolve-transitive` now wires this in: the
+  generated `sbom.spdx.json`/`sbom.cyclonedx.json` include the resolved
+  transitive graph, in addition to the existing separate
+  `evidence/sbom/transitive-dependencies.json` artefact. Verified against
+  the real, live PyPI registry (not just mocked tests): `click`'s actual
+  current dependency tree (`colorama`, `importlib-metadata` -> `zipp`)
+  resolved and merged correctly, and the merged CycloneDX document passed
+  its own real schema validator.
+- **Found and fixed a real, separate bug while doing that live-network
+  verification**: `transitive.py`'s HTTP calls used whatever default SSL
+  context `ssl.create_default_context()` found, which on at least one
+  real Python installation had no usable local trust store at all
+  (`CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate`) --
+  every lookup silently failed as an opaque "network error" with no
+  indication it was actually a local cert-store problem. Fixed by
+  preferring `certifi`'s CA bundle when `certifi` is importable (already
+  a transitive dependency via `huggingface_hub`'s `httpx`, but not
+  required -- falls through to urllib's own default context otherwise).
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD

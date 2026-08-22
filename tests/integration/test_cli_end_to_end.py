@@ -158,15 +158,28 @@ def test_provenance_resolve_transitive_is_opt_in_and_writes_evidence(tmp_path: P
     assert "transitive" not in json.loads(plain_result.output)
     assert not (project_dir / "evidence" / "sbom" / "transitive-dependencies.json").is_file()
 
-    monkeypatch.setattr(transitive_module, "_pypi_lookup", lambda name, version: (version or "8.1.7", [], "BSD-3-Clause"))
+    def fake_lookup(name, version):
+        if name == "click":
+            return (version or "8.1.7", ["colorama"], "BSD-3-Clause")
+        return ("0.4.6", [], "BSD-3-Clause")
+
+    monkeypatch.setattr(transitive_module, "_pypi_lookup", fake_lookup)
     resolved_result = _run(runner, ["--project", str(project_dir), "--json", "provenance", "--resolve-transitive"])
     payload = json.loads(resolved_result.output)
     assert payload["transitive"] == {
-        "resolved": 1, "unresolved": 0,
+        "resolved": 2, "unresolved": 0,
         "path": str(project_dir / "evidence" / "sbom" / "transitive-dependencies.json"),
     }
     written = json.loads((project_dir / "evidence" / "sbom" / "transitive-dependencies.json").read_text(encoding="utf-8"))
-    assert written["resolved"][0]["name"] == "click"
+    assert {d["name"] for d in written["resolved"]} == {"click", "colorama"}
+
+    # The transitive dependency (colorama, resolved via --resolve-transitive
+    # above) must also be merged into the actual SPDX/CycloneDX documents,
+    # not just the separate transitive-dependencies.json artefact.
+    spdx_doc = json.loads(Path(payload["spdx"]).read_text(encoding="utf-8"))
+    assert {p["name"] for p in spdx_doc["packages"]} == {"demo", "click", "colorama"}
+    cdx_doc = json.loads(Path(payload["cyclonedx"]).read_text(encoding="utf-8"))
+    assert {c["name"] for c in cdx_doc["components"]} == {"click", "colorama"}
     assert written["resolved"][0]["licence"] == "BSD-3-Clause"
 
 

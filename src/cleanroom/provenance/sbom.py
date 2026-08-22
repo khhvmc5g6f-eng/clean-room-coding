@@ -26,10 +26,17 @@ import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from cleanroom.licence.spdx import parse as parse_spdx_expression
 from cleanroom.util import new_id, utc_now_iso
+
+if TYPE_CHECKING:
+    from cleanroom.provenance.transitive import TransitiveResolution
+
+
+def _dependency_ecosystem(purl: str | None) -> str:
+    return "npm" if (purl or "").startswith("pkg:npm/") else "pypi"
 
 
 @dataclass
@@ -121,10 +128,22 @@ def _spdx_license_value(licence: str | None) -> Any:
     return get_spdx_licensing().parse(licence, validate=False)
 
 
-def to_spdx(project_name: str, project_version: str, deps: list[Dependency]) -> dict[str, Any]:
+def to_spdx(
+    project_name: str, project_version: str, deps: list[Dependency],
+    *, transitive: "TransitiveResolution | None" = None,
+) -> dict[str, Any]:
     """Real SPDX 2.3 JSON document, built via `spdx_tools`'s model/converter
     (not hand-typed) so the output is genuinely schema-conformant. See
-    https://spdx.github.io/spdx-spec/v2.3/."""
+    https://spdx.github.io/spdx-spec/v2.3/.
+
+    `transitive`, if given (from `provenance.transitive.resolve_transitive`),
+    adds every non-direct resolved dependency as its own package with a
+    DEPENDS_ON relationship from its real parent -- depth-1 entries are
+    skipped since those are the same dependencies already added from
+    `deps` above, not a duplicate. A transitive entry whose parent can't
+    be matched (e.g. `transitive` was resolved against a different `deps`
+    list) is still included as a package, just without that one edge,
+    rather than being dropped."""
     from spdx_tools.spdx.model import (
         Actor, ActorType, CreationInfo, Document, Package, Relationship, RelationshipType,
     )
@@ -148,8 +167,10 @@ def to_spdx(project_name: str, project_version: str, deps: list[Dependency]) -> 
         )
     ]
     relationships = [Relationship("SPDXRef-DOCUMENT", RelationshipType.DESCRIBES, root_id)]
+    id_by_key: dict[tuple[str, str], str] = {}
     for i, dep in enumerate(deps):
         dep_id = _spdx_id(f"SPDXRef-Package-{i}", dep.name)
+        id_by_key[(_dependency_ecosystem(dep.purl), dep.name)] = dep_id
         licence_value = _spdx_license_value(dep.licence)
         packages.append(
             Package(
@@ -166,6 +187,25 @@ def to_spdx(project_name: str, project_version: str, deps: list[Dependency]) -> 
         )
         relationships.append(Relationship(root_id, RelationshipType.DEPENDS_ON, dep_id))
 
+    if transitive is not None:
+        for i, tdep in enumerate(transitive.resolved):
+            if tdep.depth == 1:
+                continue  # already added above from `deps` -- not a duplicate package
+            key = (tdep.ecosystem, tdep.name)
+            tdep_id = _spdx_id(f"SPDXRef-Package-t{i}", tdep.name)
+            id_by_key[key] = tdep_id
+            licence_value = _spdx_license_value(tdep.licence)
+            packages.append(
+                Package(
+                    spdx_id=tdep_id, name=tdep.name, version=tdep.version or "NOASSERTION",
+                    download_location=SpdxNoAssertion(),
+                    license_concluded=licence_value, license_declared=licence_value,
+                )
+            )
+            parent_id = id_by_key.get((tdep.ecosystem, tdep.required_by))
+            if parent_id is not None:
+                relationships.append(Relationship(parent_id, RelationshipType.DEPENDS_ON, tdep_id))
+
     document = Document(creation_info, packages=packages, relationships=relationships)
     converted = DocumentConverter().convert(document)
     # spdx-tools 0.8.5 serializes ExternalPackageRefCategory via the Python
@@ -179,10 +219,19 @@ def to_spdx(project_name: str, project_version: str, deps: list[Dependency]) -> 
     return converted
 
 
-def to_cyclonedx(project_name: str, project_version: str, deps: list[Dependency]) -> dict[str, Any]:
+def to_cyclonedx(
+    project_name: str, project_version: str, deps: list[Dependency],
+    *, transitive: "TransitiveResolution | None" = None,
+) -> dict[str, Any]:
     """Real CycloneDX 1.5 JSON document, built via `cyclonedx-python-lib`'s
     model/outputter (not hand-typed) so the output is genuinely schema-
-    conformant. See https://cyclonedx.org/docs/1.5/json/."""
+    conformant. See https://cyclonedx.org/docs/1.5/json/.
+
+    `transitive`, if given, adds every non-direct resolved dependency as
+    its own component, nested under its real parent in the dependency
+    graph -- see `to_spdx()`'s docstring for the same caveats (depth-1
+    entries skipped as duplicates, an unmatched parent doesn't drop the
+    component, just that one edge)."""
     from packageurl import PackageURL
 
     from cyclonedx.model import HashAlgorithm, HashType
@@ -199,9 +248,14 @@ def to_cyclonedx(project_name: str, project_version: str, deps: list[Dependency]
     root_component = Component(name=project_name, version=project_version, type=ComponentType.APPLICATION, bom_ref=root_ref)
 
     components = []
-    dependency_entries = []
+    ref_by_key: dict[tuple[str, str], BomRef] = {}
+    children_by_ref: dict[BomRef, list[BomRef]] = {root_ref: []}
+
     for i, dep in enumerate(deps):
         dep_ref = BomRef(_spdx_id(f"cleanroom-dep-{i}", dep.name))
+        ref_by_key[(_dependency_ecosystem(dep.purl), dep.name)] = dep_ref
+        children_by_ref.setdefault(dep_ref, [])
+        children_by_ref[root_ref].append(dep_ref)
         licences = []
         parsed = parse_spdx_expression(dep.licence) if dep.licence else None
         if parsed is not None and parsed.all_known:
@@ -215,7 +269,34 @@ def to_cyclonedx(project_name: str, project_version: str, deps: list[Dependency]
                 hashes=hashes,
             )
         )
-        dependency_entries.append(CdxDependency(ref=dep_ref))
+
+    if transitive is not None:
+        for i, tdep in enumerate(transitive.resolved):
+            if tdep.depth == 1:
+                continue  # already added above from `deps` -- not a duplicate component
+            key = (tdep.ecosystem, tdep.name)
+            tdep_ref = BomRef(_spdx_id(f"cleanroom-trans-{i}", tdep.name))
+            ref_by_key[key] = tdep_ref
+            children_by_ref.setdefault(tdep_ref, [])
+            parent_ref = ref_by_key.get((tdep.ecosystem, tdep.required_by))
+            if parent_ref is not None:
+                children_by_ref.setdefault(parent_ref, []).append(tdep_ref)
+            licences = (
+                [LicenseExpression(tdep.licence)]
+                if tdep.licence and parse_spdx_expression(tdep.licence).all_known
+                else []
+            )
+            components.append(
+                Component(
+                    name=tdep.name, version=tdep.version or "unknown", type=ComponentType.LIBRARY, bom_ref=tdep_ref,
+                    licenses=licences,
+                )
+            )
+
+    dependency_entries = [
+        CdxDependency(ref=ref, dependencies=[CdxDependency(ref=child) for child in children])
+        for ref, children in children_by_ref.items()
+    ]
 
     # CycloneDX 1.5 deprecated the flat `metadata.tools` list of `Tool` in
     # favour of describing the producing tool as a `Component` inside a
@@ -228,7 +309,7 @@ def to_cyclonedx(project_name: str, project_version: str, deps: list[Dependency]
             tools=ToolRepository(components=[tool_component]),
         ),
         components=components,
-        dependencies=[CdxDependency(ref=root_ref, dependencies=dependency_entries)] + dependency_entries,
+        dependencies=dependency_entries,
     )
     outputter = make_outputter(bom, OutputFormat.JSON, SchemaVersion.V1_5)
     return json.loads(outputter.output_as_string())

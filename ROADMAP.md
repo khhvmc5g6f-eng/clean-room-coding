@@ -459,17 +459,17 @@ change that should be evaluated on its own.
   bracket/keyword-shape fallback (`structural_similarity` reports which
   method was used, and `compare_trees` down-weights fallback-based
   findings with a higher classification threshold).
-- **SBOM/dependency discovery**: the SPDX/CycloneDX documents themselves
-  (`cleanroom provenance`) still list direct declared dependencies only,
-  from `requirements.txt`/`pyproject.toml`/`package.json`. Real transitive
-  resolution now exists as a separate, opt-in artefact
-  (`cleanroom provenance --resolve-transitive` -> `src/cleanroom/
-  provenance/transitive.py`, walking PyPI/npm registry metadata by real
-  HTTP GET, never installing anything) written to `evidence/sbom/
-  transitive-dependencies.json`, but is deliberately not merged into the
-  SBOM documents themselves this pass -- kept as its own artefact so the
-  SBOM's existing direct-deps-only scope and behaviour stay unchanged for
-  anyone not opting in. No hash of resolved versions is captured yet.
+- **SBOM/dependency discovery**: `cleanroom provenance --resolve-transitive`
+  now merges the resolved transitive graph directly into the SPDX/
+  CycloneDX documents too (each dependency nested under its real parent,
+  not flattened under the root), in addition to writing the standalone
+  `evidence/sbom/transitive-dependencies.json` artefact -- verified
+  against the live PyPI registry (`click` -> `colorama`/
+  `importlib-metadata` -> `zipp`, a real 3-level chain) and against
+  CycloneDX's own schema validator. Without the flag, `cleanroom
+  provenance`'s behaviour is exactly as before (direct declared
+  dependencies only, from `requirements.txt`/`pyproject.toml`/
+  `package.json`). No hash of resolved versions is captured yet.
 - **`cleanroom compare`** (functional equivalence engine) compares two
   already-captured output files under configurable tolerance; it does not
   itself run the reference and implementation programs side-by-side.
@@ -547,10 +547,10 @@ change that should be evaluated on its own.
    on `release: published`).
 7. ~~Automatic clean-room-level (CR0-CR5) computation from project
    state~~ -- **done** (`src/cleanroom/maturity.py`, `cleanroom status`).
-8. ~~Transitive dependency resolution for SBOM generation~~ -- **done**
-   as an opt-in, separate artefact (`cleanroom provenance
-   --resolve-transitive`); not yet merged into the SPDX/CycloneDX
-   documents themselves.
+8. ~~Transitive dependency resolution for SBOM generation~~ -- **done**,
+   now including the merge into the SPDX/CycloneDX documents themselves
+   (see "SBOM/dependency discovery" above), not just the separate
+   artefact.
 9. ~~Decide `orchestration/heartbeat.py`'s fate~~ -- **done**: a minimal,
    real single-shot harness (`cleanroom heartbeat`) now wires it in
    without building a full multi-agent orchestrator (see "Update
