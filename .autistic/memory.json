@@ -3,6 +3,19 @@
   "lastUpdated": "2026-08-22",
   "invariants": [
     {
+      "rule": "schemas/config.schema.json can declare a field years before any code actually consumes it -- implementation.output_licence existed, documented, unused, until this run wired it into CaseBundle.output_licence_id and cli.py's legal command. Always check config.schema.json against real consumers (grep the field name in src/) before assuming a documented config field does anything.",
+      "confidence": 0.85,
+      "evidence": ["schemas/config.schema.json implementation.output_licence pre-existed", "src/cleanroom/legal/engine.py CaseBundle had no field for it until commit d7071c2"],
+      "confirmedRuns": 1
+    },
+    {
+      "rule": "Any pack field that cross-references other SPDX identifiers (e.g. EUPL-1.2.yml's compatible_licences) must have every entry checked against cleanroom.licence.spdx.KNOWN_IDENTIFIERS before being written -- a licence's own prose (e.g. 'GPL v2 and v3') does not itself specify the exact -only/-or-later SPDX id, so expanding it is this project's own mapping, not a claim the source text drew that precise distinction.",
+      "confidence": 0.9,
+      "evidence": ["tests/unit/test_licence_policy.py:test_eupl_1_2_compatible_licences_are_all_real_spdx_identifiers"],
+      "confirmedRuns": 1
+    },
+
+    {
       "rule": "policies/licences/*.yml is a generic glob (policy.py's available_packs()/load_pack()) -- adding a new pack requires no code change and no hardcoded list update anywhere in src/, only narrative doc/test-count updates.",
       "confidence": 0.95,
       "evidence": ["src/cleanroom/licence/policy.py:39-48"],
@@ -55,12 +68,16 @@
     {
       "claim": "US federal government works are public domain by statute (17 U.S.C. Sec. 105), not by a licence -- SPDX only has narrower agency-specific identifiers (NIST-PD, NASA-1.3, NTIA-PD), no general 'US government work' licence pack is the right shape here.",
       "verified": true,
-      "blastRadius": "low"
+      "blastRadius": "low",
+      "status": "superseded",
+      "supersededBy": "The 'no general pack' framing was right but the earlier conclusion this therefore wasn't worth building was wrong: NIST-PD/NASA-1.3/NTIA-PD were built as three separate real packs. NASA-1.3 in particular is NOT a public-domain instrument -- it's a real, substantive, OSI-approved copyleft-shaped licence (contractor-authored NASA software can carry real copyright, unlike a pure civil-servant Sec. 105 work), which the earlier assumption's framing ('US federal works are public domain by statute') implicitly, incorrectly generalised to. See policies/licences/NASA-1.3.yml's header comment."
     },
     {
       "claim": "EUPL-1.2's Article 5 'Compatible Licence' escape hatch (merging into a larger work, then redistributing under a different named licence) is NOT modelled by legal/engine.py -- the engine only reads the pack's own copyleft field, so a project that genuinely exercised this clause may see an AMBER/RED finding that a human reviewer could resolve differently.",
       "verified": true,
-      "blastRadius": "medium"
+      "blastRadius": "medium",
+      "status": "superseded",
+      "supersededBy": "Partially modelled now (commit d7071c2): CaseBundle.output_licence_id + _compatible_licence_overlap() cross-reference EUPL-1.2's compatible_licences against the project's configured output licence, naming the specific overlap in the finding's alternative_explanation. Still does NOT auto-resolve to GREEN -- confirming the actual Article-5 merge remains a human question -- so the underlying limitation is narrowed, not eliminated."
     }
   ],
   "loadBearingNodes": [
