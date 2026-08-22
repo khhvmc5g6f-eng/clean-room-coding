@@ -951,4 +951,55 @@ detail:
   licence while NIST-PD genuinely resolves to a confirmed GREEN (not
   just an unpacked-unknown one).
 
+### Added (twenty-fifth pass — a deep-dive on the two agent teams and the judicial panel, four real enhancements)
+
+- **`cleanroom recruit`**: a new command registering a real Reference-
+  side (Zone R only) agent -- the counterpart to `cleanroom build`'s
+  Zone H+I agents. Before this, `build` was the ONLY CLI path into
+  `AgentRegistry`, hardcoded to `permitted_zones=["H","I"]`; a Zone-R
+  agent could only be registered by calling `AgentRegistry` directly in
+  Python. `recruit` sets `prohibited_paths=[zone-h, zone-i]` (the same
+  belt-and-suspenders pattern `build` uses for zone-r), verified
+  end-to-end with `--agent-id`: a real allow into Zone R and a real deny
+  into Zone H via PathGuard.
+- **`--tool NAME` (repeatable) on both `build` and `recruit`**:
+  `AgentRecord.tools` was a dataclass field with zero writers and zero
+  readers anywhere in the codebase before this. Now genuinely populated
+  and surfaced through `cleanroom status`'s existing agent listing.
+- **Real tick timestamps and an efficiency summary for `cleanroom
+  heartbeat`**: `Tick` gained a `timestamp` field, stamped by the CLI at
+  the actual moment of each call (`utc_now_iso()`), not a fabricated
+  default -- a tick loaded from a log written before this field existed
+  has `timestamp=None`, honestly. New `tick_intervals_seconds()`/
+  `efficiency_summary()` in `orchestration/heartbeat.py` compute real
+  elapsed-time-between-ticks, surfaced in `heartbeat`'s own JSON output
+  as `average_tick_interval_seconds`/`elapsed_seconds` -- `None` (never
+  `0`) when fewer than two stamped ticks exist, so a stall doesn't read
+  as "instant." `diagnose()`'s STALLED/LOOPING detection could already
+  spot repetition; this adds the actual velocity signal it never had.
+- **`release_policy.require_panel_diversity_gate`** (opt-in, default
+  `false`): `judge-adjudicate` already computed whether the configured
+  `panel_size`/`panel_diversity_required` were satisfied per call, but
+  nothing previously read that back at release time -- a project could
+  configure real panel requirements and have them silently ignored. New
+  `panel_completeness_across_findings()` (`legal/panels.py`) checks every
+  finding that has ANY panel_adjudication recorded across the whole
+  project; `release_allowed()` gained `panel_diversity_gate`/
+  `require_panel_diversity_gate`/`panel_diversity_reasons` params,
+  matching the existing three gates' shape exactly. Deliberately narrow:
+  a finding with no panel_adjudications at all is not judged -- this
+  closes a half-finished-panel-review gap, it does not make judicial
+  review itself mandatory. Verified end-to-end: a same-provider
+  single-member adjudication genuinely blocks release with the gate on,
+  and passes once a second, different-provider member adjudicates.
+- Fixed two more stale doc references caught while auditing this
+  subsystem: SKILL.md's `--agent-id` paragraph still said only
+  `inspect`/`licence`/`similarity` (missing `sanitise`, added in an
+  earlier pass) and still described the pre-`recruit` "or directly via
+  `AgentRegistry`" workaround as the only path for a non-`build` role.
+- 17 new/updated tests across `test_heartbeat.py`,
+  `test_legal_engine_and_panels.py`, `test_release_policy.py`, and
+  `test_cli_end_to_end.py`, plus real end-to-end CLI verification for
+  every one of the four changes.
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD

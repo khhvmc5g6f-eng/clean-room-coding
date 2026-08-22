@@ -14,12 +14,24 @@ not spawn, schedule, or supervise agents itself (Part LXV: provider-
 agnostic) -- whatever harness is actually running multiple agents (a
 script, CI, another framework) calls `cleanroom heartbeat` once per
 meaningful action/tick.
+
+`Tick.timestamp` (and `tick_intervals_seconds()` below) close a real gap:
+`diagnose()` can spot STALLED/LOOPING from repetition alone, but with no
+time dimension in the log at all, nothing could ever measure how FAST an
+agent is actually working -- only that it repeated itself. The CLI caller
+supplies `timestamp` explicitly at the moment it calls `cleanroom
+heartbeat` (via `utc_now_iso()`, the same helper the evidence ledger uses)
+rather than this module defaulting it -- a tick loaded from a log written
+before this field existed genuinely has no recorded timestamp, and
+`timestamp=None` says so honestly instead of fabricating "now" for a tick
+that happened at some real, unknown, earlier time.
 """
 
 from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +43,7 @@ class Tick:
     action_signature: str
     files_modified: int
     test_result: str | None = None  # "pass" | "fail" | None
+    timestamp: str | None = None  # ISO-8601 UTC, e.g. utc_now_iso() -- None for ticks recorded before this field existed
 
 
 def _tick_log_path(evidence_dir: Path, agent_id: str) -> Path:
@@ -55,6 +68,49 @@ def load_ticks(evidence_dir: Path, agent_id: str) -> list[Tick]:
             continue
         ticks.append(Tick(**json.loads(line)))
     return ticks
+
+
+def _parse_timestamp(value: str) -> datetime | None:
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return None
+
+
+def tick_intervals_seconds(ticks: list[Tick]) -> list[float]:
+    """Real elapsed seconds between each consecutive PAIR of ticks that
+    both carry a timestamp -- the actual velocity signal `diagnose()`'s
+    repetition-only heuristic cannot provide on its own. Ticks with no
+    timestamp (e.g. persisted before this field existed, or a malformed
+    value) are skipped entirely rather than treated as a zero-second gap,
+    which would silently fabricate a "very fast" reading."""
+    stamped = [t for t in ticks if t.timestamp]
+    parsed = [(_parse_timestamp(t.timestamp), t) for t in stamped]
+    parsed = [(dt, t) for dt, t in parsed if dt is not None]
+    intervals: list[float] = []
+    for (dt1, _), (dt2, _) in zip(parsed, parsed[1:]):
+        intervals.append((dt2 - dt1).total_seconds())
+    return intervals
+
+
+def efficiency_summary(ticks: list[Tick]) -> dict[str, Any]:
+    """A real, honest efficiency signal to sit alongside `diagnose()`'s
+    stall/loop status -- not a fabricated score. Reports what's actually
+    computable from the tick log and says plainly when it isn't:
+    `average_tick_interval_seconds`/`elapsed_seconds` are None (not 0)
+    when fewer than two timestamped ticks exist, and `unstamped_ticks`
+    names how many ticks in this history predate timestamp tracking so a
+    reader knows the interval average excludes them rather than assuming
+    full coverage."""
+    intervals = tick_intervals_seconds(ticks)
+    stamped_count = len([t for t in ticks if t.timestamp and _parse_timestamp(t.timestamp)])
+    return {
+        "total_ticks": len(ticks),
+        "stamped_ticks": stamped_count,
+        "unstamped_ticks": len(ticks) - stamped_count,
+        "average_tick_interval_seconds": (sum(intervals) / len(intervals)) if intervals else None,
+        "elapsed_seconds": sum(intervals) if intervals else None,
+    }
 
 
 def diagnose(ticks: list[Tick], *, repeat_threshold: int = 3) -> str:

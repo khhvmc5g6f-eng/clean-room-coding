@@ -38,6 +38,9 @@ def release_allowed(
     require_contamination_gate: bool,
     block_on_red_required_jurisdiction: bool,
     open_blocking_remediation: int = 0,
+    panel_diversity_gate: bool = True,
+    require_panel_diversity_gate: bool = False,
+    panel_diversity_reasons: list[str] | None = None,
 ) -> tuple[bool, list[str]]:
     """Part LVI. Every requested gate must PASS; a RED in a required
     jurisdiction blocks release even if every technical gate is green
@@ -46,7 +49,16 @@ def release_allowed(
     similarity finding routed back to the implementation team via
     `cleanroom remediate`) blocks release unconditionally -- there is no
     config flag to disable this one, since it is the actual enforcement
-    point for "does a flagged concern get sent back to be recoded"."""
+    point for "does a flagged concern get sent back to be recoded".
+
+    `panel_diversity_gate`/`require_panel_diversity_gate` are opt-in
+    (default `require_panel_diversity_gate=False`, matching every finding
+    that has EVER had a panel_adjudication recorded before this option
+    existed): `judge-adjudicate` already computed and reported whether
+    the configured `panel_size`/`panel_diversity_required` were satisfied,
+    but nothing previously read that back at release time -- a project
+    could configure real panel requirements and have them silently
+    ignored. Set only when a caller actually wants that enforced."""
     reasons = []
     if require_technical_gate and not technical_gate:
         reasons.append("technical_gate did not pass")
@@ -61,6 +73,9 @@ def release_allowed(
             f"{open_blocking_remediation} blocking remediation task(s) are still open -- "
             "run 'cleanroom remediate' after fixing them, or override with sign-off"
         )
+    if require_panel_diversity_gate and not panel_diversity_gate:
+        detail = f": {'; '.join(panel_diversity_reasons)}" if panel_diversity_reasons else ""
+        reasons.append(f"panel_diversity_gate did not pass{detail}")
     return (len(reasons) == 0), reasons
 
 

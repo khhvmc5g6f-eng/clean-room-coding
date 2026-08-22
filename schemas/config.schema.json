@@ -148,7 +148,12 @@
         "require_technical_gate": { "type": "boolean" },
         "require_provenance_gate": { "type": "boolean" },
         "require_contamination_gate": { "type": "boolean" },
-        "block_on_red_required_jurisdiction": { "type": "boolean", "default": true }
+        "block_on_red_required_jurisdiction": { "type": "boolean", "default": true },
+        "require_panel_diversity_gate": {
+          "type": "boolean",
+          "default": false,
+          "description": "Opt-in: block release if any legal finding with a panel_adjudication recorded doesn't yet satisfy providers.panel_size/panel_diversity_required (judge-adjudicate already computes this; before this field existed, nothing read it back at release time)."
+        }
       }
     }
   }

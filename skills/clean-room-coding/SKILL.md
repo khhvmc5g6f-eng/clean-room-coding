@@ -124,14 +124,21 @@ machine-readable output) over re-deriving its logic by hand.
     candidates as embeddable/standalone vs. server-required (or honestly
     `unknown`), cross-checking each model's licence against this project's
     own policy; never present one suggestion as "the" answer, this is a
-    shortlist for a human decision. `cleanroom build --role "..."`
-    registers each implementation agent in the evidence ledger, scoped to
-    Zones H+I only. If something is actually orchestrating multiple such
+    shortlist for a human decision. `cleanroom build --role "..." [--tool
+    NAME ...]` registers each implementation agent in the evidence
+    ledger, scoped to Zones H+I only; `cleanroom recruit --role "..."
+    [--tool NAME ...]` is its Reference-side counterpart, scoped to Zone
+    R only. `--tool` (repeatable on both) records what the agent instance
+    was actually equipped with -- a plain record, not itself a grant of
+    zone access. If something is actually orchestrating multiple such
     agents over time, call `cleanroom heartbeat <agent-id>
     --action-signature ... --files-modified N` once per meaningful tick --
     it diagnoses `STALLED`/`LOOPING` from that agent's real tick history
-    (Part XXVIII) and updates its registry status accordingly, so a stuck
-    agent shows up in `cleanroom status`'s `orphaned_agents` instead of
+    (Part XXVIII), stamps a real timestamp on the tick so `status`/the
+    command's own output can report actual elapsed-time-between-ticks
+    (never fabricated for ticks recorded before timestamps existed), and
+    updates its registry status accordingly, so a stuck agent shows up in
+    `cleanroom status`'s `orphaned_agents` instead of
     silently running forever. `cleanroom` itself never spawns or
     schedules agents (Part LXV: provider-agnostic) -- this only observes
     ticks something else reports.
@@ -160,8 +167,8 @@ machine-readable output) over re-deriving its logic by hand.
     (should only ever contain C0 material) against this project's real
     policy. For a REAL per-invocation gate (not just a self-test), pass
     the global `--agent-id <id>` option (an agent registered via
-    `cleanroom build`, or directly via `AgentRegistry` for another role)
-    to `inspect`/`licence`/`similarity` -- each genuinely calls
+    `cleanroom build` or `cleanroom recruit`) to
+    `inspect`/`licence`/`similarity`/`sanitise` -- each genuinely calls
     `PathGuard.check()` against that agent's actual registered scope
     before reading its target path. `cleanroom verify` complements it by
     re-deriving hashes for

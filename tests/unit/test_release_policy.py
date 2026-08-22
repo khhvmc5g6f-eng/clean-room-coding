@@ -32,3 +32,26 @@ def test_failed_technical_gate_blocks():
 def test_optional_gate_can_be_disabled():
     allowed, reasons = release_allowed(**_base_kwargs(provenance_gate=False, require_provenance_gate=False))
     assert allowed is True
+
+
+def test_panel_diversity_gate_is_opt_in_and_ignored_by_default():
+    """Matches every project that existed before this gate did: an
+    unsatisfied panel_diversity_gate must not block release unless a
+    caller explicitly opts in with require_panel_diversity_gate=True."""
+    allowed, reasons = release_allowed(**_base_kwargs(panel_diversity_gate=False))
+    assert allowed is True
+    assert reasons == []
+
+
+def test_panel_diversity_gate_blocks_when_required_and_not_satisfied():
+    allowed, reasons = release_allowed(**_base_kwargs(
+        panel_diversity_gate=False, require_panel_diversity_gate=True,
+        panel_diversity_reasons=["copying (gb): 1 panel member(s) recorded, 2 required"],
+    ))
+    assert allowed is False
+    assert any("panel_diversity_gate did not pass" in r and "copying" in r for r in reasons)
+
+
+def test_panel_diversity_gate_passes_when_required_and_satisfied():
+    allowed, reasons = release_allowed(**_base_kwargs(panel_diversity_gate=True, require_panel_diversity_gate=True))
+    assert allowed is True

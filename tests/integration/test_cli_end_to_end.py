@@ -289,6 +289,32 @@ def test_heartbeat_detects_looping_agent_and_updates_registry(tmp_path: Path):
     assert matching_agent["status"] == "LOOPING"
 
 
+def test_heartbeat_reports_real_elapsed_time_between_ticks(tmp_path: Path):
+    """`cleanroom heartbeat` now stamps every tick with a real timestamp
+    at the moment it's called and surfaces a genuine efficiency summary --
+    not a fabricated score, an honest measurement of actual elapsed time
+    between real CLI invocations."""
+    import time
+
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    build_result = _run(runner, ["--project", str(project_dir), "--json", "build", "--role", "Implementation Team"])
+    agent_id = json.loads(build_result.output)["agent_id"]
+
+    first = _run(runner, ["--project", str(project_dir), "--json", "heartbeat", agent_id, "--action-signature", "edit:a.py", "--files-modified", "1"])
+    first_efficiency = json.loads(first.output)["efficiency"]
+    assert first_efficiency["stamped_ticks"] == 1
+    assert first_efficiency["average_tick_interval_seconds"] is None  # only one stamped tick so far -- honestly None, not 0
+
+    time.sleep(1.05)
+    second = _run(runner, ["--project", str(project_dir), "--json", "heartbeat", agent_id, "--action-signature", "edit:b.py", "--files-modified", "1"])
+    second_efficiency = json.loads(second.output)["efficiency"]
+    assert second_efficiency["stamped_ticks"] == 2
+    assert second_efficiency["average_tick_interval_seconds"] >= 1.0
+
+
 def test_heartbeat_rejects_unregistered_agent_id(tmp_path: Path):
     runner = CliRunner()
     project_dir = tmp_path / "proj"
@@ -442,6 +468,100 @@ def test_judge_adjudicate_reports_diversity_and_panel_size_completeness(tmp_path
     assert completeness["distinct_providers_recorded"] == ["anthropic"]
 
 
+def test_release_panel_diversity_gate_blocks_then_passes_once_satisfied(tmp_path: Path):
+    """End-to-end proof that `require_panel_diversity_gate` is real: judge-
+    adjudicate already computed panel_size/diversity satisfaction per
+    call, but before this gate existed nothing at release time ever read
+    it back -- a project could configure panel_size=2,
+    panel_diversity_required=true and have it silently ignored. With the
+    gate opted into via .cleanroom.yml, `cleanroom release` must actually
+    block while only one (same-provider) panel member has adjudicated,
+    and actually pass once a second, different-provider member has."""
+    import yaml
+
+    from cleanroom.exit_codes import ExitCode
+
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _setup_project_through_judge(runner, project_dir)
+
+    config_path = project_dir / ".cleanroom.yml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["providers"]["panel_size"] = 2
+    config["providers"]["panel_diversity_required"] = True
+    config["release_policy"]["require_panel_diversity_gate"] = True
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    answer_file = project_dir / "answer.json"
+    answer_file.write_text(json.dumps([{"issue": "lawful_access", "decision_state": "GREEN_WITH_CONDITIONS"}]), encoding="utf-8")
+    _run(runner, [
+        "--project", str(project_dir), "--json", "judge-adjudicate", "england-wales", str(answer_file),
+        "--panel-member", "member-1", "--model-provider", "anthropic",
+    ])
+
+    (project_dir / "zone-i").mkdir(exist_ok=True)
+    _run(runner, ["--project", str(project_dir), "provenance"])
+    _run(runner, ["--project", str(project_dir), "report", "--version", "0.1.0"])
+
+    blocked = runner.invoke(main, ["--project", str(project_dir), "--json", "release"])
+    blocked_payload = json.loads(blocked.output)
+    assert blocked_payload["release_allowed"] is False
+    assert blocked_payload["panel_diversity"]["satisfied"] is False
+    assert any("lawful_access" in r for r in blocked_payload["reasons"])
+    assert blocked.exit_code == int(ExitCode.POLICY_FAILURE)
+
+    _run(runner, [
+        "--project", str(project_dir), "--json", "judge-adjudicate", "england-wales", str(answer_file),
+        "--panel-member", "member-2", "--model-provider", "openai",
+    ])
+    _run(runner, ["--project", str(project_dir), "report", "--version", "0.1.0"])
+
+    passed = runner.invoke(main, ["--project", str(project_dir), "--json", "release"])
+    passed_payload = json.loads(passed.output)
+    assert passed_payload["panel_diversity"]["satisfied"] is True
+    assert passed_payload["release_allowed"] is True
+
+
+def test_release_panel_diversity_gate_is_opt_in_and_ignored_by_default(tmp_path: Path):
+    """`panel_size`/`panel_diversity_required` (providers config) can be
+    genuinely unsatisfied -- panel_completeness_across_findings correctly
+    reports satisfied=False -- while `release_policy.require_panel_
+    diversity_gate` stays at its default False (every project created
+    before this gate existed). Release must still proceed: computing and
+    reporting the unsatisfied state is not the same as enforcing it."""
+    import yaml
+
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _setup_project_through_judge(runner, project_dir)
+
+    config_path = project_dir / ".cleanroom.yml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["providers"]["panel_size"] = 2
+    config["providers"]["panel_diversity_required"] = True
+    # Deliberately NOT setting release_policy.require_panel_diversity_gate.
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    answer_file = project_dir / "answer.json"
+    answer_file.write_text(json.dumps([{"issue": "lawful_access", "decision_state": "GREEN_WITH_CONDITIONS"}]), encoding="utf-8")
+    _run(runner, [
+        "--project", str(project_dir), "--json", "judge-adjudicate", "england-wales", str(answer_file),
+        "--panel-member", "member-1", "--model-provider", "anthropic",
+    ])
+
+    (project_dir / "zone-i").mkdir(exist_ok=True)
+    _run(runner, ["--project", str(project_dir), "provenance"])
+    _run(runner, ["--project", str(project_dir), "report", "--version", "0.1.0"])
+
+    result = runner.invoke(main, ["--project", str(project_dir), "--json", "release"])
+    payload = json.loads(result.output)
+    assert payload["panel_diversity"]["satisfied"] is False
+    assert payload["panel_diversity"]["enforced"] is False
+    assert payload["release_allowed"] is True
+
+
 def test_judge_adjudicate_rejects_unmatched_issue(tmp_path: Path):
     runner = CliRunner()
     project_dir = tmp_path / "proj"
@@ -459,8 +579,8 @@ def test_agent_id_denies_implementation_scoped_agent_zone_r_access(tmp_path: Pat
     """`--agent-id` closes the real (not just unit-tested-in-isolation)
     gap docs/zones.py's own docstring named: cli.py's commands previously
     never routed a real file read through PathGuard per invocation. A
-    Zone-H+I-only agent (cleanroom build's only registration path) must
-    now be genuinely denied `cleanroom licence zone-r`, not just fail the
+    Zone-H+I-only agent (registered via `cleanroom build`) must now be
+    genuinely denied `cleanroom licence zone-r`, not just fail the
     self-test in isolation."""
     from cleanroom.cli import main
 
@@ -488,12 +608,12 @@ def test_agent_id_denies_implementation_scoped_agent_zone_r_access(tmp_path: Pat
 def test_agent_id_allows_r_scoped_agent_zone_r_access(tmp_path: Path):
     """The allow path, not just the deny path: an agent actually
     registered WITH Zone R access must pass straight through with no
-    PathGuard denial at all. (No CLI command registers an R-scoped agent
-    today -- 'cleanroom build' only ever registers H+I -- so this uses
-    AgentRegistry directly, exactly as an orchestration harness built on
-    this library would.)"""
+    PathGuard denial at all. Registered via 'cleanroom recruit', the real
+    CLI path into AgentRegistry for a Reference-side agent (added
+    alongside 'cleanroom build' for Implementation-side agents -- before
+    this command existed, an R-scoped agent could only be registered by
+    calling AgentRegistry directly in Python)."""
     from cleanroom.cli import main
-    from cleanroom.orchestration.agents import AgentRegistry
 
     runner = CliRunner()
     project_dir = tmp_path / "proj"
@@ -502,11 +622,56 @@ def test_agent_id_allows_r_scoped_agent_zone_r_access(tmp_path: Path):
     (project_dir / "zone-r" / "lib").mkdir(parents=True)
     (project_dir / "zone-r" / "lib" / "LICENSE").write_text("MIT License\n", encoding="utf-8")
 
-    registry = AgentRegistry(project_dir / "evidence")
-    record = registry.register(role="Analyst", permitted_zones=["R"])
+    recruit_result = _run(runner, ["--project", str(project_dir), "--json", "recruit", "--role", "Analyst"])
+    agent_id = json.loads(recruit_result.output)["agent_id"]
 
-    result = runner.invoke(main, ["--agent-id", record.agent_id, "--project", str(project_dir), "--json", "licence", str(project_dir / "zone-r")])
+    result = runner.invoke(main, ["--agent-id", agent_id, "--project", str(project_dir), "--json", "licence", str(project_dir / "zone-r")])
     assert "PathGuard" not in result.output
+
+
+def test_recruit_registers_an_r_scoped_agent_explicitly_denied_zone_h_and_i(tmp_path: Path):
+    """'cleanroom recruit' is the Reference-side counterpart to 'cleanroom
+    build' -- it must register an agent scoped to Zone R only, with Zone
+    H and Zone I both explicitly prohibited (the same belt-and-suspenders
+    pattern 'build' uses for Zone R), not just omitted from
+    permitted_zones."""
+    from cleanroom.cli import main
+
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+
+    recruit_result = _run(runner, ["--project", str(project_dir), "--json", "recruit", "--role", "Analyst", "--tool", "ast-grep", "--tool", "grep"])
+    record = json.loads(recruit_result.output)
+    assert record["permitted_zones"] == ["R"]
+    assert str(project_dir / "zone-h") in record["prohibited_paths"]
+    assert str(project_dir / "zone-i") in record["prohibited_paths"]
+    assert record["tools"] == ["ast-grep", "grep"]
+
+    denied = runner.invoke(main, ["--agent-id", record["agent_id"], "--project", str(project_dir), "--json", "sanitise", str(project_dir / "zone-h" / ".gitkeep")])
+    assert denied.exit_code == 4  # ContaminationFailure
+    assert "PathGuard denied" in json.loads(denied.output)["error"]
+
+
+def test_build_registers_tools_on_the_agent_record(tmp_path: Path):
+    """AgentRecord.tools existed as a dataclass field with no writer
+    anywhere in the codebase before this -- 'cleanroom build --tool' is
+    the first real path that actually populates it."""
+    from cleanroom.cli import main
+
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+
+    build_result = _run(runner, ["--project", str(project_dir), "--json", "build", "--role", "Backend Team", "--tool", "pytest", "--tool", "ruff"])
+    record = json.loads(build_result.output)
+    assert record["tools"] == ["pytest", "ruff"]
+
+    status_result = _run(runner, ["--project", str(project_dir), "--json", "status"])
+    status_agents = json.loads(status_result.output)["agents"]
+    assert any(a["tools"] == ["pytest", "ruff"] for a in status_agents)
 
 
 def test_agent_id_rejects_unregistered_id(tmp_path: Path):

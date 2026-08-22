@@ -113,6 +113,46 @@ def aggregate_panel_decision(panel_adjudications: list[dict[str, Any]]) -> str:
     return _normalise(worst["decision_state"])
 
 
+def panel_completeness_across_findings(
+    findings: list[dict[str, Any]], *, panel_size_required: int, diversity_required: bool,
+) -> tuple[bool, list[str]]:
+    """`judge_adjudicate` (cli.py) already computes panel_size/diversity
+    satisfaction per CALL, for whichever finding(s) that one submission
+    touched -- this is the same check applied project-wide, across every
+    finding that has EVER had a panel_adjudication recorded, so a release
+    gate can ask "is the judicial panel actually complete everywhere it
+    was used" in one pass.
+
+    Deliberately narrow scope: a finding with NO panel_adjudications at
+    all is not judged here -- this does not make judicial review itself
+    mandatory (that stays a separate workflow choice via `cleanroom
+    judge`/`judge-adjudicate`), it only checks that wherever panel review
+    WAS used, it's genuinely complete rather than left half-finished.
+
+    Returns (satisfied, reasons) -- reasons names each finding that falls
+    short and why, never just a bare boolean with no way to act on it."""
+    reasons: list[str] = []
+    for finding in findings:
+        adjudications = finding.get("panel_adjudications") or []
+        if not adjudications:
+            continue
+        member_ids = {a["panel_member_id"] for a in adjudications}
+        if len(member_ids) < panel_size_required:
+            reasons.append(
+                f"{finding['issue']} ({finding.get('jurisdiction')}): {len(member_ids)} panel member(s) recorded, "
+                f"{panel_size_required} required"
+            )
+            continue
+        if diversity_required:
+            providers = {a.get("model_provider") for a in adjudications} - {None}
+            if len(providers) <= 1:
+                reasons.append(
+                    f"{finding['issue']} ({finding.get('jurisdiction')}): panel_diversity_required is set but only "
+                    f"{len(providers)} distinct model_provider(s) recorded across its panel_adjudications"
+                )
+    return (len(reasons) == 0), reasons
+
+
 def global_decision(jurisdiction_decisions: dict[str, str], required_markets: list[str]) -> str:
     """Part LV: do not average jurisdictions. A RED in a required market
     cannot be smoothed over by GREEN elsewhere. A required market with no

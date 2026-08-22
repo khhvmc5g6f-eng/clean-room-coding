@@ -298,6 +298,32 @@ binary, not just the test suite: registering an agent, feeding it three
 identical-signature ticks, and confirming both the `LOOPING` diagnosis
 and that `cleanroom status`'s `orphaned_agents` picks it up afterward.
 
+**Update (2026-08-22): a real Reference-side registration path, agent
+tools, and tick timestamps.** A deep-dive on the two agent populations
+this project actually creates (Reference-side, Zone R only; Implementation-
+side, Zone H+I only, via `cleanroom build`) surfaced three real,
+concrete gaps, each closed:
+1. **No CLI command registered a Reference-side agent at all** --
+   `cleanroom build` was the only path into `AgentRegistry`, hardcoded to
+   `permitted_zones=["H","I"]`. New `cleanroom recruit --role "..."`
+   registers a real Zone-R-only agent (Zone H and Zone I both explicitly
+   prohibited, the same belt-and-suspenders pattern `build` uses for Zone
+   R), verified end-to-end with `--agent-id` PathGuard enforcement (real
+   allow into Zone R, real deny into Zone H).
+2. **`AgentRecord.tools` was a completely dead field** -- declared with
+   no writer or reader anywhere in the codebase. `--tool NAME` (repeatable)
+   on both `build` and `recruit` now actually populates it; `cleanroom
+   status`'s agent listing surfaces it since it already emits the whole
+   record.
+3. **Heartbeat ticks had no time dimension at all** -- `diagnose()` could
+   spot STALLED/LOOPING from repetition, but nothing could measure actual
+   velocity. `Tick.timestamp` (stamped by the CLI at the real moment of
+   the call via `utc_now_iso()`, never a fabricated default for old
+   ticks) plus new `tick_intervals_seconds()`/`efficiency_summary()`
+   surface real elapsed-time-between-ticks in `cleanroom heartbeat`'s own
+   output -- honestly `None`, not `0`, when fewer than two stamped ticks
+   exist.
+
 **Deferred (real, lower-priority findings from the same review):**
 ~~`similarity/negative_control.py`'s `background_scores` recomputes every
 negative-control file's score for every (reference, implementation) pair
@@ -676,12 +702,25 @@ change that should be evaluated on its own.
   dissenting member's RED/AMBER is never smoothed over by others' more
   favourable view, and the command reports whether `panel_size`/
   `panel_diversity_required` are actually satisfied yet (distinct
-  providers recorded so far). This does NOT change what
+  providers recorded so far). This did NOT originally change what
   `cleanroom report`/`release` treat as the release-gating
-  `global_decision` -- that remains purely finding-based (deterministic
-  engine output), not the judicial panel's adjudication, which is
-  recorded as additional evidentiary context rather than silently made a
-  new gate.
+  `global_decision` -- it remained purely finding-based (deterministic
+  engine output), not the judicial panel's adjudication, recorded as
+  additional evidentiary context rather than a gate. **Update
+  (2026-08-22): now optionally a real gate.** `release_policy`'s new
+  `require_panel_diversity_gate` (opt-in, default `false` -- every
+  project created before this option existed is unaffected) makes
+  `cleanroom release` actually check `panel_completeness_across_findings`
+  (`legal/panels.py`) across every finding that has ANY panel_adjudication
+  recorded, blocking release if `panel_size`/`panel_diversity_required`
+  aren't genuinely satisfied wherever judicial review was actually used.
+  Deliberately narrow: a finding with NO panel_adjudications at all is
+  never judged by this gate -- it does not make judicial review itself
+  mandatory, it only stops a configured-but-half-finished panel review
+  from being silently ignored at release time. Verified end-to-end: a
+  same-provider single-member adjudication genuinely blocks release with
+  the gate on, and passes once a second, different-provider member
+  adjudicates the same finding.
 - **SLSA build provenance is now generated on release** (see
   "Competitive landscape" above) via `.github/workflows/release.yml`, and
   the evidence ledger can now export to the in-toto Link predicate shape

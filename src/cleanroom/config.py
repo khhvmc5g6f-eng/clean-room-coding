@@ -98,5 +98,6 @@ def default_config(project_name: str, project_id: str, *, target_language: str =
             "require_provenance_gate": True,
             "require_contamination_gate": True,
             "block_on_red_required_jurisdiction": True,
+            "require_panel_diversity_gate": False,
         },
     }

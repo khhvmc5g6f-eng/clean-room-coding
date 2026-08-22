@@ -1,5 +1,10 @@
 from cleanroom.legal.engine import CaseBundle, ISSUES, run
-from cleanroom.legal.panels import aggregate_jurisdiction_decision, aggregate_panel_decision, global_decision
+from cleanroom.legal.panels import (
+    aggregate_jurisdiction_decision,
+    aggregate_panel_decision,
+    global_decision,
+    panel_completeness_across_findings,
+)
 
 
 def test_all_18_issues_covered():
@@ -453,3 +458,52 @@ def test_aggregate_panel_decision_never_returns_bare_green():
 def test_aggregate_panel_decision_unknown_folds_to_amber():
     panel = [{"panel_member_id": "m1", "decision_state": "UNKNOWN"}]
     assert aggregate_panel_decision(panel) == "AMBER"
+
+
+def test_panel_completeness_ignores_findings_with_no_panel_review_at_all():
+    """Deliberately narrow: a finding nobody ever ran through judge/
+    judge-adjudicate must not count against the gate -- this checks
+    completeness of panel review WHERE USED, it does not make panel
+    review itself mandatory."""
+    findings = [{"issue": "copying", "jurisdiction": "gb", "panel_adjudications": []}]
+    satisfied, reasons = panel_completeness_across_findings(findings, panel_size_required=2, diversity_required=True)
+    assert satisfied is True
+    assert reasons == []
+
+
+def test_panel_completeness_flags_insufficient_panel_size():
+    findings = [{
+        "issue": "copying", "jurisdiction": "gb",
+        "panel_adjudications": [{"panel_member_id": "m1", "decision_state": "GREEN_WITH_CONDITIONS", "model_provider": "anthropic"}],
+    }]
+    satisfied, reasons = panel_completeness_across_findings(findings, panel_size_required=2, diversity_required=False)
+    assert satisfied is False
+    assert any("copying" in r and "1 panel member" in r and "2 required" in r for r in reasons)
+
+
+def test_panel_completeness_flags_insufficient_diversity_even_with_enough_members():
+    """Panel size alone isn't diversity: 2 members from the SAME provider
+    must still fail when diversity is required."""
+    findings = [{
+        "issue": "copying", "jurisdiction": "gb",
+        "panel_adjudications": [
+            {"panel_member_id": "m1", "decision_state": "GREEN_WITH_CONDITIONS", "model_provider": "anthropic"},
+            {"panel_member_id": "m2", "decision_state": "GREEN_WITH_CONDITIONS", "model_provider": "anthropic"},
+        ],
+    }]
+    satisfied, reasons = panel_completeness_across_findings(findings, panel_size_required=2, diversity_required=True)
+    assert satisfied is False
+    assert any("diversity" in r for r in reasons)
+
+
+def test_panel_completeness_satisfied_with_enough_diverse_members():
+    findings = [{
+        "issue": "copying", "jurisdiction": "gb",
+        "panel_adjudications": [
+            {"panel_member_id": "m1", "decision_state": "GREEN_WITH_CONDITIONS", "model_provider": "anthropic"},
+            {"panel_member_id": "m2", "decision_state": "GREEN_WITH_CONDITIONS", "model_provider": "openai"},
+        ],
+    }]
+    satisfied, reasons = panel_completeness_across_findings(findings, panel_size_required=2, diversity_required=True)
+    assert satisfied is True
+    assert reasons == []

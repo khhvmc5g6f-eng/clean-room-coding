@@ -114,7 +114,7 @@ class Ctx:
         registry = AgentRegistry(project.root / "evidence")
         record = next((a for a in registry.all() if a.agent_id == self.agent_id), None)
         if record is None:
-            raise click.ClickException(f"No agent registered with id '{self.agent_id}' (register one with 'cleanroom build' first).")
+            raise click.ClickException(f"No agent registered with id '{self.agent_id}' (register one with 'cleanroom build' or 'cleanroom recruit' first).")
         scope = AgentZoneScope(
             agent_id=record.agent_id, role=record.role,
             permitted_zones=frozenset(record.permitted_zones),
@@ -675,10 +675,11 @@ def ai_suggest(ctx: Ctx, want_ai: bool | None, capability: str | None, embeddabl
 
 @main.command()
 @click.option("--role", required=True, help="e.g. 'Backend Team', 'Frontend Team'.")
+@click.option("--tool", "tools", multiple=True, help="A tool/capability this agent has access to (e.g. 'pytest', 'ast-grep'). Repeatable. Purely a record of what this agent instance was actually equipped with -- registering a tool here does not itself grant zone access or any runtime permission.")
 @click.option("--model-provider", default=None)
 @click.option("--model-id", default=None)
 @pass_ctx
-def build(ctx: Ctx, role: str, model_provider: str | None, model_id: str | None) -> None:
+def build(ctx: Ctx, role: str, tools: tuple[str, ...], model_provider: str | None, model_id: str | None) -> None:
     """Part XXVI: register a fresh, source-blind implementation agent scoped to Zone H + Zone I only."""
     project = ctx.load_project()
     registry = AgentRegistry(project.root / "evidence")
@@ -686,6 +687,7 @@ def build(ctx: Ctx, role: str, model_provider: str | None, model_id: str | None)
         role=role,
         permitted_zones=["H", "I"],
         prohibited_paths=[str(project.zone_r)],
+        tools=list(tools),
         model_provider=model_provider,
         model_id=model_id,
         supplied_documents=[str(p) for p in project.zone_h.rglob("*") if p.is_file()],
@@ -694,6 +696,41 @@ def build(ctx: Ctx, role: str, model_provider: str | None, model_id: str | None)
         actor=Actor(type="agent", id=record.agent_id, role=role, model_provider=model_provider, model_id=model_id),
         action="cleanroom build (agent registered)",
         zone="I",
+        result="success",
+    )
+    ctx.emit(record.to_dict())
+
+
+# --------------------------------------------------------------------------- recruit
+
+@main.command()
+@click.option("--role", required=True, help="e.g. 'Analyst', 'Reference Reviewer'.")
+@click.option("--tool", "tools", multiple=True, help="A tool/capability this agent has access to. Repeatable. Purely a record of what this agent instance was actually equipped with -- registering a tool here does not itself grant zone access or any runtime permission.")
+@click.option("--model-provider", default=None)
+@click.option("--model-id", default=None)
+@pass_ctx
+def recruit(ctx: Ctx, role: str, tools: tuple[str, ...], model_provider: str | None, model_id: str | None) -> None:
+    """Part VII/XXVI: register a fresh Reference-zone (Zone R only) agent --
+    the counterpart to `cleanroom build`'s Zone H+I implementation agents.
+    Before this command existed, `build` was the ONLY CLI path into
+    `AgentRegistry`, so a Reference-side agent (an analyst reviewing Zone R
+    material) could only be registered by calling `AgentRegistry` directly
+    in Python -- there was no `cleanroom` command for the reference-side
+    team at all. This closes that asymmetry."""
+    project = ctx.load_project()
+    registry = AgentRegistry(project.root / "evidence")
+    record = registry.register(
+        role=role,
+        permitted_zones=["R"],
+        prohibited_paths=[str(project.zone_h), str(project.zone_i)],
+        tools=list(tools),
+        model_provider=model_provider,
+        model_id=model_id,
+    )
+    project.evidence.append(
+        actor=Actor(type="agent", id=record.agent_id, role=role, model_provider=model_provider, model_id=model_id),
+        action="cleanroom recruit (agent registered)",
+        zone="R",
         result="success",
     )
     ctx.emit(record.to_dict())
@@ -722,16 +759,17 @@ def heartbeat(ctx: Ctx, agent_id: str, action_signature: str, files_modified: in
     registry = AgentRegistry(project.root / "evidence")
     agents_by_id = {a.agent_id: a for a in registry.all()}
     if agent_id not in agents_by_id:
-        raise click.ClickException(f"No agent registered with id {agent_id}. Register one first with 'cleanroom build'.")
+        raise click.ClickException(f"No agent registered with id {agent_id}. Register one first with 'cleanroom build' or 'cleanroom recruit'.")
 
     evidence_dir = project.root / "evidence"
     heartbeat_module.append_tick(
         evidence_dir, agent_id,
-        heartbeat_module.Tick(action_signature=action_signature, files_modified=files_modified, test_result=test_result),
+        heartbeat_module.Tick(action_signature=action_signature, files_modified=files_modified, test_result=test_result, timestamp=utc_now_iso()),
     )
     ticks = heartbeat_module.load_ticks(evidence_dir, agent_id)
     status = heartbeat_module.diagnose(ticks, repeat_threshold=repeat_threshold)
     recommended_action = heartbeat_module.recommend_action(status)
+    efficiency = heartbeat_module.efficiency_summary(ticks)
 
     # diagnose() only ever returns ACTIVE/STALLED/LOOPING from the tick
     # history alone -- it has no visibility into explicit statuses a human
@@ -747,7 +785,7 @@ def heartbeat(ctx: Ctx, agent_id: str, action_signature: str, files_modified: in
         actor=Actor(type="tool", id="cleanroom-heartbeat"), action="cleanroom heartbeat",
         result="success", detail=f"agent={agent_id} status={status} tick_count={len(ticks)}",
     )
-    ctx.emit({"agent_id": agent_id, "status": status, "recommended_action": recommended_action, "tick_count": len(ticks)})
+    ctx.emit({"agent_id": agent_id, "status": status, "recommended_action": recommended_action, "tick_count": len(ticks), "efficiency": efficiency})
 
 
 # --------------------------------------------------------------------------- test
@@ -1398,6 +1436,15 @@ def release(ctx: Ctx) -> None:
     tasks = jsonlib.loads(tasks_path.read_text(encoding="utf-8")) if tasks_path.is_file() else []
     open_blocking_remediation = len(remediation_module.open_blocking_tasks(tasks))
 
+    findings_path = project.root / "evidence" / "legal-findings.json"
+    findings = jsonlib.loads(findings_path.read_text(encoding="utf-8")) if findings_path.is_file() else []
+    providers_config = project.config.data.get("providers", {})
+    panel_diversity_gate, panel_diversity_reasons = legal_panels.panel_completeness_across_findings(
+        findings,
+        panel_size_required=providers_config.get("panel_size", 1),
+        diversity_required=providers_config.get("panel_diversity_required", False),
+    )
+
     allowed, reasons = release_allowed(
         technical_gate=certificate["tests"].get("fail", 0) == 0,
         provenance_gate=certificate["provenance_status"] != "unknown",
@@ -1408,10 +1455,16 @@ def release(ctx: Ctx) -> None:
         require_contamination_gate=policy["require_contamination_gate"],
         block_on_red_required_jurisdiction=policy["block_on_red_required_jurisdiction"],
         open_blocking_remediation=open_blocking_remediation,
+        panel_diversity_gate=panel_diversity_gate,
+        require_panel_diversity_gate=policy.get("require_panel_diversity_gate", False),
+        panel_diversity_reasons=panel_diversity_reasons,
     )
     human_signoff_required = project.config.data.get("approval_gates", {}).get("human_signoff_required_for_release", True)
     project.evidence.append(actor=Actor(type="tool", id="cleanroom-release"), action="cleanroom release", result="success" if allowed else "denied", detail="; ".join(reasons))
-    ctx.emit({"release_allowed": allowed, "reasons": reasons, "human_signoff_still_required": human_signoff_required and allowed})
+    ctx.emit({
+        "release_allowed": allowed, "reasons": reasons, "human_signoff_still_required": human_signoff_required and allowed,
+        "panel_diversity": {"satisfied": panel_diversity_gate, "reasons": panel_diversity_reasons, "enforced": policy.get("require_panel_diversity_gate", False)},
+    })
     if not allowed:
         if certificate["global_decision"] == "RED":
             sys.exit(int(ExitCode.LEGAL_RED))
