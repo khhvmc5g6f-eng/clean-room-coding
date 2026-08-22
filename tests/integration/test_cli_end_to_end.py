@@ -170,6 +170,28 @@ def test_provenance_resolve_transitive_is_opt_in_and_writes_evidence(tmp_path: P
     assert written["resolved"][0]["licence"] == "BSD-3-Clause"
 
 
+def test_verify_export_in_toto_links_is_opt_in_and_writes_one_file_per_event(tmp_path: Path):
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+
+    plain_result = _run(runner, ["--project", str(project_dir), "--json", "verify"])
+    assert "in_toto_links" not in json.loads(plain_result.output)
+    assert not (project_dir / "evidence" / "in-toto-links").is_dir()
+
+    exported_result = _run(runner, ["--project", str(project_dir), "--json", "verify", "--export-in-toto-links"])
+    payload = json.loads(exported_result.output)
+    assert payload["in_toto_links"]["count"] == 1  # just the "cleanroom init" event so far
+    link_dir = project_dir / "evidence" / "in-toto-links"
+    files = sorted(link_dir.glob("*.link.json"))
+    assert len(files) == 1
+    statement = json.loads(files[0].read_text(encoding="utf-8"))
+    assert statement["_type"] == "https://in-toto.io/Statement/v1"
+    assert statement["predicate"]["name"] == "cleanroom init"
+    assert statement["unsigned"] is True
+
+
 def test_legal_picks_up_similarity_and_requirement_graph_facts(tmp_path: Path):
     """Regression test: `cleanroom legal` previously never loaded
     evidence/similarity-findings.json or requirements.json into the

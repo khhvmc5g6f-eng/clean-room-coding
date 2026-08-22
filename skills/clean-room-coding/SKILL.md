@@ -150,6 +150,10 @@ machine-readable output) over re-deriving its logic by hand.
     against what's recorded -- run it whenever you need to prove nothing
     was altered after the fact (e.g. before `cleanroom report`, or if a
     file in Zone H looks like it might have changed since handoff).
+    `--export-in-toto-links` additionally maps every ledger event to an
+    in-toto Link-predicate Statement -- an interoperability export, NOT a
+    signed attestation (no per-actor signing key exists; every file says
+    so explicitly).
 
 14. **Legal / Judge** -- `cleanroom legal --access-authority ...` runs the
     heuristic legal-issue engine (Part XLIV-style: 18 distinct questions,

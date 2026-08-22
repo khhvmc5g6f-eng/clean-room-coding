@@ -381,10 +381,17 @@ than a bare "worth considering":
    format, Sigstore-signed), then uploads both to the release so a
    consumer can `gh attestation verify` what they downloaded. Verified the
    package actually builds cleanly with `python -m build` before writing
-   the workflow, rather than assuming it would. Separately, the evidence
-   ledger's hash-chained events are conceptually close to in-toto's "link"
-   metadata; an export from the ledger to real in-toto link files remains
-   unbuilt and is a natural fit for this project's own architecture.
+   the workflow, rather than assuming it would. The evidence ledger's
+   hash-chained events are now also exportable to the in-toto Attestation
+   Framework's Link predicate shape (`cleanroom verify
+   --export-in-toto-links` -> `provenance/intoto.py`), verified against
+   the real spec fetched from `in-toto/attestation` directly rather than
+   assumed -- **but these exports are explicitly NOT cryptographically
+   signed attestations** (every file says so in an `unsigned`/
+   `unsigned_note` field): the ledger authenticates itself by hash-chaining,
+   not by each actor holding a signing key, so there is nothing to sign
+   with. Presented honestly as a structural interoperability export, not
+   overclaimed as equivalent to a real signed in-toto attestation.
 
 None of these four libraries are integrated yet -- each is a real
 dependency/architecture decision for the project's maintainer(s) to make
@@ -458,9 +465,12 @@ change that should be evaluated on its own.
   wired to an actual multi-provider LLM adapter layer -- Claude via
   whatever harness runs `cleanroom judge`'s prompts is the only path today.
 - **SLSA build provenance is now generated on release** (see
-  "Competitive landscape" above) via `.github/workflows/release.yml`, but
-  an export of the evidence ledger to real in-toto "link" metadata is
-  still unbuilt.
+  "Competitive landscape" above) via `.github/workflows/release.yml`, and
+  the evidence ledger can now export to the in-toto Link predicate shape
+  (`cleanroom verify --export-in-toto-links`) -- but those exports are
+  unsigned structural mappings, not real signed in-toto attestations (see
+  "Competitive landscape" for why: no per-actor signing key exists to
+  produce one).
 - **No web dashboard, no plugin architecture, no GitLab/Bitbucket
   adapters** -- the CLI/library API is the whole surface for v0.1;
   `docs/architecture.md` notes these as intentionally out of scope for a

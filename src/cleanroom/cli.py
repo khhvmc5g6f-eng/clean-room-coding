@@ -40,6 +40,7 @@ from cleanroom.licence import policy as licence_policy
 from cleanroom import maturity
 from cleanroom.orchestration.agents import AgentRegistry
 from cleanroom.project import Project
+from cleanroom.provenance import intoto as intoto_module
 from cleanroom.provenance import sbom as sbom_module
 from cleanroom.provenance import transitive as transitive_module
 from cleanroom.report import (
@@ -997,8 +998,12 @@ def remediate(ctx: Ctx, override_id: str | None, override_by: str | None, overri
 # --------------------------------------------------------------------------- verify
 
 @main.command()
+@click.option(
+    "--export-in-toto-links", is_flag=True, default=False,
+    help="Also export every evidence-ledger event as an in-toto Link-predicate Statement (structural mapping only -- NOT a signed attestation; see provenance/intoto.py) to evidence/in-toto-links/.",
+)
 @pass_ctx
-def verify(ctx: Ctx) -> None:
+def verify(ctx: Ctx, export_in_toto_links: bool) -> None:
     """Re-derive every hash this project has produced and compare against
     what was recorded -- proves nothing was silently altered."""
     project = ctx.load_project()
@@ -1009,7 +1014,22 @@ def verify(ctx: Ctx) -> None:
         m = jsonlib.loads(manifest_path.read_text(encoding="utf-8"))
         manifest_problems = handoff_manifest.verify_manifest(m, project.zone_h)
     ok = not ledger_problems and not manifest_problems
-    ctx.emit({"ledger_intact": not ledger_problems, "ledger_problems": ledger_problems, "handoff_manifest_intact": not manifest_problems, "handoff_manifest_problems": manifest_problems})
+    result: dict[str, Any] = {"ledger_intact": not ledger_problems, "ledger_problems": ledger_problems, "handoff_manifest_intact": not manifest_problems, "handoff_manifest_problems": manifest_problems}
+
+    if export_in_toto_links:
+        events = project.evidence.read_all()
+        statements = intoto_module.export_ledger_to_link_statements(events)
+        out_dir = project.root / "evidence" / "in-toto-links"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        written = []
+        for event, statement in zip(events, statements):
+            action_slug = re.sub(r"[^A-Za-z0-9]+", "-", event["action"]).strip("-").lower()
+            out_path = out_dir / f"{event['sequence']:06d}-{action_slug}.link.json"
+            out_path.write_text(jsonlib.dumps(statement, indent=2, sort_keys=True), encoding="utf-8")
+            written.append(str(out_path))
+        result["in_toto_links"] = {"count": len(written), "directory": str(out_dir)}
+
+    ctx.emit(result)
     if not ok:
         sys.exit(int(ExitCode.GENERAL_FAILURE))
 

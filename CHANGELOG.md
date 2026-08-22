@@ -418,4 +418,27 @@ detail:
   and covered by a new regression test
   (`test_chip_resets_fill_colour_so_it_does_not_leak_into_later_content`).
 
+### Added (tenth pass — evidence ledger to in-toto Link export)
+
+- New `src/cleanroom/provenance/intoto.py`: maps every evidence-ledger
+  event to an in-toto Attestation Framework Statement wrapping a Link
+  predicate (`https://in-toto.io/attestation/link/v0.3`), verified field-
+  by-field against the real spec fetched from `in-toto/attestation`
+  directly (including the requirement that every `subject`/`materials`
+  entry have a real `digest` -- an input/output recorded with a path but
+  no sha256 is dropped rather than given a fabricated digest, and an
+  event with no file output at all falls back to using its own
+  tamper-evident `event_hash` as the subject, so every ledger event is
+  exportable, not just file-producing ones).
+- **These are explicitly, loudly NOT signed in-toto attestations** --
+  every exported file carries `unsigned: true` and an `unsigned_note`
+  explaining why: a genuine in-toto attestation's assurance comes from a
+  DSSE-signed statement verifiable against a known signer's key, and this
+  project's evidence ledger authenticates itself by hash-chaining events
+  (Part XLII), not by having each actor (human/agent/tool/CI) hold a
+  private signing key. Documented plainly rather than overclaimed.
+- Wired into a new opt-in `cleanroom verify --export-in-toto-links` flag
+  (default off), writing one `<sequence>-<action>.link.json` file per
+  ledger event to `evidence/in-toto-links/`.
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD
