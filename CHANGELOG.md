@@ -765,4 +765,36 @@ detail:
   agent denied `sanitise` of a Zone H document) and the allow path (an
   H-scoped agent let through).
 
+### Added (twenty-first pass — Cargo.toml/composer.json dependency listing for SBOM generation)
+
+- `sbom.discover_dependencies()` now also parses `Cargo.toml`
+  ([dependencies]/[dev-dependencies]/[build-dependencies], both bare
+  version-requirement strings and inline tables with their own `version`
+  key) and `composer.json` (`require`/`require-dev`, correctly excluding
+  platform pseudo-packages: `php`, `hhvm`, `ext-*`, `lib-*`) -- both were
+  already read for licence discovery but not for SBOM dependency listing.
+  A real TOML parser (stdlib `tomllib` on 3.11+, the `tomli` backport on
+  3.10, now a base dependency for that platform) is used for Cargo.toml,
+  not a regex -- its dependency tables have shapes a
+  `pyproject.toml`-style list regex can't represent. A path/git-only Cargo
+  dependency (no registry version) is skipped rather than listed with a
+  fabricated version.
+- `provenance/transitive.py`'s `--resolve-transitive` still only walks
+  PyPI/npm -- a Cargo/Composer direct dependency given to
+  `resolve_transitive()` is now explicitly recorded `unresolved` with the
+  reason "transitive resolution not yet implemented for the
+  cargo/composer ecosystem", rather than being silently misrouted through
+  the PyPI lookup (the previous binary npm-or-not-npm ecosystem check
+  would have done exactly that, mislabelling a real capability gap as an
+  ordinary "package not found").
+- Verified end-to-end against a real project: `cleanroom provenance` on a
+  Cargo.toml + composer.json project correctly listed all 3 real
+  dependencies (`serde`, `tokio`, `guzzlehttp/guzzle`) with real purls and
+  versions in both the SPDX and CycloneDX documents, and correctly
+  excluded the `php` platform entry.
+- 5 new unit tests (Cargo bare-string/inline-table versions, path-only
+  skip, Composer platform-package exclusion, `discover_dependencies`
+  end-to-end) plus 1 new `transitive.py` test proving the unsupported-
+  ecosystem path never reaches the PyPI lookup.
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD

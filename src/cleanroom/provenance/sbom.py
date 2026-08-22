@@ -1,22 +1,26 @@
 """Parts XXXVII-XXXVIII: SBOM generation (SPDX + CycloneDX) and dependency discovery.
 
-v0.1 scope: parses declared direct dependencies from requirements.txt,
-pyproject.toml ([project.dependencies]) and package.json
-(dependencies/devDependencies). It does NOT resolve a transitive dependency
-tree or fetch registry metadata (licence/hash of the resolved version) --
+`discover_dependencies()` parses declared *direct* dependencies from
+requirements.txt, pyproject.toml ([project.dependencies]), package.json
+(dependencies/devDependencies), Cargo.toml ([dependencies]/
+[dev-dependencies]/[build-dependencies], real TOML parsing via
+`tomllib`/`tomli`, not a regex) and composer.json (require/require-dev,
+skipping platform pseudo-packages like `php`/`ext-*`/`lib-*`). It does not
+itself fetch registry metadata (licence/hash of the resolved version) --
 those fields are populated only where already available on disk (e.g. an
-existing lockfile hash), and left null otherwise rather than guessed. This
-is a documented limitation, not silently overclaimed completeness (Part
+existing lockfile hash) or via `provenance/transitive.py`'s opt-in
+`--resolve-transitive` real registry lookups (PyPI and npm only; Cargo/
+Composer dependencies are recorded `unresolved` with an honest reason if
+`--resolve-transitive` is used, since no crates.io/Packagist lookup is
+implemented yet), and left null otherwise rather than guessed. This is a
+documented limitation, not silently overclaimed completeness (Part
 LXVIII: an untested/unresolved field is UNKNOWN, not PASS).
 
-Since the 2026-08-22 integration research, `to_spdx()`/`to_cyclonedx()`
-build real `spdx_tools`/`cyclonedx-python-lib` model objects and serialize
-through each library's own converter, rather than hand-typing JSON that
-merely resembles the format -- the output is schema-validated for real
-(`validate_full_spdx_document()` / `make_schemabased_validator()`, both
-exercised in tests/unit/test_sbom.py). Discovery (`discover_dependencies`)
-is unchanged; only the serialization half these libraries are for was
-replaced.
+`to_spdx()`/`to_cyclonedx()` build real `spdx_tools`/`cyclonedx-python-lib`
+model objects and serialize through each library's own converter, rather
+than hand-typing JSON that merely resembles the format -- the output is
+schema-validated for real (`validate_full_spdx_document()` /
+`make_schemabased_validator()`, both exercised in tests/unit/test_sbom.py).
 """
 
 from __future__ import annotations
@@ -35,8 +39,29 @@ if TYPE_CHECKING:
     from cleanroom.provenance.transitive import TransitiveResolution
 
 
+_PURL_ECOSYSTEM_PREFIXES = {"pkg:npm/": "npm", "pkg:cargo/": "cargo", "pkg:composer/": "composer"}
+
+
 def _dependency_ecosystem(purl: str | None) -> str:
-    return "npm" if (purl or "").startswith("pkg:npm/") else "pypi"
+    for prefix, ecosystem in _PURL_ECOSYSTEM_PREFIXES.items():
+        if (purl or "").startswith(prefix):
+            return ecosystem
+    return "pypi"
+
+
+def _load_toml(path: Path) -> dict[str, Any]:
+    """Real TOML parsing (stdlib `tomllib` on 3.11+, the `tomli` backport
+    on 3.10) -- not a hand-rolled regex, since Cargo.toml's dependency
+    tables use shapes a `pyproject.toml`-style `dependencies = [...]` list
+    regex can't represent (bare string versions, inline tables with a
+    `version` key, path/git-only entries with no version at all)."""
+    try:
+        import tomllib  # type: ignore[import-not-found]
+    except ModuleNotFoundError:
+        import tomli as tomllib  # type: ignore[import-not-found, no-redef]
+
+    with open(path, "rb") as f:
+        return tomllib.load(f)
 
 
 @dataclass
@@ -91,6 +116,49 @@ def _parse_package_json(path: Path) -> list[Dependency]:
     return deps
 
 
+def _parse_cargo_toml(path: Path) -> list[Dependency]:
+    deps = []
+    try:
+        data = _load_toml(path)
+    except (OSError, ValueError):
+        return deps
+    for section in ("dependencies", "dev-dependencies", "build-dependencies"):
+        for name, value in (data.get(section) or {}).items():
+            if isinstance(value, str):
+                version = value
+            elif isinstance(value, dict):
+                version = value.get("version")
+            else:
+                version = None
+            if version is None:
+                # A path/git-only dependency (no registry version) isn't a
+                # third-party component this SBOM can meaningfully name --
+                # skipped rather than listed with a fabricated version.
+                continue
+            deps.append(Dependency(name=name, version=str(version), source_manifest=path.name, purl=f"pkg:cargo/{name}"))
+    return deps
+
+
+_COMPOSER_PLATFORM_PACKAGE_RE = re.compile(r"^(php|hhvm|ext-|lib-)")
+
+
+def _parse_composer_json(path: Path) -> list[Dependency]:
+    deps = []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+    except json.JSONDecodeError:
+        return deps
+    for section in ("require", "require-dev"):
+        for name, version in (data.get(section) or {}).items():
+            if _COMPOSER_PLATFORM_PACKAGE_RE.match(name):
+                # A platform requirement (PHP itself, an HHVM version, a
+                # PHP extension, a system library) -- not an installable
+                # third-party package this SBOM can list a component for.
+                continue
+            deps.append(Dependency(name=name, version=str(version), source_manifest=path.name, purl=f"pkg:composer/{name}"))
+    return deps
+
+
 def discover_dependencies(root: Path) -> list[Dependency]:
     deps: list[Dependency] = []
     req = root / "requirements.txt"
@@ -102,6 +170,12 @@ def discover_dependencies(root: Path) -> list[Dependency]:
     package_json = root / "package.json"
     if package_json.is_file():
         deps.extend(_parse_package_json(package_json))
+    cargo_toml = root / "Cargo.toml"
+    if cargo_toml.is_file():
+        deps.extend(_parse_cargo_toml(cargo_toml))
+    composer_json = root / "composer.json"
+    if composer_json.is_file():
+        deps.extend(_parse_composer_json(composer_json))
     return deps
 
 

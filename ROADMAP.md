@@ -570,9 +570,18 @@ change that should be evaluated on its own.
   large-scale or statistically representative benchmark -- treat the
   numbers as a real signal on these specific cases, not a general
   accuracy claim.
-- **Only Python + Node manifests** are parsed by licence discovery and SBOM
-  generation; `Cargo.toml`/`composer.json` are read for licence discovery
-  only, not yet for SBOM dependency listing.
+- **`Cargo.toml`/`composer.json` direct dependencies** are now also parsed
+  for SBOM generation (real `tomllib`/`tomli`-backed TOML parsing for
+  Cargo, not a regex -- Cargo's dependency tables have shapes a
+  `pyproject.toml`-style list regex can't represent), not just licence
+  discovery as before. Path/git-only Cargo dependencies (no registry
+  version) and Composer platform requirements (`php`, `ext-*`, `lib-*`)
+  are correctly excluded rather than listed with a fabricated version.
+  `--resolve-transitive` still only walks PyPI/npm -- a Cargo/Composer
+  direct dependency is now recorded `unresolved` with an honest "not yet
+  implemented for the cargo/composer ecosystem" reason if
+  `--resolve-transitive` is used, rather than silently misrouted through
+  the PyPI lookup and reported as an ordinary "not found".
 - **`cleanroom ai-suggest`'s deployment-shape classification is a
   heuristic** based on Hub `library_name`/file extensions/`pipeline_tag`,
   not a guarantee -- it reports `unknown` rather than guessing whenever
@@ -666,3 +675,7 @@ change that should be evaluated on its own.
     landscape" above. Revisit only if a way to make this reliably
     installable across platforms materialises, or if the maintainer is
     willing to require a system-level `libmagic` install.
+13. ~~`Cargo.toml`/`composer.json` for SBOM dependency listing, not just
+    licence discovery~~ -- **done** (see "SBOM/dependency discovery"
+    above); `--resolve-transitive` for these two ecosystems remains
+    unimplemented and is now reported honestly as such.

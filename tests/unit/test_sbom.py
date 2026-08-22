@@ -27,6 +27,69 @@ def test_discover_package_json(tmp_path: Path):
     assert any(d.name == "react" and d.purl == "pkg:npm/react" for d in deps)
 
 
+def test_discover_cargo_toml_reads_bare_string_and_inline_table_versions():
+    """Cargo.toml dependency values come in two real shapes: a bare
+    version-requirement string, or an inline table with its own `version`
+    key (e.g. alongside `features = [...]`) -- both must resolve to a real
+    Dependency, not just the string form."""
+    from cleanroom.provenance.sbom import _parse_cargo_toml
+
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        cargo_path = Path(tmp) / "Cargo.toml"
+        cargo_path.write_text(
+            '[dependencies]\n'
+            'serde = "1.0"\n'
+            'tokio = { version = "1.28", features = ["full"] }\n',
+            encoding="utf-8",
+        )
+        deps = _parse_cargo_toml(cargo_path)
+    by_name = {d.name: d for d in deps}
+    assert by_name["serde"].version == "1.0"
+    assert by_name["serde"].purl == "pkg:cargo/serde"
+    assert by_name["tokio"].version == "1.28"
+
+
+def test_discover_cargo_toml_skips_path_only_dependencies_without_fabricating_a_version():
+    from cleanroom.provenance.sbom import _parse_cargo_toml
+
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        cargo_path = Path(tmp) / "Cargo.toml"
+        cargo_path.write_text('[dependencies]\nlocal-crate = { path = "../local-crate" }\n', encoding="utf-8")
+        deps = _parse_cargo_toml(cargo_path)
+    assert deps == []
+
+
+def test_discover_composer_json_reads_require_and_skips_platform_packages():
+    """composer.json's `require` mixes real installable packages with
+    platform requirements (the PHP version itself, extensions, system
+    libraries) -- only the former are real third-party components an SBOM
+    should list."""
+    from cleanroom.provenance.sbom import _parse_composer_json
+
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        composer_path = Path(tmp) / "composer.json"
+        composer_path.write_text(
+            json.dumps({"require": {"php": ">=8.1", "ext-mbstring": "*", "guzzlehttp/guzzle": "^7.0"}}),
+            encoding="utf-8",
+        )
+        deps = _parse_composer_json(composer_path)
+    assert len(deps) == 1
+    assert deps[0].name == "guzzlehttp/guzzle"
+    assert deps[0].version == "^7.0"
+    assert deps[0].purl == "pkg:composer/guzzlehttp/guzzle"
+
+
+def test_discover_dependencies_reads_cargo_toml_and_composer_json(tmp_path: Path):
+    (tmp_path / "Cargo.toml").write_text('[dependencies]\nserde = "1.0"\n', encoding="utf-8")
+    (tmp_path / "composer.json").write_text(json.dumps({"require": {"guzzlehttp/guzzle": "^7.0"}}), encoding="utf-8")
+    deps = discover_dependencies(tmp_path)
+    names = {d.name for d in deps}
+    assert names == {"serde", "guzzlehttp/guzzle"}
+
+
 def test_spdx_output_has_one_package_per_dependency_plus_root():
     deps = [Dependency(name="click", version="8.1.7", purl="pkg:pypi/click")]
     doc = to_spdx("demo", "0.1.0", deps)

@@ -33,6 +33,24 @@ _TIMEOUT_SECONDS = 10
 _MAX_DEPTH = 5  # guards against pathological or (in principle) circular dependency graphs
 _USER_AGENT = "clean-room-coding/0.1.0 (+https://github.com/khhvmc5g6f-eng/clean-room-coding)"
 
+# Ecosystems this module actually knows how to query a real registry for.
+# `sbom.discover_dependencies()` also lists Cargo/Composer direct
+# dependencies now, but there's no crates.io/Packagist lookup implemented
+# here yet -- those are recorded as unresolved with an honest reason
+# rather than silently misrouted through the PyPI lookup (which would
+# otherwise happen by falling through a same-as-before binary
+# npm-or-not-npm check, and would just 404 while looking like a genuine
+# "package not found" rather than "ecosystem not supported").
+_SUPPORTED_ECOSYSTEMS = {"pypi", "npm"}
+_PURL_ECOSYSTEM_PREFIXES = {"pkg:npm/": "npm", "pkg:cargo/": "cargo", "pkg:composer/": "composer"}
+
+
+def _ecosystem_from_purl(purl: str | None) -> str:
+    for prefix, ecosystem in _PURL_ECOSYSTEM_PREFIXES.items():
+        if (purl or "").startswith(prefix):
+            return ecosystem
+    return "pypi"
+
 
 def _ssl_context() -> ssl.SSLContext | None:
     """Prefer `certifi`'s CA bundle over whatever `ssl.create_default_context()`
@@ -198,7 +216,7 @@ def resolve_transitive(deps: list[Any], *, max_depth: int = _MAX_DEPTH) -> Trans
     queue: list[tuple[str, str | None, str, int, str]] = []
 
     for dep in deps:
-        ecosystem = "npm" if (dep.purl or "").startswith("pkg:npm/") else "pypi"
+        ecosystem = _ecosystem_from_purl(dep.purl)
         queue.append((dep.name, dep.version, ecosystem, 1, "(direct)"))
 
     while queue:
@@ -207,6 +225,10 @@ def resolve_transitive(deps: list[Any], *, max_depth: int = _MAX_DEPTH) -> Trans
         if key in seen:
             continue
         seen.add(key)
+
+        if ecosystem not in _SUPPORTED_ECOSYSTEMS:
+            result.unresolved.append({"name": name, "ecosystem": ecosystem, "reason": f"transitive resolution not yet implemented for the {ecosystem} ecosystem"})
+            continue
 
         if depth > max_depth:
             result.unresolved.append({"name": name, "ecosystem": ecosystem, "reason": f"max resolution depth ({max_depth}) exceeded"})

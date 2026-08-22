@@ -28,6 +28,7 @@ dependencies = [
   "ast-grep-py>=0.45",
   "spdx-tools>=0.8.5",
   "cyclonedx-python-lib>=11.12",
+  "tomli>=2.0.1; python_version<\"3.11\"",
 ]
 
 [project.optional-dependencies]

@@ -159,3 +159,20 @@ def test_npm_lookup_falls_back_to_legacy_shasum_without_integrity(monkeypatch):
 def test_npm_integrity_to_digest_returns_none_for_malformed_input():
     assert transitive._npm_integrity_to_digest(None) is None
     assert transitive._npm_integrity_to_digest("not-a-real-sri-string") is None
+
+
+def test_resolve_transitive_reports_unsupported_ecosystem_honestly_not_as_a_pypi_404(monkeypatch):
+    """A Cargo/Composer direct dependency has no registry lookup
+    implemented in this module -- it must be recorded unresolved with an
+    honest "not yet implemented for this ecosystem" reason, never silently
+    routed through the PyPI lookup (which would misreport a real gap as an
+    ordinary "package not found")."""
+    def unexpected_pypi_lookup(name, version):
+        raise AssertionError("must not attempt a PyPI lookup for a non-PyPI ecosystem")
+
+    monkeypatch.setattr(transitive, "_pypi_lookup", unexpected_pypi_lookup)
+    deps = [Dependency(name="serde", version="1.0", purl="pkg:cargo/serde")]
+    result = transitive.resolve_transitive(deps)
+
+    assert result.resolved == []
+    assert result.unresolved == [{"name": "serde", "ecosystem": "cargo", "reason": "transitive resolution not yet implemented for the cargo ecosystem"}]
