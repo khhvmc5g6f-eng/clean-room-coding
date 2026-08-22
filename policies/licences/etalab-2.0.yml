@@ -1,0 +1,71 @@
+# Licence policy pack: etalab-2.0 (Licence Ouverte / Open Licence v2.0, France)
+# Verified against the primary source (data.gouv.fr's own licence page,
+# https://www.data.gouv.fr/pages/legal/licences/etalab-2.0/, which
+# https://www.etalab.gouv.fr/licence-ouverte-open-licence/ now redirects
+# to) and cross-checked against SPDX's own license-list-data entry.
+#
+# Like OGL-UK-3.0, this is a public sector information/data licence, not a
+# software OSS licence -- see that pack's header comment for why it's
+# still recognised here. France's own "Licence Ouverte" is the direct
+# French-jurisdiction analogue of the UK's OGL.
+
+spdx_id: etalab-2.0
+family: public_sector_data
+osi_approved: false
+fsf_libre: false
+copyleft: none
+
+summary: >
+  The French government's standard open licence for public administration
+  data (Etalab / DISIC), version 2.0. Grants a worldwide, royalty-free,
+  non-exclusive right to reproduce, copy, adapt, modify, extract,
+  transform, distribute, republish, transmit and commercially exploit the
+  Information, alone or combined with other data, for an unlimited
+  duration. Not a share-alike licence. Explicitly stated to be compatible
+  with the UK's Open Government Licence, Creative Commons Attribution
+  (CC-BY), the Open Data Commons Attribution License (ODC-BY), and the
+  earlier Licence Ouverte v1.0.
+
+key_obligations:
+  - "Mention the paternity of the Information: its source (at minimum the name of the Grantor) and the date of the last update of the reused Information."
+  - "Attribution may be satisfied by providing a URL to the Information rather than restating the source/date inline."
+  - "Where the Information includes personal data, comply with the applicable data protection legal framework -- this licence does not itself authorise personal-data reuse beyond what that framework permits."
+
+distribution_triggers: [source, binary, saas, library, container]
+network_use_triggers_obligations: false
+patent_grant: false  # not addressed in the licence text
+trademark_grant: false
+reverse_engineering_restriction: false  # the licence text imposes no reverse-engineering/study restriction
+
+combination_notes: >
+  The licence's own text states it is compatible with the UK Open
+  Government Licence, Creative Commons Attribution (CC-BY), the Open Data
+  Commons Attribution License (ODC-BY), and the earlier Licence Ouverte
+  v1.0 -- an adaptation or combined work may be distributed under a
+  different licence provided the attribution obligation toward the
+  original Information is still discharged, the same non-share-alike
+  posture as OGL-UK-3.0.
+
+clean_room_relevance: >
+  France is one of the jurisdictions with a confirmed sui generis database
+  right (this project's `database_rights` heuristic covers gb/uk/fr/de/eu)
+  -- reference material licensed under etalab-2.0 that includes a
+  substantial dataset should be checked against that heuristic separately
+  from ordinary copyright/attribution compliance, exactly as for
+  OGL-UK-3.0.
+
+structured_issue_prompts:
+  - "Has the attribution actually included the source (at minimum the Grantor's name) and the date of last update, as the licence requires -- not just a generic 'open data' credit?"
+  - "Does the reference material include personal data, and if so has the applicable data protection framework (not just this licence) been checked separately?"
+  - "Is any part of the reference material's protection actually French database right rather than copyright -- has the 'database_rights' finding for this jurisdiction been reviewed alongside this licence pack?"
+  - "Is the version actually in force etalab-2.0, or the earlier Licence Ouverte v1.0 (a different, unpacked text in this installation)?"
+
+uncertainty_notes: >
+  Like OGL-UK-3.0, this is a public sector data/information licence, not a
+  software licence in the OSI/FSF sense -- "osi_approved"/"fsf_libre" are
+  set false here as an honest "not applicable/not found" rather than
+  fabricated (confirmed via SPDX's own license-list-data: `isOsiApproved:
+  false`, `isFsfLibre` not present). Whether a specific dataset's
+  attribution actually satisfies the licence, and whether French database
+  right also attaches, are questions this tool can flag but not resolve --
+  that remains a matter for qualified counsel.

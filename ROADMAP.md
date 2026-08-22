@@ -25,12 +25,14 @@ see "External review findings" and "Competitive landscape" below.
 - Deterministic licence discovery (LICENSE/NOTICE/COPYING files, SPDX
   headers, `package.json`/`pyproject.toml`/`Cargo.toml`/`composer.json`
   manifests, with symlink/non-regular-file safety) and policy evaluation,
-  with 6 licence packs: MIT, Apache-2.0, GPL-3.0-only, AGPL-3.0-only,
-  BUSL-1.1 (this project's own licence), and OGL-UK-3.0 (the UK Open
-  Government Licence -- a real, SPDX-recognised public sector data/
-  information licence, not a conventional OSS software licence; see
-  "Update (2026-08-22): OGL-UK-3.0 pack, and a real correctness fix it
-  surfaced" below).
+  with 10 licence packs: MIT, Apache-2.0, GPL-3.0-only, AGPL-3.0-only,
+  BUSL-1.1 (this project's own licence), EUPL-1.2 (the EU's own strong
+  reciprocal-copyleft software licence, OSI- and FSF-approved), and four
+  public sector data/information licences (OGL-UK-3.0 for the UK,
+  etalab-2.0 for France, and Germany's DL-DE-BY-2.0/DL-DE-ZERO-2.0 pair)
+  -- see "Update (2026-08-22): OGL-UK-3.0 pack, and a real correctness fix
+  it surfaced" and "Update (2026-08-22): three more country licence
+  packs" below.
 - SPDX expression parsing backed by the real `license-expression` library
   (`AND`/`OR`/`WITH`, the full real SPDX licence list via
   `get_spdx_licensing()`, `LicenseRef-*` always flagged for manual review)
@@ -356,6 +358,40 @@ the previous GREEN_WITH_CONDITIONS. This fix benefits every currently-
 unpacked-but-SPDX-recognised copyleft licence a project might reference
 (LGPL variants, MPL-2.0, EPL-2.0, EUPL, CDDL, OSL-3.0, etc.), not just
 OGL or EUPL specifically.
+
+**Update (2026-08-22): three more country licence packs, plus EUPL-1.2.**
+Following the OGL-UK-3.0 pack above, added the direct France/Germany
+analogues -- `etalab-2.0.yml` (France's Licence Ouverte, verified against
+data.gouv.fr's own licence page), `DL-DE-BY-2.0.yml` and
+`DL-DE-ZERO-2.0.yml` (Germany's attribution/no-attribution public-data
+licence pair, verified against govdata.de) -- all three the same
+`family: public_sector_data` shape as OGL-UK-3.0, none copyleft, none
+OSI/FSF-approved (confirmed via SPDX's own `license-list-data`, not
+assumed). Also added `EUPL-1.2.yml`, a genuinely different kind of
+addition: the European Union Public Licence is a real copyleft SOFTWARE
+licence (confirmed OSI-approved directly on opensource.org, "Approved:
+July 13, 2017", and FSF-libre per SPDX's own dataset), verified by
+fetching the actual licence text and full-text-searching it (confirmed:
+no occurrence of "network"/"SaaS" anywhere, unlike AGPL-3.0; a general
+breach-termination clause in Article 12, not a patent-specific
+retaliation clause like Apache-2.0/GPL-3.0-only's). EUPL-1.2 also
+directly demonstrates the `_distribution`/`_linking` fix from the OGL
+pass: with this pack now present, a EUPL-1.2 reference gets the specific
+copyleft-distribution-trigger AMBER finding rather than the generic
+"no matching pack" one. 4 new/updated unit tests plus a real end-to-end
+`cleanroom licence` run confirming EUPL-1.2 concludes at high confidence
+with its real obligations surfaced.
+
+Not pursued in this pass, honestly: Japan has no SPDX-recognised
+government open-data licence (the Government of Japan Standard Terms of
+Use has no SPDX identifier, so building a pack for it would mean
+inventing an `spdx_id` this tool's own discovery/policy machinery has no
+real way to recognise -- `discover()`'s confidence is driven entirely by
+`license-expression`'s SPDX symbol table); and US federal government
+works are public domain by statute (17 U.S.C. Sec. 105), not by a
+licence, so there is no single clean "US government licence pack" to
+build the same way -- SPDX only has narrower, agency-specific identifiers
+(`NIST-PD`, `NASA-1.3`, `NTIA-PD`) for this, not a general one.
 
 ## Competitive landscape (researched 2026-08-22)
 

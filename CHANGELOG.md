@@ -852,4 +852,50 @@ detail:
   `linking`, where it previously reported a false `GREEN_WITH_CONDITIONS`.
 - 2 new regression tests confirming this exact case.
 
+### Added (twenty-third pass — three more country licence packs, plus EUPL-1.2)
+
+- `policies/licences/etalab-2.0.yml` for France's Licence Ouverte / Open
+  Licence v2.0 (Etalab), verified against its primary source
+  (data.gouv.fr's own licence page). Same `family: public_sector_data`
+  shape as OGL-UK-3.0, non-copyleft, explicitly stated by its own text to
+  be compatible with the UK OGL, CC-BY, and ODC-BY.
+- `policies/licences/DL-DE-BY-2.0.yml` and `DL-DE-ZERO-2.0.yml` for
+  Germany's attribution/no-attribution public-data licence pair
+  (Datenlizenz Deutschland), verified against govdata.de. The Zero
+  variant's `key_obligations` honestly records that it imposes none at
+  all -- the licence's genuinely notable feature, not an oversight.
+- `policies/licences/EUPL-1.2.yml` for the European Union Public Licence
+  v1.2 -- unlike the three data-licence packs above, a real copyleft
+  SOFTWARE licence. Verified by fetching the actual licence text (via
+  OSI's own mirror) and full-text-searching it directly rather than
+  summarising an excerpt: confirmed no occurrence of "network"/"SaaS"
+  anywhere (so `network_use_triggers_obligations: false`, unlike
+  AGPL-3.0), a general breach-termination clause in Article 12 (not a
+  patent-specific retaliation clause, so `patent_retaliation_clause:
+  false`), and an express patent grant. OSI approval confirmed directly
+  on opensource.org ("Approved: July 13, 2017"); both `osi_approved` and
+  `fsf_libre` cross-checked against SPDX's own `license-list-data`
+  (`isOsiApproved: true`, `isFsfLibre: true`).
+- All four new packs' `osi_approved`/`fsf_libre` fields were checked
+  against SPDX's own `license-list-data` JSON rather than assumed --
+  confirming `false`/`false` for the three data licences (genuinely not
+  applicable/not found, not a gap) and `true`/`true` for EUPL-1.2.
+- EUPL-1.2 directly demonstrates the `_distribution`/`_linking` fix from
+  the same day's earlier pass: with this pack now present, a EUPL-1.2
+  reference gets the specific copyleft-distribution-trigger AMBER finding
+  rather than the generic "no matching policy pack" one (the two earlier
+  regression tests for that fix were switched to MPL-2.0, a real
+  SPDX-recognised copyleft licence still genuinely unpacked, so they keep
+  testing the no-pack case they were written for).
+- 5 new/updated unit tests (per-pack structured facts for all four, plus
+  the EUPL-1.2-now-has-a-pack distinction) and a real end-to-end
+  `cleanroom licence` run confirming EUPL-1.2 concludes at high confidence
+  with its real, verified obligations surfaced.
+- Not pursued, honestly: Japan has no SPDX-recognised government
+  open-data licence to build a pack around; US federal government works
+  are public domain by statute (17 U.S.C. Sec. 105), not by a licence, so
+  there's no single "US government licence pack" analogous to the other
+  four -- SPDX only has narrower agency-specific identifiers (`NIST-PD`,
+  `NASA-1.3`, `NTIA-PD`) for this.
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD

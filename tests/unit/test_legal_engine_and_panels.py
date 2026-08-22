@@ -123,13 +123,12 @@ def test_distribution_amber_not_green_when_reference_licence_has_no_pack():
     lookup and treated a term with NO matching policy pack exactly like a
     term confirmed non-copyleft -- both silently fell through to the same
     GREEN_WITH_CONDITIONS fallback. A real, SPDX-recognised copyleft
-    licence with no pack yet (e.g. EUPL-1.2, which `license-expression`
-    already resolves at high confidence via `cleanroom licence`, but which
-    has no policies/licences/EUPL-1.2.yml as of this test) must report
-    AMBER "unknown to this tool", exactly like `_patent_risk`/
-    `_trademark_risk` already do via the same `_licence_terms_with_packs`
-    helper -- never a false-clean GREEN."""
-    bundle = CaseBundle(output_distribution_model=["binary"], reference_licence_ids=["EUPL-1.2"])
+    licence with no pack (MPL-2.0, which `license-expression` already
+    resolves at high confidence via `cleanroom licence`, but which has no
+    policies/licences/MPL-2.0.yml) must report AMBER "unknown to this
+    tool", exactly like `_patent_risk`/`_trademark_risk` already do via the
+    same `_licence_terms_with_packs` helper -- never a false-clean GREEN."""
+    bundle = CaseBundle(output_distribution_model=["binary"], reference_licence_ids=["MPL-2.0"])
     findings = {f["issue"]: f for f in run(bundle)}
     assert findings["distribution"]["decision_state"] == "AMBER"
     assert "no matching policy pack" in findings["distribution"]["finding"]
@@ -137,10 +136,26 @@ def test_distribution_amber_not_green_when_reference_licence_has_no_pack():
 
 def test_linking_amber_not_green_when_reference_licence_has_no_pack():
     """Same regression as `_distribution`, for `_linking`."""
-    bundle = CaseBundle(output_distribution_model=["library"], reference_licence_ids=["EUPL-1.2"])
+    bundle = CaseBundle(output_distribution_model=["library"], reference_licence_ids=["MPL-2.0"])
     findings = {f["issue"]: f for f in run(bundle)}
     assert findings["linking"]["decision_state"] == "AMBER"
     assert "no matching policy pack" in findings["linking"]["finding"]
+
+
+def test_distribution_amber_with_specific_trigger_when_eupl_pack_exists():
+    """EUPL-1.2 (added the same pass as the fix above) closes its own
+    instance of the gap: with a real pack now present, a EUPL-1.2
+    reference gets the MORE SPECIFIC copyleft-distribution-trigger AMBER
+    finding, not just the generic 'unknown pack' one."""
+    bundle = CaseBundle(output_distribution_model=["binary"], reference_licence_ids=["EUPL-1.2"])
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["distribution"]["decision_state"] == "AMBER"
+    assert "copyleft distribution triggers" in findings["distribution"]["finding"]
+
+    bundle2 = CaseBundle(output_distribution_model=["library"], reference_licence_ids=["EUPL-1.2"])
+    findings2 = {f["issue"]: f for f in run(bundle2)}
+    assert findings2["linking"]["decision_state"] == "AMBER"
+    assert "strong copyleft" in findings2["linking"]["finding"]
 
 
 def test_derivative_work_question_unknown_without_requirement_graph():

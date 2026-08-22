@@ -78,9 +78,10 @@ machine-readable output) over re-deriving its logic by hand.
    under `/policies/licences/<SPDX-ID>.yml` only when you need it
    (progressive disclosure -- don't load all of them up front; v0.1 ships
    MIT, Apache-2.0, GPL-3.0-only, AGPL-3.0-only, BUSL-1.1 -- the licence
-   this project itself ships under -- and OGL-UK-3.0, the UK Open
-   Government Licence, a public sector data/information licence rather
-   than a software one).
+   this project itself ships under -- EUPL-1.2 (the EU's own strong-
+   copyleft software licence), and four public sector data/information
+   licences rather than software ones: OGL-UK-3.0 (UK), etalab-2.0
+   (France), and Germany's DL-DE-BY-2.0/DL-DE-ZERO-2.0 pair).
 
 5. **Jurisdiction** -- `cleanroom jurisdiction` builds `JURISDICTION_MATRIX.json`
    from `.cleanroom.yml`'s configured markets. Never assume a single

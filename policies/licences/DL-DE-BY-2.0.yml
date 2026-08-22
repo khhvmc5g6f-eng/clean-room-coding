@@ -1,0 +1,64 @@
+# Licence policy pack: DL-DE-BY-2.0 (Datenlizenz Deutschland - Namensnennung - Version 2.0)
+# Verified against the primary source (https://www.govdata.de/dl-de/by-2-0,
+# the German government's own open-data portal) and cross-checked against
+# SPDX's own license-list-data entry.
+#
+# Like OGL-UK-3.0/etalab-2.0, this is a public sector information/data
+# licence, not a software OSS licence -- Germany's direct analogue of the
+# UK's OGL and France's Licence Ouverte. See its companion,
+# DL-DE-ZERO-2.0.yml, for the no-attribution variant of the same scheme.
+
+spdx_id: DL-DE-BY-2.0
+family: public_sector_data
+osi_approved: false
+fsf_libre: false
+copyleft: none
+
+summary: >
+  A German government open-data licence (published via govdata.de)
+  permitting both commercial and non-commercial use of licensed data and
+  metadata: copying, printing, presenting, altering, processing and
+  transmitting to third parties; merging with other data to form new,
+  independent datasets; integration into internal/external business
+  processes, products and applications on public or non-public networks.
+  Not a share-alike licence -- modifications must be marked, but a
+  derivative dataset is not required to carry the same licence.
+
+key_obligations:
+  - "Where the data holder has provided the required elements, the source note must include: the name of the provider; the annotation 'Data licence Germany - attribution - Version 2.0' or the short form 'dl-de/by-2-0' referring to the licence text; and a reference (URI) to the dataset."
+  - "This attribution obligation applies only to the extent the data holder actually supplied these elements -- it does not require inventing an attribution the provider never gave."
+
+distribution_triggers: [source, binary, saas, library, container]
+network_use_triggers_obligations: false
+patent_grant: false  # not mentioned in the licence text
+trademark_grant: false
+reverse_engineering_restriction: false  # the licence text imposes no reverse-engineering/study restriction
+
+combination_notes: >
+  Published as one of a pair with DL-DE-ZERO-2.0 (see that pack) on the
+  same govdata.de portal -- analogous to the CC-BY / CC0 relationship,
+  where DL-DE-ZERO-2.0 drops the attribution requirement entirely rather
+  than imposing a share-alike obligation on either variant.
+
+clean_room_relevance: >
+  Germany is one of the jurisdictions with a confirmed sui generis
+  database right (this project's `database_rights` heuristic covers
+  gb/uk/fr/de/eu) -- reference material licensed under DL-DE-BY-2.0 that
+  includes a substantial dataset should be checked against that heuristic
+  separately from ordinary attribution compliance.
+
+structured_issue_prompts:
+  - "Did the data holder actually provide all three required source-note elements (provider name, licence annotation, dataset URI) -- and if not, has that been recorded rather than an attribution being invented?"
+  - "Is this specific dataset actually published under DL-DE-BY-2.0, or under the no-attribution DL-DE-ZERO-2.0 variant?"
+  - "Is any part of the reference material's protection actually German database right rather than copyright -- has the 'database_rights' finding for this jurisdiction been reviewed alongside this licence pack?"
+
+uncertainty_notes: >
+  Like OGL-UK-3.0/etalab-2.0, this is a public sector data/information
+  licence, not a software licence in the OSI/FSF sense -- "osi_approved"/
+  "fsf_libre" are set false here as an honest "not applicable/not found"
+  rather than fabricated (confirmed via SPDX's own license-list-data:
+  `isOsiApproved: false`, `isFsfLibre` not present). No exclusions (e.g.
+  for personal data or third-party rights) were located in this pack's
+  primary source at the time of writing -- absence of a stated exclusion
+  here reflects what was verified, not a claim that none exist in the
+  full licence text.

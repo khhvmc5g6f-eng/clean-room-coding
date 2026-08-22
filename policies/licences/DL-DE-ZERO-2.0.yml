@@ -1,0 +1,60 @@
+# Licence policy pack: DL-DE-ZERO-2.0 (Datenlizenz Deutschland - Zero - Version 2.0)
+# Verified against the primary source (https://www.govdata.de/dl-de/zero-2-0,
+# the German government's own open-data portal) and cross-checked against
+# SPDX's own license-list-data entry.
+#
+# The public-domain-equivalent companion to DL-DE-BY-2.0.yml (see that
+# pack) -- same publisher, same permitted uses, but with no attribution
+# requirement at all.
+
+spdx_id: DL-DE-ZERO-2.0
+family: public_sector_data
+osi_approved: false
+fsf_libre: false
+copyleft: none
+
+summary: >
+  A German government open-data licence (published via govdata.de,
+  paired with DL-DE-BY-2.0) that permits use of the licensed data and
+  metadata for both commercial and non-commercial purposes "without
+  restrictions or conditions": copying, printing, presenting, altering,
+  processing and transmitting to third parties; merging with other data
+  to form new, independent datasets; integration into internal/external
+  business processes, products and applications on public or non-public
+  networks. Functions as a public-domain-equivalent instrument, not a
+  share-alike licence.
+
+key_obligations:
+  - "None are imposed by this licence itself -- no attribution, no notice-preservation, and no other condition on reuse. This is the licence's genuinely notable feature relative to its DL-DE-BY-2.0 sibling, not an oversight in this pack."
+
+distribution_triggers: [source, binary, saas, library, container]
+network_use_triggers_obligations: false
+patent_grant: false
+trademark_grant: false
+reverse_engineering_restriction: false
+
+combination_notes: >
+  Published as the no-attribution counterpart to DL-DE-BY-2.0 (see that
+  pack) on the same govdata.de portal -- analogous to the CC0 / CC-BY
+  relationship. Because it imposes no conditions at all, it does not
+  itself restrict combination with any other licence.
+
+clean_room_relevance: >
+  Germany is one of the jurisdictions with a confirmed sui generis
+  database right (this project's `database_rights` heuristic covers
+  gb/uk/fr/de/eu). Even though this licence itself imposes no conditions,
+  the underlying data can still be a protected database under that
+  separate regime -- "no licence conditions" is not the same fact as "no
+  rights attach to this data at all," and this pack's absence of
+  obligations should not be read as implying the latter.
+
+structured_issue_prompts:
+  - "Is this specific dataset actually published under DL-DE-ZERO-2.0, or under the attribution-requiring DL-DE-BY-2.0 variant -- the two are easy to conflate since they share a publisher and near-identical permitted-use language?"
+  - "Even with no licence-imposed obligations, is any part of the reference material's protection German database right -- has the 'database_rights' finding for this jurisdiction been reviewed regardless?"
+
+uncertainty_notes: >
+  A public sector data/information licence, not a software licence in the
+  OSI/FSF sense -- "osi_approved"/"fsf_libre" are set false here as an
+  honest "not applicable/not found" (confirmed via SPDX's own
+  license-list-data: `isOsiApproved: false`, `isFsfLibre` not present),
+  not a comment on the licence's genuine permissiveness.

@@ -1,0 +1,92 @@
+# Licence policy pack: EUPL-1.2 (European Union Public Licence v1.2)
+# Verified against the actual licence text (fetched via OSI's own mirror,
+# https://opensource.org/license/eupl-1-2, and directly text-searched for
+# "network"/"SaaS"/"patent"/"termination"/"trademark" rather than
+# summarised from an excerpt), the European Commission's own explainer
+# (https://interoperable-europe.ec.europa.eu/collection/eupl/news/understanding-eupl-v12),
+# and SPDX's own license-list-data (`isOsiApproved: true`, `isFsfLibre:
+# true` -- both independently confirmed, the OSI approval also directly on
+# OSI's own site: "Approved: July 13, 2017").
+#
+# Unlike the other public-sector-data packs added alongside this one
+# (OGL-UK-3.0, etalab-2.0, DL-DE-BY-2.0, DL-DE-ZERO-2.0), EUPL-1.2 is a
+# genuine copyleft SOFTWARE licence -- the European Commission's own
+# steward licence for software developed by public administrations.
+
+spdx_id: EUPL-1.2
+family: copyleft
+osi_approved: true
+fsf_libre: true
+copyleft: strong
+
+summary: >
+  A strong reciprocal copyleft software licence stewarded by the European
+  Commission. Distributing or communicating the Work (or a Derivative
+  Work) must be done under the EUPL (this version or a later one) unless
+  the Original Work is expressly restricted to this version only. When
+  the Work is distributed as Executable Code, the Licensor must also
+  provide a machine-readable copy of the Source Code (or indicate an
+  easily and freely accessible repository for it). Distinctively, Article
+  5's "Compatibility clause" lets a Derivative Work that merges EUPL code
+  with code under one of a fixed, named list of other licences be
+  distributed under that OTHER (compatible) licence instead of the EUPL --
+  a deliberate interoperability mechanism, not an accidental loophole.
+
+key_obligations:
+  - "When distributing the Work as Executable Code, provide a machine-readable copy of the Source Code along with it, or indicate in a notice following the copyright notice a repository where the Source Code is easily and freely accessible for as long as the Licensor continues to distribute/communicate the Work."
+  - "Keep intact all copyright, patent and trademark notices and all notices referring to the Licence and its disclaimer of warranties; include a copy of those notices and of the Licence itself with every copy distributed or communicated."
+  - "Cause any Derivative Work to carry prominent notices stating that the Work has been modified, and the date of modification."
+  - "Distribute or communicate the Work (or Derivative Works) under this same Licence (this version or a later one) -- UNLESS merging it into a larger work with code under one of Article 5's listed Compatible Licences, in which case that Compatible Licence may govern the combined work on distribution instead."
+  - "Do not impose any additional term or condition on the Work or Derivative Work that alters or restricts the Licence's own terms."
+
+distribution_triggers: [source, binary, library, container]
+network_use_triggers_obligations: false  # confirmed by a full-text search of the licence: no occurrence of "network", "software as a service", or "SaaS" anywhere in its text -- unlike AGPL-3.0, EUPL-1.2 has no network-use copyleft trigger
+patent_grant: true
+patent_retaliation_clause: false  # Article 12 has a general "terminates automatically upon any breach" clause, not a patent-litigation-specific retaliation/termination clause like Apache-2.0/GPL-3.0-only's
+trademark_grant: false  # the "Attribution right" clause requires PRESERVING existing trademark notices; it grants no right to USE the Licensor's trade names/trademarks/service marks
+reverse_engineering_restriction: false  # the licence text imposes no reverse-engineering/study restriction
+
+combination_notes: >
+  Article 5's Compatible Licences list (as published) includes: GPL v2 and
+  v3, AGPL v3, OSL v2.1 and v3.0, EPL v1.0, CeCILL v2.0 and v2.1, MPL v2,
+  LGPL v2.1 and v3, CC BY-SA 3.0 (for non-software works), EUPL v1.1 and
+  v1.2, and LiLiQ-R/LiLiQ-R+. This project's `legal/engine.py` heuristics
+  only check this pack's own `copyleft` field (a project-wide "is this
+  term copyleft" classification) -- they do not model the Article 5
+  escape hatch itself, so a EUPL-referencing project that has genuinely
+  exercised that clause (merged into, and redistributed under, one of the
+  listed Compatible Licences) may see an AMBER/RED finding from this tool
+  that a human reviewer, aware of the actual redistribution licence used,
+  can resolve differently. This is a real, documented limitation, not
+  something the engine currently distinguishes.
+
+clean_room_relevance: >
+  Before this pack existed, a project whose reference material concluded
+  as EUPL-1.2 (which `cleanroom licence` already recognises at high
+  confidence via `license-expression`'s SPDX symbol table) would have
+  received a FALSE `GREEN_WITH_CONDITIONS` from the `distribution` and
+  `linking` legal-engine heuristics, which previously treated any licence
+  term with no matching policy pack exactly like a term confirmed
+  non-copyleft (see CHANGELOG.md's "twenty-second pass" fix). This pack
+  closes that gap for EUPL-1.2 specifically -- the same central risk
+  GPL-3.0-only.yml documents applies here: rewriting or refactoring
+  EUPL-licensed source does not itself remove the EUPL's obligations if
+  the result remains a derivative of the original expression.
+
+structured_issue_prompts:
+  - "Was the reference implementation observed only to extract observable requirements, never source implementation detail, in the handoff bundle (Part XVI)?"
+  - "Did the implementation team have zero read access to the EUPL-licensed source (Zone I has no path to Zone R)?"
+  - "If the output is merged into a larger work with code under one of Article 5's listed Compatible Licences, is redistribution actually happening under that Compatible Licence rather than plain EUPL -- and has that been recorded, since this tool does not model that distinction itself?"
+  - "Has the Source Code (or an accessible repository reference to it) actually been made available alongside any distributed Executable Code, as Article 3 requires?"
+  - "Does the similarity report show any SUSPICIOUS or MATERIAL findings against this reference, and if so have they been resolved?"
+
+uncertainty_notes: >
+  Whether a given implementation is legally a Derivative Work of the
+  EUPL-licensed reference, versus an independently created work that
+  happens to be functionally compatible, is precisely the question a
+  competent clean-room process is built to support -- and precisely the
+  question this tool cannot answer by itself. `network_use_triggers_obligations`
+  reflects a direct full-text search of the licence at the time of
+  writing, not exhaustive external legal research into how EUPL-1.2 has
+  been interpreted in practice; treat it as a real but not
+  future-proofed fact.

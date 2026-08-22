@@ -32,10 +32,11 @@ block` (the default).
 ## Licence policy packs
 
 `/policies/licences/*.yml` (MIT, Apache-2.0, GPL-3.0-only, AGPL-3.0-only, BUSL-1.1,
-and OGL-UK-3.0 -- the UK Open Government Licence, a public sector data/
-information licence rather than a software one -- in v0.1) are FACTS + structured
-review questions, never verdicts -- `key_obligations`, `distribution_triggers`,
-`network_use_triggers_obligations`, `clean_room_relevance`,
+EUPL-1.2 -- the EU's own strong-copyleft software licence -- and four public sector
+data/information licences rather than software ones: OGL-UK-3.0 (UK), etalab-2.0
+(France), and Germany's DL-DE-BY-2.0/DL-DE-ZERO-2.0 pair, in v0.1) are FACTS +
+structured review questions, never verdicts -- `key_obligations`,
+`distribution_triggers`, `network_use_triggers_obligations`, `clean_room_relevance`,
 `structured_issue_prompts`, `uncertainty_notes`.
 Read the specific pack for the licence in play before advising a user on
 what a licence "requires" -- don't rely on general knowledge, since the
