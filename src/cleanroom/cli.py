@@ -834,16 +834,33 @@ def legal(ctx: Ctx, access_authority: str) -> None:
     project = ctx.load_project()
     licence_findings = [f.to_dict() for f in licence_discovery.discover(project.zone_r)]
     isolation_ok, _ = run_pathguard_self_test(project.zone_r, project.zone_h, project.zone_i)
+
+    similarity_path = project.root / "evidence" / "similarity-findings.json"
+    similarity_findings = jsonlib.loads(similarity_path.read_text(encoding="utf-8")) if similarity_path.is_file() else None
+
+    graph = RequirementGraph.load(project.root / "requirements.json")
+    requirement_classifications: dict[str, int] | None = None
+    if graph.nodes:
+        requirement_classifications = {}
+        for node in graph.nodes.values():
+            classification = node["classification"]
+            requirement_classifications[classification] = requirement_classifications.get(classification, 0) + 1
+
     j = project.config.data["jurisdiction"]
     markets = j["required_markets"] + [m for m in j.get("informational_markets", []) if m not in j["required_markets"]]
     findings: list[dict[str, Any]] = []
     for market in markets or ["unspecified"]:
+        pack_id = jurisdiction_resolver.COUNTRY_TO_PACK.get(market.lower())
+        pack = jurisdiction_resolver.load_pack(pack_id) if pack_id else None
         bundle = legal_engine.CaseBundle(
             access_authority=access_authority,
             licence_findings=licence_findings,
             isolation_test_passed=isolation_ok,
+            similarity_findings=similarity_findings,
             output_distribution_model=project.config.data.get("implementation", {}).get("distribution_model"),
             reference_licence_ids=[f.get("concluded") for f in licence_findings if f.get("concluded")],
+            requirement_classifications=requirement_classifications,
+            interoperability_permitted_acts=pack.get("interoperability_permitted_acts") if pack else None,
             jurisdiction=market,
         )
         findings.extend(legal_engine.run(bundle))

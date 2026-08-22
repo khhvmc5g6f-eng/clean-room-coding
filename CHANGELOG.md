@@ -260,4 +260,39 @@ detail:
   `COUNTRY_TO_PACK`; a regression test (`test_new_jurisdiction_markets_
   resolve_to_primary_tier`) now asserts all four resolve to `primary`.
 
+### Added (fourth pass — more legal-issue heuristics)
+
+- Four new real heuristics in the legal issue engine
+  (`src/cleanroom/legal/engine.py`), bringing coverage from 5 to 10 of
+  Part XLIV's 18 issues: `licence_obligations` (flags concluded licences
+  with copyleft obligations via each licence's policy pack), `distribution`
+  (flags configured distribution acts that overlap a reference/dependency
+  licence's copyleft distribution triggers), `derivative_work_question`
+  (grounded in the requirement graph's observable/source classification
+  plus any open MATERIAL similarity finding), and
+  `interoperability_provisions` (surfaces the jurisdiction pack's
+  documented interoperability-permitted-acts, if any). Each still ends in
+  `UNKNOWN` when its underlying facts are missing rather than guessing.
+- `licence/policy.py` gained a small public `split_terms()` helper
+  (extracted from `evaluate()`) so the new heuristics and the existing
+  policy evaluator share one compound-SPDX-expression splitter instead of
+  duplicating the logic.
+
+### Fixed (fourth pass)
+
+- **`cleanroom legal` never populated `similarity_findings`,
+  `requirement_classifications`, or `interoperability_permitted_acts` on
+  the `CaseBundle` it builds.** The `copying`/`substantiality` heuristic
+  has existed since v0.1 but was unreachable in practice: the CLI command
+  never read `evidence/similarity-findings.json`, so it always reported
+  `UNKNOWN` even after `cleanroom similarity` had produced real findings.
+  Fixed by loading that file (and the requirement graph, and the
+  resolved jurisdiction pack) in the `legal` command; confirmed with a new
+  CLI-level regression test
+  (`test_legal_picks_up_similarity_and_requirement_graph_facts`) that
+  writes a suspicious similarity finding and an unresolved
+  `source_implementation_detail` requirement node before running
+  `cleanroom legal`, and asserts both are reflected as `AMBER` rather than
+  `UNKNOWN`.
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD

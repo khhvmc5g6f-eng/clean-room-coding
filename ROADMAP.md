@@ -60,11 +60,20 @@ see "External review findings" and "Competitive landscape" below.
   unresolved suspicious/material finding.
 - SBOM generation (SPDX 2.3 + CycloneDX 1.5 JSON) from direct declared
   dependencies.
-- A heuristic legal-issue engine covering 5 of Part XLIV's 18 issues with
+- A heuristic legal-issue engine covering 10 of Part XLIV's 18 issues with
   real deterministic logic (`lawful_access`, `copyright_subsistence`,
-  `permitted_acts`, `copying`/`substantiality`, `saas_network_provision`);
-  the remaining 13 are honestly `UNKNOWN` pending more heuristics or human
-  review -- never fabricated.
+  `permitted_acts`, `copying`/`substantiality`, `saas_network_provision`,
+  `licence_obligations`, `distribution`, `derivative_work_question`,
+  `interoperability_provisions`); the remaining 8 (`patent_risk`,
+  `trademark_risk`, `database_rights`, `confidentiality`, `trade_secrets`,
+  `linking`, `contractual_permissions`, `protected_expression`) are
+  honestly `UNKNOWN` pending more heuristics or human review -- never
+  fabricated. `cleanroom legal` now actually feeds the engine real
+  similarity findings and requirement-graph classifications (see "Fixed"
+  below -- this was previously a silent gap: the CLI built every
+  `CaseBundle` without them, so `copying`/`substantiality` and
+  `derivative_work_question` reported `UNKNOWN` even after `cleanroom
+  similarity`/`cleanroom specify` had produced real facts).
 - Adversarial-counsel + judicial-review **prompt generation**
   (`cleanroom judge`) for whatever LLM harness answers them, plus
   deterministic decision-state aggregation that can never produce an
@@ -378,11 +387,13 @@ change that should be evaluated on its own.
   `cleanroom` as a library (e.g. an orchestration harness that spawns
   implementation subagents) can and should gate their file access through
   `PathGuard` directly; the CLI itself doesn't yet do this automatically.
-- **Legal-issue engine**: 13 of 18 issues (contractual_permissions,
-  protected_expression, interoperability_provisions, licence_obligations,
-  derivative_work_question, linking, distribution, patent_risk,
-  trademark_risk, database_rights, confidentiality, trade_secrets) have no
-  dedicated heuristic yet -- always `UNKNOWN`.
+- **Legal-issue engine**: 8 of 18 issues (`contractual_permissions`,
+  `protected_expression`, `linking`, `patent_risk`, `trademark_risk`,
+  `database_rights`, `confidentiality`, `trade_secrets`) have no dedicated
+  heuristic yet -- always `UNKNOWN`. Each would need facts this tool
+  cannot compute deterministically (actual contract/NDA text analysis,
+  patent/trademark/database-right registry lookups, or idea/expression-
+  merger judgment), not just a missing feature.
 - **Jurisdiction packs**: England & Wales, US federal, EU, France, Germany
   and Japan now exist (6 of the 6 originally mentioned in the design
   brief). Adding a further jurisdiction is still a real research task (see
@@ -447,9 +458,11 @@ change that should be evaluated on its own.
    detection is needed beyond the current fingerprint scanner.
 3. ~~`ast-grep-py`-based structural similarity for JS/Go/Rust/Java~~ --
    **done**, and extended to also cover TypeScript/TSX/Ruby/C/C++.
-4. More legal-issue heuristics (particularly `distribution`,
-   `licence_obligations`, `derivative_work_question`, since those close
-   the loop with the licence-discovery/policy layer that already exists).
+4. ~~More legal-issue heuristics (particularly `distribution`,
+   `licence_obligations`, `derivative_work_question`)~~ -- **done**, along
+   with `interoperability_provisions`. The remaining 8 issues each need
+   facts this tool cannot compute deterministically (see "Documented
+   limitations").
 5. spdx-tools / cyclonedx-python-lib to replace the hand-rolled SBOM
    serialization in `provenance/sbom.py` (both Apache-2.0; not yet
    started this pass).

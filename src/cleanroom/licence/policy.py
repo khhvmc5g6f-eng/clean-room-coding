@@ -48,6 +48,19 @@ def available_packs() -> list[str]:
     return sorted(p.stem for p in policy_dir().glob("*.yml"))
 
 
+def split_terms(spdx_expression: str) -> list[str]:
+    """Split a compound SPDX expression into simple identifier terms,
+    stripping the AND/OR/WITH operators and parens. Not a real boolean-
+    algebra parse (see licence/spdx.py for that) -- good enough for
+    looking up each term's individual policy pack, which is all callers
+    of this need it for."""
+    return [
+        t.strip()
+        for t in spdx_expression.replace("(", " ").replace(")", " ").split()
+        if t not in ("AND", "OR", "WITH")
+    ]
+
+
 def evaluate(
     spdx_expression: str | None,
     *,
@@ -68,11 +81,7 @@ def evaluate(
 
     # Simple identifiers only for allow/deny matching in v0.1; compound
     # expressions are evaluated term-by-term.
-    terms = [
-        t.strip()
-        for t in spdx_expression.replace("(", " ").replace(")", " ").split()
-        if t not in ("AND", "OR", "WITH")
-    ]
+    terms = split_terms(spdx_expression)
     if any(t in denied for t in terms):
         status = "denied"
         notes = f"One or more terms in '{spdx_expression}' are explicitly denied by project policy."

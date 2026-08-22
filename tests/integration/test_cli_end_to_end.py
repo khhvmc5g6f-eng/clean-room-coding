@@ -88,3 +88,38 @@ def test_full_pipeline(tmp_path: Path, monkeypatch):
     verify_payload = json.loads(verify_result.output)
     assert verify_payload["ledger_intact"] is True
     assert verify_payload["handoff_manifest_intact"] is True
+
+
+def test_legal_picks_up_similarity_and_requirement_graph_facts(tmp_path: Path):
+    """Regression test: `cleanroom legal` previously never loaded
+    evidence/similarity-findings.json or requirements.json into the
+    CaseBundle it builds, so 'copying'/'substantiality' and
+    'derivative_work_question' always reported UNKNOWN even after
+    `cleanroom similarity`/`cleanroom specify` had produced real facts.
+    Both must now be reflected in the legal findings."""
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+
+    (project_dir / "evidence").mkdir(parents=True, exist_ok=True)
+    (project_dir / "evidence" / "similarity-findings.json").write_text(
+        json.dumps([
+            {"id": "SIM-STRUCT-00000", "method": "structural", "reference_ref": "a.py", "implementation_ref": "a.py",
+             "classification": "suspicious", "requires_finding": True, "score": 0.9, "threshold": 0.15},
+        ]),
+        encoding="utf-8",
+    )
+
+    _run(runner, [
+        "--project", str(project_dir), "specify", "add-requirement",
+        "--id", "CR-REQ-000001", "--kind", "requirement",
+        "--statement", "sorts ascending", "--classification", "source_implementation_detail",
+    ])
+
+    legal_result = _run(runner, ["--project", str(project_dir), "--json", "legal", "--access-authority", "public"])
+    findings = {f["issue"]: f for f in json.loads(legal_result.output)["findings"]}
+    assert findings["copying"]["decision_state"] == "AMBER"
+    assert findings["copying"]["confidence"] != "insufficient_evidence"
+    assert findings["derivative_work_question"]["decision_state"] == "AMBER"

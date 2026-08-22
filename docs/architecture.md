@@ -61,9 +61,10 @@ keeps the deterministic core honestly deterministic.
 ## What's a documented limitation, not a silent gap
 
 See [ROADMAP.md](../ROADMAP.md) for the full list -- e.g. structural
-similarity has real AST support for Python only (generic-fallback for
-other languages), SBOM dependency discovery reads direct declared
-dependencies only (no transitive resolution), and the legal issue engine
-implements 5 of 18 issues with a real heuristic (the rest are honestly
-`UNKNOWN` pending either more heuristics or a human reviewer, never a
-fabricated answer).
+similarity has real AST/tree-sitter support for Python, JavaScript,
+TypeScript, Go, Rust, Java, Ruby, C and C++ (generic-fallback for other
+languages), SBOM dependency discovery reads direct declared dependencies
+only (no transitive resolution), and the legal issue engine implements 10
+of 18 issues with a real heuristic (the rest are honestly `UNKNOWN`
+pending either more heuristics or a human reviewer, never a fabricated
+answer).
