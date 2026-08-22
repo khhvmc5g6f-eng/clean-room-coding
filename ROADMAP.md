@@ -276,18 +276,18 @@ documented, but not wired to anything real. Wiring it in properly needs an
 actual multi-agent orchestration harness to feed it ticks -- tracked as a
 roadmap item, not silently removed or silently claimed as functional.
 
-**Deferred (real, lower-priority findings from the same review, not yet
-acted on):** `similarity/negative_control.py`'s `background_scores`
-recomputes every negative-control file's score for every (reference,
-implementation) pair rather than caching per implementation file (real
-but pure performance, not correctness); `structural_method` (`python_ast`
-vs `generic_fallback`) is recorded on each finding but not yet consulted
-by `classify()` to down-weight the weaker fallback's findings relative to
-real AST comparisons; the PDF jurisdiction table renders row-by-row with
-manual `cell()` calls, so a page break could in principle land mid-row
-without a repeated header (fpdf2's built-in table API would fix this more
-robustly than a manual patch); `ai/suggest.py`'s Hub search call has no
-explicit timeout.
+**Deferred (real, lower-priority findings from the same review):**
+~~`similarity/negative_control.py`'s `background_scores` recomputes every
+negative-control file's score for every (reference, implementation) pair
+rather than caching per implementation file~~ and ~~`structural_method`
+not being consulted by `classify()` to down-weight the weaker fallback's
+findings~~ -- both **done** during the `ast-grep-py` integration pass
+(`similarity/engine.py`'s `impl_text_cache`/`background_cache` and
+`effective_threshold`). Still not acted on: the PDF jurisdiction table
+renders row-by-row with manual `cell()` calls, so a page break could in
+principle land mid-row without a repeated header (fpdf2's built-in table
+API would fix this more robustly than a manual patch); `ai/suggest.py`'s
+Hub search call has no explicit timeout.
 
 ## Competitive landscape (researched 2026-08-22)
 
