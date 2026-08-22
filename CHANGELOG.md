@@ -388,4 +388,34 @@ detail:
   (`test_provenance_resolve_transitive_is_opt_in_and_writes_evidence`) --
   no test in this suite makes a real network call.
 
+### Fixed (ninth pass — two long-deferred small findings, plus a real bug found while fixing one of them)
+
+- **`ai/suggest.py`'s Hugging Face Hub search had no timeout** -- neither
+  `HfApi.__init__` nor `list_models` exposes one. `search_models()` now
+  bounds the call explicitly. First attempt used a
+  `concurrent.futures.ThreadPoolExecutor` with `shutdown(wait=False)` on
+  timeout; confirmed by direct testing (a simulated 5-second hang) that
+  this still blocked process exit for the full hang duration, because
+  CPython's `concurrent.futures.thread` registers an atexit hook that
+  joins every executor-owned thread at interpreter shutdown regardless of
+  `wait=False`. Switched to a plain daemon `threading.Thread` + a result
+  queue instead, which isn't subject to that join; confirmed the fix by
+  timing the test (0.9s total vs. 5.6s with the executor-based attempt).
+- **The PDF jurisdiction table rendered row-by-row with manual `cell()`
+  calls**, so a page break could in principle split a row across pages
+  with no repeated header. Rewritten using fpdf2's own `table()` API
+  (`first_row_as_headings`/`repeat_headings`, both on by default), which
+  repeats the header row automatically on every page.
+- **Found while fixing the table, by visually reading a rendered sample
+  report rather than trusting the test suite alone: `_chip()` (the
+  coloured "Global decision" badge) set the document's fill colour via
+  `set_fill_color()` but, unlike its own text-colour reset, never reset
+  it afterwards.** fpdf2's `table()` API fills any cell without its own
+  explicit style using whatever fill colour is currently active on the
+  document -- so every cell in the jurisdiction table inherited the
+  chip's colour, not just the intentionally-coloured Decision cell.
+  Reproduced with an isolated minimal script before and after the fix,
+  and covered by a new regression test
+  (`test_chip_resets_fill_colour_so_it_does_not_leak_into_later_content`).
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD

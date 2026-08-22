@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from cleanroom.report import build_certificate, render_final_report, render_html_report
-from cleanroom.report_pdf import render_pdf_report
+from cleanroom.report_pdf import _ReportPDF, _chip, render_pdf_report
 
 
 def _sample_certificate() -> dict:
@@ -77,3 +77,44 @@ def test_pdf_report_handles_unicode_punctuation_without_crashing(tmp_path: Path)
     path = render_pdf_report(cert, tmp_path / "unicode-report.pdf")
     assert path.is_file()
     assert path.read_bytes()[:5] == b"%PDF-"
+
+
+def test_chip_resets_fill_colour_so_it_does_not_leak_into_later_content():
+    """Regression test found by visual inspection of a rendered PDF: _chip()
+    (used for the coloured "Global decision" chip) set the document's fill
+    colour via set_fill_color() but never reset it afterwards -- only
+    text colour was reset. fpdf2's table() API fills any cell without its
+    own explicit style using whatever fill colour is currently active on
+    the document, so every cell in the jurisdiction table (not just the
+    intentionally-coloured Decision cell) inherited the chip's colour.
+    Confirmed by direct reproduction (rendering a real report and reading
+    the output) before fixing; this asserts the actual fix -- fill colour
+    is restored to plain white after the chip is drawn."""
+    pdf = _ReportPDF()
+    pdf._subtitle = "test"
+    pdf.add_page()
+    _chip(pdf, "RED")
+    assert pdf.fill_color.colors == (1.0, 1.0, 1.0)  # DeviceRGB white, not RED's (192, 57, 43)/255
+
+
+def test_pdf_jurisdiction_table_survives_a_page_break(tmp_path: Path):
+    """Regression test: the jurisdiction table used to be rendered
+    row-by-row with manual cell() calls, so a page break could in
+    principle land mid-row with no repeated header on the new page.
+    Now built with fpdf2's own table() API, which repeats headers across
+    pages automatically. Enough rows to force a real page break must
+    still render as a single valid, reasonably-sized multi-page PDF."""
+    cert = _sample_certificate()
+    cert["jurisdictions"] = [
+        {"jurisdiction": f"market-{i:03d}", "decision_state": ["AMBER", "RED", "GREEN_WITH_CONDITIONS", "UNKNOWN"][i % 4], "required_market": i % 2 == 0}
+        for i in range(80)
+    ]
+    path = render_pdf_report(cert, tmp_path / "many-jurisdictions.pdf")
+    data = path.read_bytes()
+    assert data[:5] == b"%PDF-"
+    # 80 rows at ~7pt line height won't fit on one page -- if this file is
+    # no bigger than the single-page sample report, the table silently
+    # failed to actually add the extra content/pages rather than genuinely
+    # testing the page-break path.
+    small_report = render_pdf_report(_sample_certificate(), tmp_path / "small-report.pdf")
+    assert len(data) > len(small_report.read_bytes())

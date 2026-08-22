@@ -283,11 +283,22 @@ rather than caching per implementation file~~ and ~~`structural_method`
 not being consulted by `classify()` to down-weight the weaker fallback's
 findings~~ -- both **done** during the `ast-grep-py` integration pass
 (`similarity/engine.py`'s `impl_text_cache`/`background_cache` and
-`effective_threshold`). Still not acted on: the PDF jurisdiction table
-renders row-by-row with manual `cell()` calls, so a page break could in
-principle land mid-row without a repeated header (fpdf2's built-in table
-API would fix this more robustly than a manual patch); `ai/suggest.py`'s
-Hub search call has no explicit timeout.
+`effective_threshold`). ~~The PDF jurisdiction table renders row-by-row
+with manual `cell()` calls, so a page break could in principle land
+mid-row without a repeated header~~ and ~~`ai/suggest.py`'s Hub search
+call has no explicit timeout~~ -- both **done**: the jurisdiction table
+now uses fpdf2's own `table()` API (repeats headers across pages
+automatically), and `search_models()` now bounds the Hub call with an
+explicit timeout via a daemon thread (a `ThreadPoolExecutor` was tried
+first, but confirmed by direct testing to still block process exit for
+the full hang duration -- CPython's `concurrent.futures.thread` joins
+every executor-owned thread at interpreter shutdown regardless of
+`shutdown(wait=False)`). Fixing the table also surfaced a real,
+previously-undetected rendering bug (see "Fixed" in CHANGELOG.md): `_chip()`
+never reset the fill colour it set for the coloured "Global decision"
+chip, which fpdf2's table cells silently inherited for every column, not
+just the intentionally-coloured one -- found by visually reading a
+rendered sample report, not just running the test suite.
 
 ## Competitive landscape (researched 2026-08-22)
 

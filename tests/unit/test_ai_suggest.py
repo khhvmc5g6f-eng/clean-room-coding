@@ -1,5 +1,8 @@
+import time
 from types import SimpleNamespace
 from unittest.mock import patch
+
+import pytest
 
 from cleanroom.ai.suggest import (
     _classify_deployment_shape,
@@ -94,3 +97,22 @@ def test_evaluate_against_policy_never_fabricates_status_for_unmapped_licence():
 
     evaluate_against_policy(suggestions, allowed=["MIT"], denied=[])
     assert suggestions[0].licence_policy_status == "unknown"  # "openrail" has no SPDX mapping here
+
+
+def test_search_models_raises_timeout_error_rather_than_hanging(monkeypatch):
+    """Regression test: neither HfApi.__init__ nor list_models exposes a
+    timeout kwarg, so a hung Hub response previously had nothing bounding
+    it. search_models() now wraps the call in an explicit timeout and
+    raises TimeoutError rather than blocking indefinitely."""
+    import cleanroom.ai.suggest as suggest_module
+
+    monkeypatch.setattr(suggest_module, "_HUB_SEARCH_TIMEOUT_SECONDS", 0.2)
+
+    class HangingApi:
+        def list_models(self, **kwargs):
+            time.sleep(5)
+            return []
+
+    with patch("huggingface_hub.HfApi", return_value=HangingApi()):
+        with pytest.raises(TimeoutError, match="did not respond within"):
+            search_models("classification", limit=1)

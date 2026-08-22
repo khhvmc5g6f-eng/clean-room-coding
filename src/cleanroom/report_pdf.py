@@ -13,6 +13,7 @@ from typing import Any
 
 try:
     from fpdf import FPDF
+    from fpdf.fonts import FontFace
 except ImportError as e:  # pragma: no cover - exercised only when [pdf] extra isn't installed
     raise ImportError(
         "PDF report generation requires the 'pdf' extra: pip install 'cleanroom[pdf]'"
@@ -89,6 +90,13 @@ def _chip(pdf: _ReportPDF, label: str) -> None:
     width = pdf.get_string_width(label) + 6
     pdf.cell(width, 7, label, fill=True, align="C")
     pdf.set_text_color(0, 0, 0)
+    # fpdf2's table() API falls back to whatever fill colour is currently
+    # set on the document for any cell whose own style doesn't specify
+    # one -- confirmed by direct reproduction: without this reset, the
+    # jurisdiction table rendered further down the page inherited this
+    # chip's colour across every cell in every row, not just the styled
+    # Decision cell.
+    pdf.set_fill_color(255, 255, 255)
     pdf.set_font("Helvetica", "", 10)
     pdf.ln(9)
 
@@ -145,19 +153,25 @@ def render_pdf_report(certificate: dict[str, Any], path: Path) -> Path:
     pdf.ln(2)
 
     _section_title(pdf, "Jurisdictions")
-    pdf.set_font("Helvetica", "B", 9)
-    pdf.cell(60, 7, "Jurisdiction", border=1)
-    pdf.cell(60, 7, "Decision", border=1)
-    pdf.cell(40, 7, "Required market", border=1, ln=True)
     pdf.set_font("Helvetica", "", 9)
-    for j in certificate["jurisdictions"]:
-        pdf.cell(60, 7, str(j["jurisdiction"]), border=1)
-        r, g, b = _DECISION_RGB.get(j["decision_state"], (127, 140, 141))
-        pdf.set_fill_color(r, g, b)
-        pdf.set_text_color(255, 255, 255)
-        pdf.cell(60, 7, j["decision_state"], border=1, fill=True, align="C")
-        pdf.set_text_color(0, 0, 0)
-        pdf.cell(40, 7, "Yes" if j.get("required_market") else "No", border=1, ln=True)
+    # fpdf2's built-in table API (not manual per-cell cell() calls) so a
+    # page break mid-table repeats the header row automatically instead of
+    # silently splitting a row across pages with no header on the new page.
+    with pdf.table(
+        col_widths=(60, 60, 40),
+        text_align=("LEFT", "CENTER", "CENTER"),
+        headings_style=FontFace(emphasis="BOLD"),
+    ) as table:
+        header_row = table.row()
+        header_row.cell("Jurisdiction")
+        header_row.cell("Decision")
+        header_row.cell("Required market")
+        for j in certificate["jurisdictions"]:
+            row = table.row()
+            row.cell(_safe_text(str(j["jurisdiction"])))
+            r, g, b = _DECISION_RGB.get(j["decision_state"], (127, 140, 141))
+            row.cell(_safe_text(j["decision_state"]), style=FontFace(color=(255, 255, 255), fill_color=(r, g, b)))
+            row.cell("Yes" if j.get("required_market") else "No")
     pdf.ln(4)
 
     _section_title(pdf, "Outstanding issues")

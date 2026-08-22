@@ -19,6 +19,8 @@ completeness).
 
 from __future__ import annotations
 
+import queue
+import threading
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -66,24 +68,59 @@ def _classify_deployment_shape(library_name: str | None, sibling_filenames: list
     return "unknown", "no embeddable-format file found and pipeline_tag isn't in the known-heavy list -- not enough evidence to classify"
 
 
+_HUB_SEARCH_TIMEOUT_SECONDS = 15
+
+
 def search_models(capability: str, *, limit: int = 10) -> list[ModelSuggestion]:
     """Queries the public Hugging Face Hub for models matching a free-text
     capability description (e.g. "text classification", "speech to text").
     Raises ImportError if the 'ai' extra isn't installed, and re-raises any
     network/API error from huggingface_hub rather than silently returning
-    an empty/misleading result."""
+    an empty/misleading result. Bounded by an explicit timeout (neither
+    `HfApi.__init__` nor `list_models` exposes one directly) so a slow/
+    hanging Hub response can't block `cleanroom ai-suggest` indefinitely."""
     try:
         from huggingface_hub import HfApi
     except ImportError as e:
         raise ImportError("cleanroom ai-suggest requires the 'ai' extra: pip install 'cleanroom[ai]'") from e
 
     api = HfApi()
-    models = api.list_models(
-        search=capability,
-        sort="downloads",
-        limit=limit,
-        expand=["pipeline_tag", "library_name", "tags", "downloads", "likes", "siblings"],
-    )
+    result_queue: queue.Queue = queue.Queue(maxsize=1)
+
+    def _fetch() -> None:
+        try:
+            result_queue.put((
+                "ok",
+                list(
+                    api.list_models(
+                        search=capability,
+                        sort="downloads",
+                        limit=limit,
+                        expand=["pipeline_tag", "library_name", "tags", "downloads", "likes", "siblings"],
+                    )
+                ),
+            ))
+        except Exception as e:  # noqa: BLE001 -- re-raised in the caller's context below, not swallowed
+            result_queue.put(("error", e))
+
+    # A daemon thread, not a ThreadPoolExecutor: CPython's
+    # concurrent.futures.thread registers an atexit hook that joins EVERY
+    # executor-owned thread before the interpreter exits, regardless of
+    # shutdown(wait=False) -- confirmed by direct testing (a "timed out"
+    # search still blocked process exit for the full hang duration with
+    # an executor). A daemon thread has no such join, so a genuinely hung
+    # request is abandoned rather than blocking this short-lived CLI's exit.
+    threading.Thread(target=_fetch, daemon=True).start()
+    try:
+        status, payload = result_queue.get(timeout=_HUB_SEARCH_TIMEOUT_SECONDS)
+    except queue.Empty as e:
+        raise TimeoutError(
+            f"Hugging Face Hub search for '{capability}' did not respond within "
+            f"{_HUB_SEARCH_TIMEOUT_SECONDS}s"
+        ) from e
+    if status == "error":
+        raise payload
+    models = payload
 
     suggestions = []
     for m in models:
