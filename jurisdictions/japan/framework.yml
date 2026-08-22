@@ -1,0 +1,206 @@
+# Jurisdiction pack: Japan
+# Part LXIII. Facts and structured questions for the heuristic legal engine
+# and the simulated legal/judicial panels. NOT legal advice -- see
+# docs/legal-disclaimer.md. Every article number and case citation in this
+# pack was checked against the Ministry of Justice's Japanese Law
+# Translation database (japaneselawtranslation.go.jp) and/or checkable
+# secondary academic sources before being written down (see Verification
+# Notes at the end of this file). Currency should always be re-checked
+# (Part LIII) before relying on this pack -- japaneselawtranslation.go.jp
+# is the canonical source, and its translations lag statutory amendments
+# by months to a few years.
+
+jurisdiction_id: japan
+legal_system: civil_law
+languages: [ja, en]
+
+governing_statutes:
+  - name: "Copyright Act (Chosakuken-ho)"
+    short: "Copyright Act, Act No. 48 of 1970"
+    url: "https://www.japaneselawtranslation.go.jp/en/laws/view/3379"
+    relevance: >
+      Japan's primary copyright statute. Article 10(1)(ix) lists "program
+      works" (works of computer programming, i.e. プログラムの著作物) among
+      the illustrative categories of copyrightable works. Article 10(3) is
+      Japan's explicit statutory analogue to the idea/expression
+      distinction for software: protection of a program work does NOT
+      extend to (i) the programming language (the letters/symbols and
+      their system used to express a program), (ii) "rules" -- defined in
+      the Act as special conventions on the use of a programming language
+      in a particular program (coding conventions) -- or (iii) the
+      algorithm, defined as the method of combining instructions to a
+      computer in a program. This three-way exclusion is the closest
+      Japanese analogue to Part XVI's observable-requirement/
+      source-implementation-detail split. Article 47-3 separately permits
+      the owner of a lawfully acquired copy of a program work to make
+      reproductions/adaptations necessary for using it on a computer
+      (Japan's rough analogue to 17 U.S.C. section 117). Article 20(2)(iii)
+      exempts from moral-rights (right of integrity) liability those
+      modifications necessary to make a program executable on a
+      particular computer or to make it more effective.
+  - name: "Copyright Act, Article 30-4 (flexible non-enjoyment use)"
+    short: "Chosakuken-ho art. 30-4, added by Act No. 30 of 2018, in force 1 Jan 2019"
+    url: "https://www.japaneselawtranslation.go.jp/en/laws/view/3379"
+    relevance: >
+      Added by the 2018 amendment as part of a package of "flexible"
+      limitations responding to IoT/AI/data-analysis technology (alongside
+      arts. 47-4 and 47-5, below). Permits exploiting a work, in any way
+      and to the extent considered necessary, where it is not a person's
+      purpose to personally enjoy, or cause another to enjoy, the thoughts
+      or sentiments expressed in the work -- expressly including (i) use
+      in testing to develop or put into practical use a technology
+      connected with recording or other exploitation of a work, and (ii)
+      use in data analysis (extraction, comparison, classification or
+      other statistical analysis of elemental data from a large volume of
+      works) -- subject to a proviso that it does NOT apply if the
+      exploitation would unreasonably prejudice the copyright owner's
+      interests in light of the nature/purpose of the work or the
+      circumstances of exploitation. Japan has no dedicated
+      decompilation-specific or interoperability-specific permitted act
+      comparable to EU Software Directive art. 6 / UK CDPA s.50B / US DMCA
+      section 1201(f); art. 30-4 is the operative, but fact-sensitive and
+      proviso-limited, gateway most likely to cover technical-verification-
+      type reference analysis. It authorizes analysis, not reproduction of
+      protectable expression in the eventual reimplementation.
+  - name: "Copyright Act, Articles 47-4 and 47-5 (incidental technical exploitation)"
+    short: "Chosakuho-ho arts. 47-4, 47-5, added by Act No. 30 of 2018"
+    url: "https://www.japaneselawtranslation.go.jp/en/laws/view/3379"
+    relevance: >
+      Article 47-4 (exploitation incidental to exploitation of a work on a
+      computer) permits acts necessary for a work to be exploited smoothly
+      or efficiently on a computer (e.g. caching-type acts). Article 47-5
+      (minor exploitation incidental to computerised data processing)
+      permits minor incidental exploitation forming part of information
+      processing and the provision of its results (e.g. search/analysis
+      services). Narrower and more mechanical/incidental in character than
+      art. 30-4; relevant mainly if the tooling used during Zone R analysis
+      itself incidentally caches or processes reference material, rather
+      than to the substance of a clean-room observation-and-reimplementation
+      exercise.
+  - name: "Act on General Rules for Application of Laws (Ho no Tekiyo ni Kansuru Tsusoku-ho)"
+    short: "Act No. 78 of 2006 (successor to the 1898 Horei)"
+    url: "https://www.japaneselawtranslation.go.jp/en/laws/view/3783/en"
+    relevance: >
+      Japan's general private international law statute (contract, tort,
+      property choice-of-law rules). See conflicts_of_laws_notes below --
+      Japanese case law treats copyright subsistence/infringement
+      questions as governed separately from this Act's general tort rule,
+      via the lex loci protectionis principle.
+
+leading_case_law:
+  - citation: "System Science Co., Ltd. v. Toyo Sokki K.K., Tokyo District Court, decision of 31 March 1989 (Heisei 1), aff'd on appeal, Tokyo High Court, decision of 20 June 1989 (Heisei 1)"
+    relevance: >
+      One of the earliest and most-cited Japanese decisions applying the
+      statutory algorithm/language/rule exclusion (predecessor of the
+      current art. 10(3)) to a dispute over how far copyright in a
+      computer program extends beyond its literal text -- i.e. whether
+      shared processing structure between two independently-written
+      measurement/data-processing programs was infringing expression or
+      unprotectable algorithm. Directly relevant to Part XVI's
+      observable-requirement/source-implementation-detail split and to
+      classifying similarity findings as REQUIRED/CONVENTIONAL/CONSTRAINED
+      (Part XXXV). VERIFICATION NOTE: this is a pre-2005 Tokyo District/
+      High Court decision (the IP High Court was not established until
+      2005), not a Supreme Court or IP High Court decision -- see
+      Verification Notes below. Checkable secondary citation: Dennis S.
+      Karjala, "Japanese Courts Interpret the 'Algorithm' Limitation on the
+      Copyright Protection of Programs," 31 Jurimetrics J. 233 (1991); T.
+      Yoshida, "Creativity and the Scope of Protection of Computer
+      Programs," SOFTIC (softic.or.jp/en/cases/yoshida-art.html).
+  - citation: "Microsoft Corp. v. Shuwa System Trading K.K., Tokyo District Court, decision of 30 January 1987 (Showa 62)"
+    relevance: >
+      Held that disassembling the object code of a ROM-resident BASIC
+      interpreter, and publishing the resulting annotated source-code
+      listing, infringed copyright in that object program; the court
+      treated the interpreter as a protectable program work notwithstanding
+      its operating-system-level function. Directly on point for the
+      legality of the disassembly/decompilation ACT ITSELF (as distinct
+      from lawful post-analysis reimplementation): illustrates that,
+      unlike the US position in Sega v. Accolade or the EU/UK Software
+      Directive decompilation right, Japan has never recognized a
+      decompilation-specific permitted act -- any decompilation must be
+      justified, if at all, under the general art. 30-4 flexible-use
+      gateway (added three decades later, in 2018/2019), not a dedicated
+      exemption. VERIFICATION NOTE: pre-dates the IP High Court (est.
+      2005); a Tokyo District Court decision, not Supreme Court/IP High
+      Court -- see Verification Notes below. Checkable secondary citation:
+      Dennis S. Karjala, "The First Case on Protection of Operating
+      Systems and Reverse Engineering of Programs in Japan," 10 Eur.
+      Intell. Prop. Rev. 172 (1988).
+
+conflicts_of_laws_notes: >
+  The Act on General Rules for Application of Laws (Ho no Tekiyo ni Kansuru
+  Tsusoku-ho, Act No. 78 of 2006) supplies Japan's general choice-of-law
+  rules for contract and tort, but Japanese courts do not apply its general
+  tort rule to copyright subsistence or infringement questions. Consistent
+  with Article 5(2) of the Berne Convention (to which Japan is a party) --
+  "the extent of protection, as well as the means of redress ... shall be
+  governed exclusively by the laws of the country where protection is
+  claimed" -- Japanese precedent treats copyright subsistence and
+  infringement as governed by the law of the country for which protection
+  is sought (lex loci protectionis), which may differ from the law
+  governing any licence or collaboration contract under which reference
+  material was obtained. Treat "governing law of the licence/NDA" and
+  "applicable copyright law" as distinct questions, as in the other packs.
+
+court_terminology:
+  trial_court: "Tokyo District Court or Osaka District Court (Intellectual Property Division) -- exclusive first-instance jurisdiction over actions concerning an author's right to a work of computer programming, Code of Civil Procedure art. 6(1) (the same exclusive-jurisdiction provision that covers patent and utility-model actions; ordinary copyright actions not involving a program work instead have concurrent, non-exclusive, jurisdiction in Tokyo/Osaka under art. 6-2)"
+  appellate_court: "Intellectual Property High Court (Chiteki Zaisan Koto Saibansho), a specialized branch of the Tokyo High Court established 1 April 2005 -- exclusive appellate jurisdiction over program-work copyright actions, Code of Civil Procedure art. 6(3)"
+  final_court: "Supreme Court of Japan (Saiko Saibansho)"
+  simulated_judicial_role_title: "Simulated Tokyo/Osaka District Court (Intellectual Property Division) Reviewer"
+
+interoperability_permitted_acts:
+  summary: >
+    Japan has no decompilation-specific or interoperability-specific
+    permitted act comparable to EU Software Directive art. 6 / UK CDPA
+    s.50B-s.50BA / US DMCA section 1201(f). The operative, but general and
+    fact-sensitive, framework is: art. 30-4 (added 2018, in force 2019),
+    which can cover technology-development testing and data-analysis-type
+    reference analysis where the purpose is not to enjoy the work's
+    expressed thoughts/sentiments, subject to a proviso against
+    unreasonable prejudice to the copyright owner; art. 47-3, which lets
+    the owner of a lawfully acquired copy of a program work modify/
+    reproduce it to the extent necessary for use on a computer; and arts.
+    47-4/47-5, narrower incidental-technical-use permissions. Because
+    Japan uses an enumerated-limitations approach (no general fair-use
+    doctrine even after the 2018 reform), whether a specific analysis
+    activity -- especially disassembly of object code, as opposed to
+    observing external behaviour -- falls within art. 30-4 is fact-
+    sensitive and must be assessed per Part XXXII before relying on it;
+    none of these provisions authorizes reproducing protectable expression
+    in the eventual reimplementation.
+
+questions_for_review:
+  - "Does Article 10(3)'s exclusion of the programming language, coding conventions ('rules'), and algorithm cover the specific expressive element the similarity report has flagged, or does that element instead reflect protectable structure/organization of the kind at issue in the System Science v. Toyo Sokki line of authority?"
+  - "Does the observation/analysis activity that occurred in Zone R fall within Article 30-4(i)'s 'testing to develop or put into practical use' technology exception, and if so has the fact-sensitive proviso (no unreasonable prejudice to the copyright owner's interests, given the nature/purpose of the work and the circumstances of exploitation) been assessed and documented before analysis began, not reconstructed afterward (Part IX)?"
+  - "If the analysis activity involved disassembly/decompilation of object code (rather than observation of external behaviour alone), is there any Article 30-4 or other statutory basis for that specific act, given that Japan has no DMCA section 1201(f)/CDPA s.50B-style dedicated decompilation right and Microsoft v. Shuwa System Trading treated unauthorized disassembly-and-publication of object code as infringing?"
+  - "Is Japan a required distribution market, and if so does any GPL/AGPL-triggering distribution occur from or into Japan, engaging the Tokyo/Osaka District Court's exclusive jurisdiction under Code of Civil Procedure art. 6(1) over program-work copyright actions?"
+  - "Where reference material was received under a confidentiality obligation or licence governed by non-Japanese law, has the conflicts analysis kept the licence/contract governing-law question (Act on General Rules for Application of Laws) separate from the copyright subsistence/infringement question (lex loci protectionis), consistent with Part XXXIV?"
+
+# Verification Notes (not part of the schema consumed by the engine --
+# retained here for audit trail; see final chat report for the complete
+# source-by-source account).
+#
+# - Statutory citations (art. 10(1)(ix), 10(3), 20(2)(iii), 30-4, 47-3,
+#   47-4, 47-5) were checked directly against the official English
+#   translation at japaneselawtranslation.go.jp/en/laws/view/3379
+#   (Copyright Act, Act No. 48 of 1970, translation current to Act No. 30
+#   of 2018) via live fetch, and cross-checked against independent
+#   secondary summaries (monolith.law; academic commentary on the 2018
+#   amendment).
+# - Code of Civil Procedure art. 6/6-2 jurisdiction facts were checked
+#   directly against japaneselawtranslation.go.jp/en/laws/view/2834/en.
+# - The two case citations (System Science v. Toyo Sokki; Microsoft v.
+#   Shuwa System Trading) were triangulated across three independent
+#   sources each (SOFTIC/Yoshida; academic citations to Dennis Karjala's
+#   published articles; and a Meiji University case-archive index whose
+#   page content itself could not be retrieved directly -- a 403 blocked
+#   automated fetches -- so it was used only for its URL-encoded date
+#   confirmation, not as a freestanding source). Neither case is a Supreme
+#   Court or (post-2005) IP High Court decision; no Supreme Court or IP
+#   High Court decision squarely on point for program-work substantial-
+#   similarity/reimplementation was found with a citation verifiable
+#   against a primary or authoritative secondary source in the time
+#   available. Do not treat the absence as proof none exists -- flag for
+#   follow-up research with access to a Japanese case-law database
+#   (e.g. Westlaw Japan, LEX/DB) if this becomes load-bearing.

@@ -11,9 +11,7 @@ from pathlib import Path
 from statistics import mean
 
 from cleanroom.similarity.lexical import lexical_similarity
-from cleanroom.similarity.structural import structural_similarity
-
-SOURCE_SUFFIXES = {".py", ".js", ".ts", ".jsx", ".tsx", ".go", ".rs", ".java", ".rb", ".c", ".cpp", ".h"}
+from cleanroom.similarity.structural import SOURCE_SUFFIXES, structural_similarity
 
 
 def _read_files(root: Path) -> list[str]:

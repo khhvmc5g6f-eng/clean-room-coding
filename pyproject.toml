@@ -24,6 +24,8 @@ dependencies = [
   "PyYAML>=6.0",
   "jsonschema>=4.20",
   "rich>=13.7",
+  "license-expression>=30.4",
+  "ast-grep-py>=0.45",
 ]
 
 [project.optional-dependencies]

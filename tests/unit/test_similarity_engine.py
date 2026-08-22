@@ -93,6 +93,19 @@ def test_all_pairs_truncation_is_not_biased_toward_first_impl_file(tmp_path: Pat
     assert "z_last.py" in compared_impl_names
 
 
+def test_compare_trees_uses_treesitter_for_javascript_files(tmp_path: Path):
+    ref = tmp_path / "ref"
+    impl = tmp_path / "impl"
+    ref.mkdir()
+    impl.mkdir()
+    (ref / "sort.js").write_text("function foo(x, y) { if (x) { return y; } }", encoding="utf-8")
+    (impl / "sort.js").write_text("function bar(p, q) { if (p) { return q; } }", encoding="utf-8")
+
+    result = compare_trees(ref, impl)
+    struct_finding = next(f for f in result["findings"] if f["method"] == "structural")
+    assert struct_finding["structural_method"] == "treesitter:javascript"
+
+
 def test_findings_have_both_lexical_and_structural_methods(tmp_path: Path):
     ref = tmp_path / "ref"
     impl = tmp_path / "impl"

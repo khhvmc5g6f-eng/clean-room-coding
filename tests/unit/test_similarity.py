@@ -1,6 +1,6 @@
 from cleanroom.similarity.classify import classify
 from cleanroom.similarity.lexical import jaccard, lexical_similarity
-from cleanroom.similarity.structural import generic_structural_shape, structural_similarity
+from cleanroom.similarity.structural import generic_structural_shape, structural_similarity, treesitter_structural_shape
 
 
 def test_identical_text_lexical_similarity_is_one():
@@ -100,3 +100,43 @@ def test_generic_structural_shape_covers_go_rust_ruby_keywords():
     assert "kw:loop" in generic_structural_shape("loop {\n")
     assert "kw:elsif" in generic_structural_shape("elsif x\n")
     assert "kw:unless" in generic_structural_shape("unless x\n")
+
+
+def test_treesitter_javascript_real_ast_detects_identical_shape_different_names():
+    a = "function foo(x, y) { if (x) { return y; } }"
+    b = "function bar(p, q) { if (p) { return q; } }"
+    shape_a = treesitter_structural_shape(a, "javascript")
+    shape_b = treesitter_structural_shape(b, "javascript")
+    assert shape_a is not None and shape_b is not None
+    assert shape_a == shape_b  # identical AST shape despite different identifiers
+
+
+def test_treesitter_go_rust_java_all_produce_real_shapes():
+    assert treesitter_structural_shape("func main() {}\n", "go") is not None
+    assert treesitter_structural_shape("fn main() {}\n", "rust") is not None
+    assert treesitter_structural_shape("class Foo { void bar() {} }\n", "java") is not None
+
+
+def test_treesitter_unsupported_language_returns_none_not_raises():
+    assert treesitter_structural_shape("whatever", "not-a-real-language") is None
+
+
+def test_treesitter_unparseable_source_returns_none_not_raises():
+    # ast-grep-py is generally tolerant/error-recovering, but this must
+    # never raise regardless -- a parse failure is "not available", not a
+    # crash.
+    result = treesitter_structural_shape("\x00\x01 not real code {{{", "javascript")
+    assert result is None or isinstance(result, list)
+
+
+def test_structural_similarity_uses_treesitter_for_javascript_files():
+    a = "function foo(x, y) { if (x) { return y; } }"
+    b = "function bar(p, q) { if (p) { return q; } }"
+    score, method = structural_similarity(a, b, language="javascript")
+    assert method == "treesitter:javascript"
+    assert score == 1.0  # identical shape
+
+
+def test_structural_similarity_falls_back_to_generic_for_unsupported_language():
+    score, method = structural_similarity("if x then y end", "if p then q end", language="cobol-does-not-exist")
+    assert method == "generic_fallback"

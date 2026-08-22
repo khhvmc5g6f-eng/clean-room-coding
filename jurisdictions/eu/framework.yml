@@ -1,0 +1,239 @@
+# Jurisdiction pack: European Union (EU law as it applies across member
+# states -- NOT any single member state's national implementation; see the
+# england-wales, france and germany packs for national-level detail).
+# Part LXIII. Facts and structured questions for the heuristic legal engine
+# and the simulated legal/judicial panels. NOT legal advice -- see
+# docs/legal-disclaimer.md. Every directive/regulation article number and
+# CJEU case citation in this pack was checked directly against EUR-Lex
+# (legislative text) and searched/cross-checked against curia.europa.eu,
+# WIPO Lex's mirror of the EUR-Lex text, and reputable secondary sources
+# (IPKat, Kluwer Copyright Blog, and law-firm case notes) before being
+# written down; none is reproduced from unverified memory. Currency should
+# still be re-checked (Part LIII) before relying on this pack --
+# eur-lex.europa.eu and curia.europa.eu are the canonical sources.
+
+jurisdiction_id: eu
+legal_system: "supranational (EU law overlays and is implemented/enforced through the diverse national civil-law and common-law systems of 27 member states; it is not itself a single common-law or civil-law system -- see court_terminology below)"
+languages: [en]
+# Note: all 24 official EU languages are equally authentic for the
+# legislative texts cited below (Article 55 TEU); this pack's citations and
+# paraphrases use the EUR-Lex English-language versions.
+
+governing_statutes:
+  - name: "Directive 2009/24/EC of the European Parliament and of the Council of 23 April 2009 on the legal protection of computer programs (codified version)"
+    short: "Software Directive"
+    url: "https://eur-lex.europa.eu/eli/dir/2009/24/oj/eng"
+    relevance: >
+      THE central EU authority for clean-room reimplementation. Article
+      1(2) provides that protection applies to the expression in any form
+      of a computer program, and that ideas and principles which underlie
+      any element of the program, including those underlying its
+      interfaces, are not protected by copyright under the Directive --
+      the EU analogue to the US idea/expression and merger doctrines
+      (mirrors CDPA 1988 s.50B/50BA per the england-wales pack, and
+      §102(b) per the usa-federal pack). Article 4(1) defines the
+      rightholder's restricted acts: (a) permanent or temporary
+      reproduction by any means and in any form, in whole or in part; (b)
+      translation, adaptation, arrangement and any other alteration; (c)
+      distribution to the public, including rental, of the original or
+      copies. Article 5(1) permits, absent specific contrary contractual
+      provisions, the acts (including error correction) necessary for use
+      of the program by a lawful acquirer in accordance with its intended
+      purpose. Article 5(3) permits a person with a right to use a copy to
+      observe, study or test the program's functioning, without
+      authorisation, in order to determine the ideas and principles
+      underlying any element of it. Article 6 permits decompilation
+      (reproduction of code and translation of its form) without
+      authorisation where indispensable to achieve interoperability of an
+      independently created program with other programs, subject to three
+      conditions in Article 6(1) (performed by a licensee/authorised
+      person or on their behalf; the interoperability information was not
+      previously readily available to that person; acts confined to the
+      parts of the original program necessary to achieve interoperability)
+      and to the further restrictions in Article 6(2) on how the
+      information obtained may be used (only for interoperability, not
+      disclosed to others except as necessary, not used to develop, produce
+      or market a substantially similar program).
+  - name: "Directive 2001/29/EC of the European Parliament and of the Council of 22 May 2001 on the harmonisation of certain aspects of copyright and related rights in the information society"
+    short: "InfoSoc Directive"
+    url: "https://eur-lex.europa.eu/eli/dir/2001/29/oj/eng"
+    relevance: >
+      The general EU copyright-harmonisation directive (reproduction,
+      communication to the public, distribution rights and permitted
+      exceptions) implementing the WIPO Copyright Treaty. Interacts with
+      the Software Directive at the margins of software protection: e.g.
+      a graphical user interface, while not itself a "computer program"
+      protected under the Software Directive, can still be an original
+      work protected under the InfoSoc Directive if it is its author's own
+      intellectual creation (Case C-393/09, below).
+  - name: "Directive 96/9/EC of the European Parliament and of the Council of 11 March 1996 on the legal protection of databases"
+    short: "Database Directive"
+    url: "https://eur-lex.europa.eu/eli/dir/1996/9/oj/eng"
+    relevance: >
+      Provides (i) copyright protection for databases that, by the
+      selection or arrangement of their contents, constitute the author's
+      own intellectual creation, and (ii) a separate sui generis right
+      (Article 7) for the maker of a database who shows substantial
+      investment in obtaining, verifying or presenting its contents,
+      entitling them to prevent extraction and/or re-utilisation of the
+      whole or a substantial part of that content, for 15 years from
+      completion (renewable on substantial new investment). Relevant
+      whenever a "reference" being reimplemented is or contains a
+      database/schema rather than program code as such -- this is a
+      distinct right from copyright in any underlying data or code and
+      must be analysed separately (cf. the england-wales pack's UK
+      database-regulations entry).
+  - name: "Directive (EU) 2016/943 of the European Parliament and of the Council of 8 June 2016 on the protection of undisclosed know-how and business information (trade secrets) against their unlawful acquisition, use and disclosure"
+    short: "Trade Secrets Directive"
+    url: "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32016L0943"
+    relevance: >
+      Harmonises the conditions under which acquisition, use and
+      disclosure of a trade secret (information that is secret, has
+      commercial value because it is secret, and has been subject to
+      reasonable steps to keep it secret) is unlawful. Directly relevant
+      to confidentiality/access questions in Zone R: Article 3(1)(b)
+      expressly provides that acquisition of a trade secret is lawful when
+      obtained by "observation, study, disassembly or testing of a product
+      ... that has been made available to the public or that is lawfully
+      in the possession of the acquirer," who is free of any legally valid
+      duty to limit acquisition of the trade secret -- an independent,
+      non-copyright basis for reverse-engineering-derived know-how that
+      must be checked alongside, not instead of, the Software Directive
+      analysis.
+
+leading_case_law:
+  - citation: "Case C-406/10 SAS Institute Inc v World Programming Ltd, Grand Chamber, judgment of 2 May 2012, EU:C:2012:259"
+    relevance: >
+      The central CJEU authority (referred from the England and Wales High
+      Court; followed by the Court of Appeal in the parties' own later
+      judgment, cited in the england-wales pack). Interpreting the
+      predecessor Directive 91/250/EEC (materially identical on this point
+      to the current Directive 2009/24/EC) and the InfoSoc Directive, the
+      Court held that neither the functionality of a computer program, nor
+      the programming language, nor the format of data files used to
+      exploit certain of its functions, constitute a form of expression of
+      that program and are therefore not protected by copyright as a
+      computer program; and that reproducing, in a second program, certain
+      elements described in the first program's user manual (rather than
+      copying its source/object code) does not constitute an infringing
+      reproduction of that source or object code. Directly supports Part
+      XVI's observable-requirement/source-implementation-detail split:
+      re-implementing observed FUNCTIONALITY and INTERFACES is a
+      materially different question from copying EXPRESSION.
+  - citation: "Case C-393/09 Bezpečnostní softwarová asociace - Svaz softwarové ochrany v Ministerstvo kultury (\"BSA\"), Third Chamber, judgment of 22 December 2010, EU:C:2010:816"
+    relevance: >
+      Preliminary ruling from the Czech Supreme Administrative Court,
+      interpreting Directive 91/250/EEC and the InfoSoc Directive. Held
+      that a graphical user interface (GUI) is not a form of expression of
+      a computer program and so cannot itself be protected by copyright AS
+      a computer program under the Software Directive; however, a GUI can
+      be protected by ordinary copyright under the InfoSoc Directive if it
+      is its author's own intellectual creation. Relevant whenever the
+      reference material includes a GUI/screen layout that is being
+      reimplemented separately from the underlying program logic -- two
+      different protection regimes with different scope may apply to the
+      same visible surface.
+  - citation: "Case C-128/11 UsedSoft GmbH v Oracle International Corp, Grand Chamber, judgment of 3 July 2012, EU:C:2012:407"
+    relevance: >
+      Interpreting Article 4(2) (exhaustion of the distribution right) and
+      Article 5(1) (concept of "lawful acquirer") of Directive 2009/24/EC,
+      held that the distribution right in a copy of a computer program is
+      exhausted on its first sale in the EU/EEA with an unlimited-duration
+      user licence, irrespective of whether the copy was distributed on a
+      physical medium or by download, and that a subsequent acquirer of
+      such a "used" licence is a lawful acquirer able to invoke Article
+      5(1). Relevant to resale/redistribution and SaaS-adjacent questions
+      about whether a party analysing or interoperating with reference
+      software is itself a "lawful acquirer" for Article 5 purposes.
+  - citation: "Case C-13/20 Top System SA v Belgian State, judgment of 6 October 2021, EU:C:2021:811"
+    relevance: >
+      Interpreting Articles 5(1) and 6 of Directive 2009/24/EC, held that
+      a lawful acquirer of a program is entitled, without the rightholder's
+      authorisation, to decompile all or part of the program (including
+      disabling a malfunctioning function) where that is necessary to
+      correct errors affecting its functioning, subject to Article 5(1)'s
+      own conditions (necessity; no contrary contractual term; the acquirer
+      may not otherwise be able to correct the error, e.g. because source
+      code was not made available). The Court confirmed this error-
+      correction decompilation right under Article 5(1) is distinct from,
+      and not subsumed by, the interoperability-decompilation regime of
+      Article 6 -- the rightholder cannot force every decompilation claim
+      into Article 6's stricter conditions. Relevant wherever the
+      justification offered for decompiling a reference program is error
+      correction/maintenance rather than interoperability.
+  - citation: "Case C-159/23 Sony Computer Entertainment Europe Ltd v Datel Design and Development Ltd and Datel Direct Ltd, judgment of 17 October 2024, EU:C:2024:892"
+    relevance: >
+      Interpreting Articles 1(2) and 4(1)(b) of Directive 2009/24/EC in a
+      dispute over PlayStation "cheat" software, held that software which
+      merely changes the content of variables temporarily transferred to
+      a console's RAM during a program's execution, without reproducing or
+      adapting the program's source code, object code, or its internal
+      structure and organisation, does not infringe the reproduction or
+      adaptation rights under Article 4(1)(b). Significant for two
+      reasons: it confirms for the first time that a program's "internal
+      structure and organisation" (not only its literal code) is part of
+      the protected expression, while also confirming that unprotected
+      run-time data/variables generated by a program's execution remain
+      outside that protection. Relevant to any similarity assessment that
+      turns on non-literal structural similarity versus mere behavioural/
+      data-level correspondence.
+
+conflicts_of_laws_notes: >
+  Regulation (EC) No 593/2008 (Rome I) governs the law applicable to
+  contractual obligations (e.g. a reference-material licence or NDA),
+  subject to party choice under Article 3 and default rules under Article 4
+  absent choice. Regulation (EC) No 864/2007 (Rome II) governs the law
+  applicable to non-contractual obligations; its Article 8 provides that a
+  non-contractual obligation arising from an infringement of an
+  intellectual property right is governed by the law of the country FOR
+  WHICH PROTECTION IS CLAIMED (lex loci protectionis) -- a rule that
+  cannot be displaced by party agreement (Article 8(3)) and that may well
+  differ from whatever law governs the licence contract itself under Rome
+  I. Regulation (EU) No 1215/2012 (Brussels I Recast) governs which member
+  state's courts have jurisdiction and how judgments are recognised and
+  enforced across the EU, generally on the basis of the defendant's
+  domicile (Article 4) subject to special/exclusive jurisdiction rules
+  (e.g. Article 7(2) for tort/delict, at the place where the harmful event
+  occurred). As with the england-wales pack's approach to UK conflicts
+  rules: treat "governing law of the licence," "governing law of the IP
+  infringement claim," and "which member state's courts have jurisdiction"
+  as three distinct questions that can each point to a different member
+  state, not a single unified analysis.
+
+court_terminology:
+  trial_court: "There is no EU-level trial court for this subject matter: EU directives (e.g. the Software Directive) are transposed into and applied in the first instance by the ordinary national courts of each member state (see the england-wales, france and germany packs for the relevant national first-instance courts), applying their own national implementing legislation."
+  appellate_court: "National appellate courts of the member state in question, applying the same national implementing legislation; any national court or tribunal, at any level, may refer a question on the interpretation of EU law to the CJEU under Article 267 TFEU where a ruling is necessary to give judgment."
+  final_court: "A national court of last instance (against whose decision there is no judicial remedy under national law) is, in principle, OBLIGED under Article 267(3) TFEU to refer an unresolved question of EU-law interpretation to the CJEU, subject to the 'acte clair'/'acte eclaire' exceptions recognised in Case 283/81 CILFIT and Lanificio di Gavardo SpA v Ministero della Sanita (judgment of 6 October 1982). The CJEU itself -- comprising the Court of Justice and the General Court -- does NOT sit as an ordinary court of final appeal over the national dispute; in its Article 267 TFEU role it answers the referred question of interpretation and remits the case to the referring national court to apply that answer and decide the actual dispute."
+  simulated_judicial_role_title: "Simulated CJEU Preliminary Ruling Panel (answers a discrete Article 267 TFEU interpretive question on EU software-copyright law; it is not a merits tribunal and does not decide the underlying infringement dispute, which remains for the national court)"
+
+interoperability_permitted_acts:
+  summary: >
+    Three distinct, non-excludable-by-contract-in-part permitted acts under
+    Directive 2009/24/EC, each with its own scope: (1) Article 5(1) --
+    absent a specific contrary contractual term, a lawful acquirer may
+    perform the acts (including loading, running, and error correction,
+    per Case C-13/20 Top System) necessary to use the program for its
+    intended purpose; (2) Article 5(3) -- a person with a right to use a
+    copy may observe, study or test its functioning, without authorisation
+    and without this right being excludable by contract, to determine the
+    ideas and principles underlying any element of it; (3) Article 6 --
+    decompilation specifically for achieving interoperability of an
+    independently created program is permitted only where indispensable,
+    only by a licensee/authorised person, only where the interoperability
+    information was not otherwise readily available, and only to the
+    extent necessary, with Article 6(2) further restricting use of any
+    information obtained to interoperability purposes (not disclosure to
+    others beyond what is necessary, and not use to develop a substantially
+    similar program). Whether a specific analysis activity in Zone R falls
+    within (1), (2) or (3) -- or none of them -- is fact-sensitive and must
+    be assessed per Part XXXII (contractual testing gate) before relying on
+    any of them; note that Case C-13/20 confirms these are three separate,
+    cumulative-not-exclusive gateways, not competing tests for the same
+    conduct.
+
+questions_for_review:
+  - "Which member state's national legislation transposing the Software Directive actually governs this analysis, and does that member state's implementation of Article 5/6 narrow, widen, or otherwise diverge from the Directive's text in a way that matters here (see the england-wales, france and germany packs for the specific national implementations already checked)?"
+  - "Is this a cross-border EU distribution or licensing scenario in which Rome I (governing-law-of-the-licence), Rome II Article 8 (lex loci protectionis for the infringement claim), and Brussels I Recast (jurisdiction) may point to different member states' laws or courts for different aspects of the same fact pattern, rather than a single unified 'which country's law applies' answer?"
+  - "Has a CJEU ruling -- e.g. C-406/10 SAS v WPL (interfaces/functionality/data formats), C-393/09 BSA (GUIs), C-128/11 UsedSoft (exhaustion/lawful acquirer), C-13/20 Top System (error-correction decompilation), or C-159/23 Sony v Datel (internal structure/organisation vs. runtime data) -- already addressed this exact fact pattern, such that the point is 'acte clair' and no fresh Article 267 TFEU reference would be needed if the question reached a national court of last instance?"
+  - "Are the similarities identified in the similarity report attributable to the reference program's 'internal structure and organisation' (potentially protected expression per C-159/23 Sony v Datel), or to its functionality, programming language, data-file formats, or interfaces (not protected as expression per Article 1(2) and C-406/10 SAS v WPL)?"
+  - "If the reference material was obtained under a confidentiality obligation, does the Trade Secrets Directive's lawful-acquisition carve-out for observation/study/testing of a product made available to the public or lawfully in the observer's possession (Article 3(1)(b) of Directive (EU) 2016/943) independently justify the access, separately from whichever Software Directive permitted act is also being relied on?"

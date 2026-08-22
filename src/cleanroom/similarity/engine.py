@@ -19,9 +19,7 @@ from typing import Any
 from cleanroom.similarity.classify import classify
 from cleanroom.similarity.lexical import lexical_similarity
 from cleanroom.similarity.negative_control import background_scores
-from cleanroom.similarity.structural import structural_similarity
-
-SOURCE_SUFFIXES = {".py", ".js", ".ts", ".jsx", ".tsx", ".go", ".rs", ".java", ".rb", ".c", ".cpp", ".h"}
+from cleanroom.similarity.structural import SOURCE_SUFFIXES, SUFFIX_TO_ASTGREP_LANG, structural_similarity
 IGNORE_DIRNAMES = {".git", "__pycache__", ".venv", "node_modules", "dist", "build"}
 
 
@@ -103,14 +101,25 @@ def compare_trees(
     negative_control_roots = negative_control_roots or []
     plan = _plan_pairs(reference_root, implementation_root, max_comparisons=max_comparisons)
 
+    # Cache per impl-file text and background score: an impl file compared
+    # against multiple reference files (the all-pairs fallback) previously
+    # re-read every negative-control file and recomputed its background
+    # score once per pair, rather than once per impl file.
+    impl_text_cache: dict[Path, str] = {}
+    background_cache: dict[Path, dict[str, float]] = {}
+
     findings = []
     for i, (ref_file, impl_file) in enumerate(plan.pairs):
         ref_text = ref_file.read_text(encoding="utf-8", errors="replace")
-        impl_text = impl_file.read_text(encoding="utf-8", errors="replace")
+        if impl_file not in impl_text_cache:
+            impl_text_cache[impl_file] = impl_file.read_text(encoding="utf-8", errors="replace")
+            background_cache[impl_file] = (
+                background_scores(impl_text_cache[impl_file], negative_control_roots) if negative_control_roots else {}
+            )
+        impl_text = impl_text_cache[impl_file]
+        background = background_cache[impl_file]
         ref_rel = str(ref_file.relative_to(reference_root))
         impl_rel = str(impl_file.relative_to(implementation_root))
-
-        background = background_scores(impl_text, negative_control_roots) if negative_control_roots else {}
 
         lex_score = lexical_similarity(ref_text, impl_text)
         findings.append(
@@ -121,10 +130,17 @@ def compare_trees(
             ).to_dict()
         )
 
-        struct_score, struct_method = structural_similarity(ref_text, impl_text)
+        language = SUFFIX_TO_ASTGREP_LANG.get(impl_file.suffix)
+        struct_score, struct_method = structural_similarity(ref_text, impl_text, language=language)
+        # A generic bracket/keyword fallback is real but weaker evidence
+        # than an actual AST/tree-sitter comparison (see structural.py's
+        # docstring) -- down-weight it by requiring a higher score before
+        # it's flagged, rather than silently giving it the same confidence
+        # as a real parse.
+        effective_threshold = structural_threshold * 1.5 if struct_method == "generic_fallback" else structural_threshold
         finding = classify(
             finding_id=f"SIM-STRUCT-{i:05d}", method="structural", reference_ref=ref_rel,
-            implementation_ref=impl_rel, score=struct_score, threshold=structural_threshold,
+            implementation_ref=impl_rel, score=struct_score, threshold=effective_threshold,
             background_score=background.get("structural"),
         )
         finding_dict = finding.to_dict()

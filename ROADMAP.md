@@ -27,11 +27,14 @@ see "External review findings" and "Competitive landscape" below.
   manifests, with symlink/non-regular-file safety) and policy evaluation,
   with 5 licence packs: MIT, Apache-2.0, GPL-3.0-only, AGPL-3.0-only,
   BUSL-1.1 (this project's own licence).
-- A minimal SPDX expression parser (`AND`/`OR`/`WITH`, `LicenseRef-*`,
-  a curated known-identifier list -- not the full SPDX licence list).
-- Jurisdiction resolution engine with 2 real packs: England & Wales and
-  US federal (real statutes and leading case law, structured review
-  questions, never defaulting to a single assumed jurisdiction).
+- SPDX expression parsing backed by the real `license-expression` library
+  (`AND`/`OR`/`WITH`, the full real SPDX licence list via
+  `get_spdx_licensing()`, `LicenseRef-*` always flagged for manual review)
+  -- replaced the earlier hand-rolled, curated-subset parser.
+- Jurisdiction resolution engine with 6 real, independently fact-checked
+  packs: England & Wales, US federal, EU, France, Germany, Japan (real
+  statutes and leading case law, structured review questions, never
+  defaulting to a single assumed jurisdiction).
 - Sanitisation scanner (secrets, code-like text, prompt-injection
   phrasing, distinctive-identifier overlap covering camelCase/PascalCase/
   snake_case, verbatim-text overlap checked at every offset via an n-gram
@@ -45,8 +48,11 @@ see "External review findings" and "Competitive landscape" below.
   the CLI) and integrity verification, with symlink-escape detection so
   Zone R content can't be smuggled into the "sanitised" bundle via a link.
 - Similarity engine: lexical (token-shingle Jaccard), structural (real
-  Python AST comparison; generic bracket/keyword fallback for other
-  languages), and negative-control background scoring -- with automatic
+  Python AST comparison, and real tree-sitter comparison via `ast-grep-py`
+  for JavaScript/TypeScript/Go/Rust/Java/Ruby/C/C++; a generic bracket/
+  keyword fallback -- down-weighted via a higher classification threshold
+  -- only for languages neither path supports), and negative-control
+  background scoring -- with automatic
   classification restricted to `coincidental`/`conventional`/`suspicious`
   only (`required`/`constrained`/`material` require human/panel review by
   design). Now wired to a real CLI command, `cleanroom similarity
@@ -104,7 +110,7 @@ see "External review findings" and "Competitive landscape" below.
 - Licensed under **BUSL-1.1** (Business Source License 1.1): free for
   essentially all use including internal commercial use, restricted from
   being resold/white-labelled as a competing product, converting to
-  GPL-2.0-or-later on 2030-08-22.
+  GPL-3.0-or-later on 2030-08-22.
 
 ## External review findings (2026-08-22) -- fixed this pass
 
@@ -377,15 +383,22 @@ change that should be evaluated on its own.
   derivative_work_question, linking, distribution, patent_risk,
   trademark_risk, database_rights, confidentiality, trade_secrets) have no
   dedicated heuristic yet -- always `UNKNOWN`.
-- **Jurisdiction packs**: only England & Wales and US federal exist. EU,
-  Germany, France, Japan (mentioned in the original design brief) are not
-  built. Adding one is a real research task (see CONTRIBUTING.md), not a
-  template fill-in.
-- **Structural similarity**: real AST comparison only for Python. Other
-  languages use a much weaker bracket/keyword-shape fallback
-  (`structural_similarity` reports which method was used so callers can
-  weight accordingly) -- see "Competitive landscape" for a concrete
-  tree-sitter-based upgrade path.
+- **Jurisdiction packs**: England & Wales, US federal, EU, France, Germany
+  and Japan now exist (6 of the 6 originally mentioned in the design
+  brief). Adding a further jurisdiction is still a real research task (see
+  CONTRIBUTING.md), not a template fill-in -- each existing pack's
+  citations were independently verified against primary sources
+  (official statute translations, EUR-Lex/BGH/Cour de cassation/
+  Bundesgerichtshof/court self-published texts), and two case law
+  citations in the France and Japan packs are explicitly flagged as
+  unverified/pre-dating the modern IP court structure rather than forced
+  into a false fit.
+- **Structural similarity**: real AST comparison for Python, and real
+  tree-sitter comparison (via `ast-grep-py`) for JavaScript/TypeScript/Go/
+  Rust/Java/Ruby/C/C++. Any other language still uses a much weaker
+  bracket/keyword-shape fallback (`structural_similarity` reports which
+  method was used, and `compare_trees` down-weights fallback-based
+  findings with a higher classification threshold).
 - **SBOM/dependency discovery**: direct declared dependencies only, from
   `requirements.txt`/`pyproject.toml`/`package.json`. No transitive
   resolution, no registry lookups for licence/hash of resolved versions.
@@ -427,16 +440,23 @@ change that should be evaluated on its own.
 1. Wire `PathGuard.check()` into a real per-agent file-access path for
    whatever orchestration harness this library is embedded in (the
    remaining piece of the isolation-enforcement gap above).
-2. Depend on `license-expression` (~1-2 days) and/or ScanCode Toolkit as an
-   optional extra (~1-2 days) instead of the hand-rolled SPDX parser and
-   licence-text fingerprints -- see "Competitive landscape" for the
-   verified effort estimates and the one real gap in each (flat operator
-   list; heavy transitive dependency tree).
-3. `ast-grep-py`-based structural similarity for JS/Go/Rust/Java
-   (~half a day to a day for all four -- see "Competitive landscape").
+2. ~~Depend on `license-expression`~~ -- **done**: `spdx.py` is now backed
+   by the real `license-expression` library. ScanCode Toolkit remains an
+   option for a future optional `[licensecheck]` extra (not a base
+   dependency, given its ~40 transitive deps) if deeper licence-text
+   detection is needed beyond the current fingerprint scanner.
+3. ~~`ast-grep-py`-based structural similarity for JS/Go/Rust/Java~~ --
+   **done**, and extended to also cover TypeScript/TSX/Ruby/C/C++.
 4. More legal-issue heuristics (particularly `distribution`,
    `licence_obligations`, `derivative_work_question`, since those close
    the loop with the licence-discovery/policy layer that already exists).
+5. spdx-tools / cyclonedx-python-lib to replace the hand-rolled SBOM
+   serialization in `provenance/sbom.py` (both Apache-2.0; not yet
+   started this pass).
+6. SLSA build provenance via `actions/attest-build-provenance` in a
+   release workflow (confirmed buildable; not yet built).
+7. Automatic clean-room-level (CR0-CR5) computation from project state
+   (not yet started).
 5. A third jurisdiction pack (EU, as the design brief's next most-requested).
 6. `spdx-tools`/`cyclonedx-python-lib` for spec-valid, schema-validated SBOM
    output in place of the hand-rolled serialisation (~1.5-2 days combined).

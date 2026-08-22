@@ -1,0 +1,244 @@
+# Jurisdiction pack: France
+# Part LXIII. Facts and structured questions for the heuristic legal engine
+# and the simulated legal/judicial panels. NOT legal advice -- see
+# docs/legal-disclaimer.md. Every article number and case citation in this
+# pack was checked directly against legifrance.gouv.fr (statutory text and
+# Cour de cassation decisions) and EUR-Lex (EU directive text) before being
+# written down; none is reproduced from unverified memory. Currency should
+# still be re-checked (Part LIII) before relying on this pack -- legifrance.gouv.fr
+# and courdecassation.fr are the canonical sources, and legifrance.gouv.fr
+# is the source of the exact article text quoted/paraphrased below.
+
+jurisdiction_id: france
+legal_system: civil_law
+languages: [fr, en]
+
+governing_statutes:
+  - name: "Code de la propriété intellectuelle (CPI), Article L112-2, 13°"
+    short: "CPI, Art. L112-2 13°"
+    url: "https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000006278875"
+    relevance: >
+      Enumerates the categories of "oeuvres de l'esprit" (works of the mind)
+      protected by droit d'auteur. Item 13° of the list reads "Les
+      logiciels, y compris le matériel de conception préparatoire" (software,
+      including preparatory design material) -- the express statutory basis
+      for treating a computer program (and its preparatory design
+      materials) as a protected work under French copyright law, confirmed
+      verbatim against the Légifrance text.
+  - name: "Code de la propriété intellectuelle (CPI), Article L122-6"
+    short: "CPI, Art. L122-6"
+    url: "https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000006278919"
+    relevance: >
+      Defines the software author's exclusive exploitation rights, subject
+      to Article L122-6-1: 1° permanent or provisional reproduction of the
+      software in whole or in part, by any means and in any form (loading,
+      display, running, transmission or storage that requires reproduction
+      is only lawful with the author's authorisation); 2° translation,
+      adaptation, arrangement or any other modification of the software and
+      reproduction of the resulting software; 3° placing on the market for
+      value or free of charge, including rental, of copies of the software,
+      subject to EU/EEA first-sale exhaustion (except for the right to
+      authorise subsequent rental). This is France's implementation of
+      Article 4 of EU Software Directive 2009/24/EC.
+  - name: "Code de la propriété intellectuelle (CPI), Article L122-6-1"
+    short: "CPI, Art. L122-6-1"
+    url: "https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000044365559"
+    relevance: >
+      France's implementation of Articles 5 and 6 of EU Software Directive
+      2009/24/EC -- the permitted acts that qualify or limit L122-6. Per the
+      verified Légifrance text: (I) the acts in L122-6 1°/2° do not require
+      authorisation when necessary for use of the software in accordance
+      with its intended purpose by the person entitled to use it, including
+      to correct errors (the rightholder may reserve the error-correction
+      right and set conditions by contract); (II) the authorised user may
+      make a back-up copy where necessary to preserve use of the software;
+      (III) the authorised user may, without authorisation, observe, study
+      or test the functioning of the software in order to determine the
+      ideas and principles underlying any element of it, while performing
+      any authorised loading/display/running/transmission/storage
+      operation; (IV) reproduction of the code or translation of its form
+      is not subject to authorisation where indispensable to obtain the
+      information necessary to achieve interoperability of an independently
+      created program, subject to conditions on who may act, what may be
+      accessed, and restrictions on how the resulting information may be
+      used or disclosed; (VIII) none of this may be interpreted as
+      permitting acts that conflict with normal exploitation of the
+      software or unreasonably prejudice the rightholder's legitimate
+      interests, and contrary contractual stipulations against paragraphs
+      II, III and IV are null and void (d'ordre public).
+  - name: "Code de la propriété intellectuelle (CPI), Article L121-1"
+    short: "CPI, Art. L121-1"
+    url: "https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000006278891"
+    relevance: >
+      The general droit moral (moral right) provision: the author enjoys
+      the right to respect for their name, authorial status and work; this
+      right is personal, perpetual, inalienable and imprescriptible, and
+      transmissible on death. Verified verbatim against Légifrance. France's
+      droit d'auteur tradition treats authorship/moral rights as a
+      continuing personal attribute of the human author, analytically
+      distinct from the exploitation (patrimonial) rights in L122-6 that
+      are the ones actually assigned/licensed in most software contracts --
+      see conflicts_of_laws_notes below on why this matters, and does not
+      unduly matter, for a clean-room reimplementation question.
+  - name: "Code de la propriété intellectuelle (CPI), Article L331-1"
+    short: "CPI, Art. L331-1"
+    url: "https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000019298716/2008-08-06"
+    relevance: >
+      Gives the judicial courts (juridictions de l'ordre judiciaire)
+      exclusive jurisdiction over civil disputes arising from Book I of the
+      CPI (literary and artistic property, which includes software
+      copyright), without prejudice to the injured party's right to bring a
+      criminal action. The seat/territorial jurisdiction of the specific
+      tribunaux judiciaires exercising this exclusive competence is fixed by
+      Article D211-6-1 of the Code de l'organisation judiciaire (see
+      court_terminology below).
+  - name: "Directive 2009/24/EC of the European Parliament and of the Council of 23 April 2009 on the legal protection of computer programs"
+    short: "EU Software Directive 2009/24/EC"
+    url: "https://eur-lex.europa.eu/eli/dir/2009/24/oj/eng"
+    relevance: >
+      The EU instrument CPI Articles L122-6/L122-6-1 implement. Article 5
+      is the general-exceptions provision (use per intended purpose
+      including error correction; back-up copy; observe/study/test while
+      running the program) corresponding to CPI L122-6-1 I-III. Article 6 is
+      the decompilation-for-interoperability provision corresponding to CPI
+      L122-6-1 IV. Confirmed against the EUR-Lex text of the Directive.
+
+leading_case_law:
+  - citation: "Cass. Ass. plén., 7 mars 1986, Babolat Maillot Witt c. M. X. (Pachot), pourvoi no. 83-10.477, Bull. Ass. plén. no. 3 (Publié au bulletin)"
+    relevance: >
+      Confirmed on Légifrance (JURITEXT000007016934): court, date, pourvoi
+      number, parties and publication status all verified directly. The
+      foundational French decision on software copyrightability: a computer
+      program is protectable where its author's effort goes beyond the mere
+      application of a mechanical/constrained logic and shows a
+      "personalized effort" (apport intellectuel) whose materialization
+      lies in an "individualized structure" -- i.e. the software bears the
+      "mark of [the author's] intellectual contribution." This is France's
+      analogue to the originality threshold that separates protectable
+      expression from unprotectable functional logic, relevant to Part
+      XVI's observable-requirement/source-implementation-detail split.
+  - citation: "Cass. civ. 1re, 20 octobre 2011, Fiducial Informatique c. M. X., Alphapi, DPSI et And@lys, pourvoi no. 10-14.069, Bull. civ. I (Publié au bulletin)"
+    relevance: >
+      Confirmed on Légifrance (JURITEXT000024701253): court/chamber, date,
+      pourvoi number, parties and publication status all verified directly.
+      Held that data-migration operations, carried out by a third party
+      authorised by a licensee to recover the licensee's own data files from
+      one program so as to move to a competing program, fell within the
+      "strict necessities of interoperability" protected by CPI Article
+      L122-6-1 IV, applying the Article 1(1) Directive 2009/24/EC definition
+      of interoperability as "the capacity to exchange information and
+      mutually use the information which has been exchanged." Directly
+      relevant to how narrowly or broadly a "necessary for interoperability"
+      justification should be read for reference-analysis or migration-type
+      activity touching French-protected software.
+  - citation: "UNVERIFIED -- no further Cour de cassation decision squarely on decompilation-for-clean-room-reimplementation was found with a checkable citation"
+    relevance: >
+      Secondary sources (law-firm bulletins, Lexbase, Village Justice)
+      repeatedly reference a Cour d'appel de Caen decision of 18 March 2015
+      acquitting a defendant of contrefaçon for partial Skype decompilation
+      undertaken for interoperability, and a Cour d'appel de Paris decision
+      from 2006 on the limits of disassembly under L122-6-1 IV. Neither is
+      included as a citation here: both are appellate (not Cour de
+      cassation) decisions, and this pass could not locate their full
+      Légifrance/courdecassation.fr references (chamber, precise date, RG or
+      pourvoi number) to check them directly, per the instruction to omit
+      rather than fabricate a citation. If this pack is extended, these two
+      should be tracked down and verified (or dropped) before being relied
+      on -- do not treat the secondary-source summaries above as citable
+      case law until then.
+
+conflicts_of_laws_notes: >
+  France is an EU Member State: choice of law for contractual obligations is
+  governed by Rome I (Regulation (EC) No. 593/2008) and for non-contractual
+  obligations by Rome II (Regulation (EC) No. 864/2007), as in the EU pack.
+  Copyright subsistence and infringement questions are generally governed by
+  the law of the country for which protection is sought (lex loci
+  protectionis) rather than by the law governing any licence contract --
+  treat "governing law of the licence" and "applicable copyright law" as
+  distinct questions, as in the England & Wales pack. One France-specific
+  nuance: French droit d'auteur treats moral rights (droit moral, CPI
+  Article L121-1 -- respect for name, authorial status and integrity of the
+  work; perpetual, inalienable, imprescriptible) as a standing attribute of
+  the human author, separate from and surviving any assignment of the
+  patrimonial/exploitation rights in CPI Article L122-6. This is a real
+  doctrinal difference from the UK/US copyright tradition, where authorial
+  attribution is not typically treated as a perpetual, inalienable right
+  running alongside an assignable economic right. Do not overstate its
+  practical effect here, though: droit moral protects the author's
+  personality interest in a specific existing work (its integrity,
+  attribution, disclosure) -- it is not a mechanism for one author to claim
+  rights over a second party's independently written, non-copying
+  reimplementation, and it has no special bearing on whether reproducing
+  observed *functionality* (as opposed to a specific author's expressive
+  choices) infringes. Where it can be practically relevant to this
+  project's process is narrower: verbatim reuse of an original author's
+  documentation text, error messages, or distinctive naming choices in a
+  reimplementation could implicate both patrimonial copyright and (if
+  attribution or integrity is affected) moral rights -- one more reason Zone
+  R outputs should stay at the level of observed behaviour, not copied text.
+
+court_terminology:
+  trial_court: >
+    Tribunal judiciaire (following the 1 January 2020 merger of the tribunal
+    de grande instance and tribunal d'instance). For literary and artistic
+    property (which includes software copyright), designs and models,
+    trademarks and geographical indications, CPI Article L331-1 gives
+    exclusive jurisdiction to a designated subset of tribunaux judiciaires
+    only, fixed by Article D211-6-1 of the Code de l'organisation
+    judiciaire: as verified against Légifrance, these are the tribunaux
+    judiciaires of Bordeaux, Lille, Lyon, Marseille, Nanterre, Nancy, Paris,
+    Rennes and Fort-de-France -- concentrated jurisdiction, not solely
+    Paris. (By contrast, Article D211-6 COJ gives the Paris tribunal
+    judiciaire sole nationwide jurisdiction over patents, utility
+    certificates and semiconductor topographies -- a stricter, single-forum
+    rule that does NOT apply to software copyright as such; do not conflate
+    the two regimes.)
+  appellate_court: "Cour d'appel (the territorial cour d'appel for the tribunal judiciaire seised, e.g. Cour d'appel de Paris)"
+  final_court: "Cour de cassation (Chambre civile, most often the première chambre civile for literary/artistic property matters, as in the 2011 Fiducial decision above; a copyright question can also reach the Assemblée plénière, as Babolat/Pachot did)"
+  simulated_judicial_role_title: "Simulated Cour de Cassation (Chambre Civile) IP Reviewer"
+  note: >
+    Per Part XLVI's principle, this deliberately does not reuse
+    England & Wales/US common-law titles ("High Court", "District Court").
+    France is a civil-law jurisdiction: the Cour de cassation reviews
+    questions of law only (not fact), does not itself retry the case on the
+    merits, and typically either quashes (casse) and remands to a different
+    cour d'appel or rejects the pourvoi -- a materially different role from
+    a common-law apex court affirming/reversing a judgment outright. Frame
+    any simulated-panel review accordingly rather than importing a
+    common-law appellate posture.
+
+interoperability_permitted_acts:
+  summary: >
+    CPI Article L122-6-1 (implementing Software Directive 2009/24/EC
+    Articles 5-6) is the operative framework, and per paragraph VIII it is
+    d'ordre public: paragraphs II (back-up copy), III (observe/study/test)
+    and IV (decompilation) cannot be excluded or narrowed by contract.
+    Paragraph I permits use-consistent-with-intended-purpose acts including
+    error correction (subject to contractual conditions the rightholder may
+    impose on error correction specifically). Paragraph III permits
+    observing, studying or testing the software's functioning, without
+    authorisation, to determine the underlying ideas and principles, but
+    only while carrying out an authorised loading/display/running/
+    transmission/storage operation -- it does not authorise decompilation.
+    Paragraph IV permits reproduction/translation of code where indispensable
+    to obtain interoperability information for an independently created
+    program, subject to conditions on who may perform it, what may be
+    accessed, and a hard restriction against using the resulting
+    information for any purpose other than achieving interoperability of
+    the independently created program, or disclosing it to third parties
+    except as necessary for that interoperability. Cass. civ. 1re,
+    20 October 2011 (10-14.069, above) confirms these permitted acts are
+    read functionally (data migration to enable moving to a competing
+    program qualified) rather than narrowly to only classic decompilation.
+    Whether a specific Zone R analysis activity falls within L122-6-1 is
+    fact-sensitive and must be assessed per Part XXXII (contractual testing
+    gate) before relying on it -- paragraph I's contractual carve-out for
+    error correction, in particular, means the "cannot be excluded by
+    contract" protection is narrower here than it looks at first glance.
+
+questions_for_review:
+  - "Does the reference-analysis activity fall within CPI L122-6-1 III (observe/study/test while performing an authorised operation) or L122-6-1 IV (decompilation for interoperability), and if IV, are all of its conditions met -- performed by an authorised user or someone acting on their behalf, limited to the parts indispensable for interoperability, and is the resulting information confined to achieving interoperability of the independently created program without disclosure beyond that purpose?"
+  - "Is there a contractual clause purporting to restrict back-up copies (L122-6-1 II), observation/study/testing (III) or decompilation (IV), and if so is it void as against French ordre public under L122-6-1 VIII -- as distinct from L122-6-1 I's error-correction acts, where the rightholder MAY validly impose contractual conditions?"
+  - "Do the similarities identified in the similarity report reflect an 'individualized structure' bearing the mark of the original author's personal intellectual contribution (the Pachot originality test), or unprotectable functional/constrained logic -- and separately, could any verbatim reuse of the reference's documentation text, UI strings or distinctive naming implicate the original author's droit moral (L121-1) independently of the patrimonial-copyright analysis?"
+  - "Is France (or another EU/EEA state) a required distribution market, and if so does Rome I/Rome II choice-of-law analysis (as in the EU pack) apply separately from the lex loci protectionis question of whether French copyright subsists in and is infringed by the reimplementation?"
+  - "If French litigation risk is being modelled, has the analysis used the correct concentrated-jurisdiction list for literary/artistic property (the nine tribunaux judiciaires under COJ Article D211-6-1), rather than assuming the stricter Paris-only rule that in fact applies only to patents (COJ Article D211-6)?"

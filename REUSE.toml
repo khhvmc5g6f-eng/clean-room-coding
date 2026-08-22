@@ -6,7 +6,7 @@ SPDX-PackageDownloadLocation = "https://github.com/khhvmc5g6f-eng/clean-room-cod
 # This project's own source, schemas, policy/jurisdiction packs, docs and
 # tests are licensed under the Business Source License 1.1 (see LICENSE/
 # NOTICE) -- source-available, not OSI-approved; converts to
-# GPL-2.0-or-later on 2030-08-22. Rather than stamping an
+# GPL-3.0-or-later on 2030-08-22. Rather than stamping an
 # SPDX-FileCopyrightText/SPDX-License-Identifier header into every file
 # individually, this global annotation covers the whole tree per the
 # REUSE 3.x TOML format; per-file headers remain the more precise option

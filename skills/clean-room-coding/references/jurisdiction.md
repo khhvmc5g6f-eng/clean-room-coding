@@ -12,14 +12,21 @@ competition_law), every configured market gets a tier: `primary` (required
 market with a pack), `secondary` (informational market with a pack), or
 `unknown` (no pack available -- flag for qualified local counsel).
 
-v0.1 ships two jurisdiction packs, `/jurisdictions/england-wales/framework.yml`
-and `/jurisdictions/usa-federal/framework.yml`: governing statutes, leading
-case law with real citations (Navitaire v Easyjet, SAS v WPL, IBCOS v
-Barclays, Computer Associates v Altai, Sega v Accolade, Oracle v Google,
-Lotus v Borland), conflicts-of-laws notes, court terminology (including the
-`simulated_judicial_role_title` used by `cleanroom judge` -- never call a
-simulated reviewer a generic "judge" without this jurisdiction-appropriate
-framing), and `questions_for_review`.
+v0.1 ships six jurisdiction packs under `/jurisdictions/<id>/framework.yml`:
+`england-wales`, `usa-federal`, `eu`, `france`, `germany`, `japan`. Each is
+independently fact-checked against primary sources and contains governing
+statutes, leading case law with real citations (England & Wales/US:
+Navitaire v Easyjet, SAS v WPL, IBCOS v Barclays, Computer Associates v
+Altai, Sega v Accolade, Oracle v Google, Lotus v Borland; EU/France/
+Germany/Japan add CJEU cases such as SAS Institute v WPL and UsedSoft v
+Oracle, Cour de cassation's Babolat v Pachot, BGH's UsedSoft II and World
+of Warcraft I, and Japan's System Science v Toyo Sokki), conflicts-of-laws
+notes, court terminology (including the `simulated_judicial_role_title`
+used by `cleanroom judge` -- never call a simulated reviewer a generic
+"judge" without this jurisdiction-appropriate framing), and
+`questions_for_review`. Two case-law entries (in the France and Japan
+packs) are explicitly flagged in-file as unverified or pre-dating the
+modern IP court structure, rather than presented as settled authority.
 
 **More than one jurisdiction is normal.** If `required_markets` has more
 than one entry, `conflicts_of_law_panel_required` is set `true` in the

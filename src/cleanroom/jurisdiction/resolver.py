@@ -23,6 +23,10 @@ COUNTRY_TO_PACK = {
     "gb": "england-wales",
     "uk": "england-wales",
     "us": "usa-federal",
+    "fr": "france",
+    "de": "germany",
+    "jp": "japan",
+    "eu": "eu",
 }
 
 LEGAL_ISSUES = [

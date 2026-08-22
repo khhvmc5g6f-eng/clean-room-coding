@@ -96,7 +96,7 @@ Initial v0.1.0 build. This is early, alpha software — see
   that; BUSL-1.1 permits free use including internal commercial use, but
   not offering the software to third parties as a competing hosted/SaaS
   product or reselling/white-labelling it, and automatically converts to
-  GPL-2.0-or-later on 2030-08-22 for each released version. See
+  GPL-3.0-or-later on 2030-08-22 for each released version. See
   `LICENSE`/`NOTICE`/`REUSE.toml`.
 - `cleanroom audit` now checks Zone H licences against the project's own
   configured `dependency_policy` (previously a hardcoded MIT/Apache-2.0
@@ -216,5 +216,48 @@ detail:
   exit-codes.md` wrongly said exit code 7 was unwired (it has been, since
   `cleanroom similarity` shipped); `cleanroom verify`/`cleanroom status`
   were never mentioned in the skill; the licence-pack count was stale.
+
+### Added (third pass — library integrations and jurisdiction coverage)
+
+- `src/cleanroom/licence/spdx.py` is now backed by the real
+  `license-expression` library (`get_spdx_licensing()`), replacing the
+  hand-rolled curated-subset parser with the full real SPDX licence list;
+  the public API surface is unchanged and all existing tests pass
+  unmodified.
+- Real tree-sitter structural similarity via `ast-grep-py`
+  (`similarity/structural.py`'s `treesitter_structural_shape`) for
+  JavaScript, TypeScript, TSX, Go, Rust, Java, Ruby, C and C++ — previously
+  only Python had a real AST comparison; every other language used the
+  weaker bracket/keyword fallback. `similarity/engine.py` now derives a
+  language hint per compared file and down-weights genuine
+  `generic_fallback` findings with a 1.5x higher classification
+  threshold, since that path is real but weaker evidence.
+- Four new independently fact-checked jurisdiction packs: `eu`, `france`,
+  `germany`, `japan` (`jurisdictions/<id>/framework.yml`), bringing the
+  total to 6. Each cites real primary sources (official statute
+  translations, EUR-Lex, Cour de cassation, Bundesgerichtshof, Japan's
+  Ministry of Justice translation service) verified during this pass, not
+  reused from training-data recall; two case-law entries (France, Japan)
+  are explicitly flagged in-file as unverified/pre-dating the modern IP
+  court structure rather than presented as settled authority.
+
+### Fixed (third pass)
+
+- **`treesitter_structural_shape` silently escaped its own error
+  handling.** `ast-grep-py`'s underlying Rust library raises
+  `pyo3_runtime.PanicException` for an unrecognised language string, and
+  that exception class subclasses `BaseException` directly rather than
+  `Exception` — so the function's `except Exception` clause never caught
+  it, and an unsupported/misspelled language crashed the whole comparison
+  instead of falling back. Confirmed by direct reproduction (inspecting
+  the exception's `__mro__`); fixed by catching `BaseException` in that
+  narrowly-scoped single-call `try` block.
+- **The four new jurisdiction packs were orphan files.**
+  `jurisdiction/resolver.py`'s `COUNTRY_TO_PACK` only mapped `gb`/`uk`/`us`
+  to their packs — `eu`/`fr`/`de`/`jp` had no entry, so `build_matrix`
+  would report every EU/France/Germany/Japan market as `unknown` tier
+  regardless of the new packs existing on disk. Fixed by extending
+  `COUNTRY_TO_PACK`; a regression test (`test_new_jurisdiction_markets_
+  resolve_to_primary_tier`) now asserts all four resolve to `primary`.
 
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD

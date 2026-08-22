@@ -1,0 +1,204 @@
+# Jurisdiction pack: Germany
+# Part LXIII. Facts and structured questions for the heuristic legal engine
+# and the simulated legal/judicial panels. NOT legal advice -- see
+# docs/legal-disclaimer.md. Primary authorities cited are foundational and
+# stable, but currency should always be re-checked (Part LIII) before relying
+# on this pack. gesetze-im-internet.de's English translation of the UrhG is
+# a non-binding convenience translation published by the Federal Ministry of
+# Justice; the German text is the only authoritative version. Canonical
+# sources: gesetze-im-internet.de (statute text), bundesgerichtshof.de
+# (BGH case law and Geschaeftsverteilungsplan), EUR-Lex (EU directives and
+# regulations, and CJEU judgments).
+
+jurisdiction_id: germany
+legal_system: civil_law
+languages: [de, en]
+
+governing_statutes:
+  - name: "Gesetz ueber Urheberrecht und verwandte Schutzrechte (Urheberrechtsgesetz)"
+    short: "UrhG"
+    url: "https://www.gesetze-im-internet.de/englisch_urhg/englisch_urhg.html"
+    relevance: >
+      Division 8 (sections 69a-69g) contains Germany's special provisions on
+      computer programs, implementing the EU Software Directive. Section 69a
+      defines "computer programs" broadly (including drafts and preparatory
+      design material, s.69a(1)) and states that "the protection granted
+      applies to the expression, in any form, of a computer program. Ideas
+      and principles which underlie any element of a computer program,
+      including the ideas and principles which underlie its interfaces, are
+      not protected" (s.69a(2)) -- the direct German analogue to Part XVI's
+      observable-requirement/source-implementation-detail split. Section
+      69a(3) sets a deliberately low originality bar ("the result of the
+      author's own intellectual creation," with "no other criteria,
+      especially qualitative or aesthetic criteria" to be applied), enacted
+      to override the earlier, much stricter "Schoepfungshoehe" (creative
+      height) case law (see leading_case_law below). Section 69c lists the
+      rightholder's exclusive acts: reproduction (including reproduction
+      necessarily incidental to loading, displaying, running, transmission
+      or storage), translation/adaptation/arrangement and reproduction of
+      the results, distribution (subject to EU/EEA first-sale exhaustion,
+      excluding rental), and communication to the public. Section 69d sets
+      out exceptions: s.69d(1) permits acts under s.69c nos. 1-2 that are
+      "necessary for the use of the computer program in accordance with its
+      intended purpose, including for the correction of errors," by an
+      authorised user -- but ONLY "unless otherwise provided by special
+      contractual provisions," i.e. this specific exception can be narrowed
+      by contract; s.69d(2) protects the right to make a back-up copy
+      "necessary to secure future use," which "may not be prevented by
+      contract"; s.69d(3) entitles an authorised user, without the
+      rightholder's authorisation, "to observe, study or test the
+      functioning of that program in order to determine the ideas and
+      principles which underlie any element of the program" while lawfully
+      loading, displaying, running, transmitting or storing it -- the
+      operative provision for Zone R observation activity. Section 69e
+      permits decompilation ("reproduction of the code or translation of
+      its form") without consent where "indispensable to obtain the
+      information necessary to achieve the interoperability of an
+      independently created computer program with other programs,"
+      conditioned on: (1) the acts being performed by an authorised
+      licensee/user or someone acting on their behalf; (2) the
+      interoperability information not having "previously been made readily
+      available" to that person; and (3) the acts being "confined to those
+      parts of the original program which are necessary to achieve
+      interoperability" (s.69e(1) nos. 1-3). Section 69e(2) restricts reuse
+      of information obtained: not for purposes other than achieving the
+      new program's interoperability, not disclosed to third parties except
+      as necessary for that interoperability, and not used to develop a
+      program "substantially similar in its expression" or for any other
+      infringing act. Section 69e(3) requires a "three-step-test"-style
+      reading (normal exploitation / legitimate interests) of both
+      subsections. Critically, section 69g(2) provides that "contractual
+      provisions which are contrary to section 69d (2), (3), (5) or (7) or
+      section 69e are null and void" -- s.69d(1) (intended-use/error
+      correction) is conspicuously NOT on that non-excludable list, unlike
+      s.69d(2)/(3) (back-up copy; observe/study/test) and s.69e
+      (decompilation), which cannot be contracted away.
+  - name: "Directive 2009/24/EC of the European Parliament and of the Council of 23 April 2009 on the legal protection of computer programs (codified version, replacing Council Directive 91/250/EEC of 14 May 1991)"
+    url: "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32009L0024"
+    relevance: >
+      The EU instrument sections 69a-69g UrhG implement. Article 1(2) is the
+      source of section 69a(2)'s idea/expression rule; Article 5 is the
+      source of section 69d's permitted acts (including the error-correction
+      limb now central to the CJEU's Top System distinction, see
+      leading_case_law); Article 6 is the source of section 69e's
+      decompilation right. As a directly-effective EU directive implemented
+      identically across the EU/EEA, CJEU rulings on the Directive's Article
+      5/6 bind German courts' reading of sections 69d/69e.
+
+leading_case_law:
+  - citation: "BGH, Urteil vom 6. Oktober 2016, I ZR 25/15 -- \"World of Warcraft I\""
+    relevance: >
+      Applying section 69d(3) to commercial bot/automation software built
+      against the World of Warcraft/Diablo III game clients, the BGH (I.
+      Zivilsenat) held, following the CJEU's SAS Institute reasoning, that a
+      licence restricting use to private purposes does not defeat the
+      section 69d(3) observe/study/test privilege -- the provision looks at
+      the permitted ACT, not the purpose (commercial or private) behind it.
+      But the court drew a sharp boundary: section 69d(3) covers only the
+      "computer program" element of a software product, not other
+      copyrighted works bundled with it -- reproducing the client's
+      "graphics, music, film sequences, texts and models" for the same
+      analysis was NOT covered and required separate authorisation. Directly
+      relevant to scoping Zone R observation activity where the reference
+      product bundles code with non-program copyrighted assets.
+  - citation: "CJEU, judgment of 6 October 2021, Case C-13/20, Top System SA v. Etat belge (interpreting Directive 91/250/EEC, predecessor to 2009/24/EC)"
+    relevance: >
+      NOTE: this is a Court of Justice of the European Union decision, not a
+      Bundesgerichtshof decision -- it is included because CJEU rulings on
+      the Software Directive bind German courts' application of sections
+      69d/69e UrhG, and no directly on-point BGH decision interpreting
+      section 69e itself could be verified (see report). The CJEU held that
+      a lawful acquirer may decompile a program, in whole or in part, to
+      correct errors affecting its functioning, and that this falls under
+      the error-correction permitted act (Article 5(1) of the Directive --
+      the direct analogue of section 69d(1) UrhG), not under the
+      decompilation article's interoperability-specific conditions (Article
+      6 -- the analogue of section 69e). This matters for Part XXXII-style
+      gating: decompilation-for-error-correction and
+      decompilation-for-interoperability are governed by different
+      provisions with different conditions, and should not be conflated.
+  - citation: "BGH, Urteil vom 17. Juli 2013, I ZR 129/08 -- \"UsedSoft II\" (following CJEU, judgment of 3 July 2012, Case C-128/11, UsedSoft GmbH v. Oracle International Corp.)"
+    relevance: >
+      Held that the section 69c no. 3 distribution right in a copy of a
+      computer program is exhausted once the rightholder has, against
+      payment of a fee corresponding to the economic value of the copy,
+      granted a right to use that copy for an unlimited period -- including
+      where the copy was made available only by download, not on a physical
+      medium -- and that the resulting lawful acquirer may then rely on
+      section 69d(1) as a person "entitled to use" the program. Relevant
+      wherever the clean-room project's own distribution model, or a
+      reference copy's provenance, turns on exhaustion rather than on
+      copying/reimplementation questions -- these are analytically distinct
+      inquiries and should not be merged.
+  - citation: "BGH, Urteil vom 9. Mai 1985, I ZR 52/83 -- \"Inkassoprogramm\" (BGHZ 94, 276)"
+    relevance: >
+      Pre-harmonisation decision holding that a computer program (a debt
+      collection program) is protectable only where it clearly exceeds
+      routine, mechanical arrangement of material and reflects a creative
+      achievement "clearly surpassing average programming work" -- a high
+      "Schoepfungshoehe" (creative-height) threshold later confirmed in BGH,
+      Urteil vom 4. Oktober 1990, I ZR 139/89 -- "Betriebssystem". This
+      threshold was deliberately overridden by section 69a(3) UrhG's
+      "no other criteria, especially qualitative or aesthetic criteria"
+      standard when the Software Directive was implemented. Included for
+      historical context only -- do not apply Inkassoprogramm's high bar to
+      a present-day originality assessment; section 69a(3) now controls.
+
+conflicts_of_laws_notes: >
+  Germany is an EU Member State, so Regulation (EC) No 593/2008 (Rome I)
+  governs choice of law for contractual obligations (e.g. any licence
+  covering the reference material) and Regulation (EC) No 864/2007 (Rome
+  II) governs non-contractual obligations. Rome II Article 8(1) provides
+  that the law applicable to a non-contractual obligation arising from
+  infringement of an intellectual property right "shall be the law of the
+  country for which protection is claimed" (lex loci protectionis), and
+  Article 8(3) (read with Article 14) provides this rule may NOT be
+  derogated from by agreement between the parties -- copyright infringement
+  choice-of-law cannot be contracted around even where the licence itself
+  has a different governing-law clause. Domestically, Art. 3 EGBGB
+  (Einfuehrungsgesetz zum Buergerlichen Gesetzbuche) gives these
+  directly-applicable EU Regulations priority over Germany's own autonomous
+  private-international-law rules, so Rome I/Rome II -- not a separate
+  German conflicts regime -- are the operative rules here. As in the other
+  packs, treat "governing law of the licence" and "applicable law for
+  copyright subsistence/infringement" as distinct questions that can yield
+  different answers.
+
+court_terminology:
+  trial_court: "Landgericht (Regional Court) -- the effectively exclusive first-instance forum for copyright litigation in most Laender, which have used the concentration power in section 105 UrhG to assign copyright disputes within their territory to a single designated Landgericht; the Amtsgericht (Local Court) retains formal first-instance jurisdiction only over the lowest-value general civil claims under the ordinary GVG rules (section 104 UrhG merely confirms copyright disputes go to the ordinary civil courts, not the labour or administrative courts)."
+  appellate_court: "Oberlandesgericht (Higher Regional Court)"
+  final_court: "Bundesgerichtshof (BGH, Federal Court of Justice) -- copyright matters are allocated to the I. Zivilsenat (First Civil Senate) under the BGH's annual Geschaeftsverteilungsplan (business allocation plan); the Bundesverfassungsgericht (Federal Constitutional Court) is not a further ordinary appellate instance and hears only constitutional complaints (Verfassungsbeschwerde, Art. 93(1) no. 4a GG) once all other remedies are exhausted."
+  simulated_judicial_role_title: "Simulated Bundesgerichtshof I. Zivilsenat (Copyright) Reviewer"
+
+interoperability_permitted_acts:
+  summary: >
+    Section 69d(3) UrhG permits an authorised user, without the
+    rightholder's consent, to observe, study or test a program's
+    functioning to determine the ideas and principles underlying any
+    element of it, provided this occurs while lawfully loading, displaying,
+    running, transmitting or storing the program -- and this permitted act
+    cannot be excluded by contract (section 69g(2)) and applies regardless
+    of whether the user's purpose is commercial (BGH, World of Warcraft I),
+    but reaches only the computer program itself, not other copyrighted
+    material bundled with it. Section 69e UrhG separately permits
+    decompilation (reproducing code or translating its form) without
+    consent where indispensable to obtain interoperability information,
+    but only where performed by an authorised licensee/user (or someone
+    acting on their behalf), the information was not already readily
+    available, and the acts are confined to the parts of the program
+    necessary for interoperability; information obtained may not be reused
+    for other purposes, disclosed to third parties beyond what
+    interoperability requires, or used to build a program "substantially
+    similar in its expression." Decompilation to correct errors in a
+    lawfully used copy is instead analysed under section 69d(1) (itself
+    subject to contractual variation, unlike sections 69d(2)/(3)/(5)/(7)
+    and 69e, which section 69g(2) makes non-excludable) -- per the CJEU's
+    Top System reasoning, these are two distinct gateways with different
+    conditions, not one undifferentiated "reverse engineering" exception.
+
+questions_for_review:
+  - "Does section 69a(2) UrhG's idea/expression split -- protection extends only to 'the expression, in any form, of a computer program,' with ideas and principles underlying any element, including its interfaces, unprotected -- exclude the specific reference elements the similarity report flags, or do they cross into protected expression?"
+  - "Are all three section 69e(1) conditions independently satisfied here: performance by an authorised licensee/user (or someone acting on their behalf); that the interoperability information was not already 'readily available'; and that the acts were 'confined to those parts of the original program which are necessary to achieve interoperability' -- and has any decompilation-for-error-correction activity been analysed separately under section 69d(1), rather than folded into the section 69e interoperability analysis (per CJEU Top System, C-13/20)?"
+  - "Does any contract term purport to restrict the section 69d(2) back-up-copy right, the section 69d(3) observe/study/test right, or the section 69e decompilation right -- and if so, is that term void under section 69g(2) UrhG, in contrast to a restriction on the section 69d(1) intended-use/error-correction right, which section 69d(1) itself allows the parties to narrow by 'special contractual provisions'?"
+  - "Where the reference program bundles non-program copyrighted content (game assets, media, text, documentation) alongside code, has observation/testing under section 69d(3) been kept confined to the computer program element, consistent with BGH's World of Warcraft I (I ZR 25/15) holding that section 69d(3) does not extend to audiovisual or other non-program content in the same product?"
+  - "If the clean-room output will be distributed into Germany or another EU/EEA state, does Rome II Article 8's non-derogable lex loci protectionis rule make German substantive copyright law the operative infringement standard regardless of what law governs the reference licence under Rome I -- and has that been analysed as a distinct question from the licence's own governing-law clause?"

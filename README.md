@@ -44,12 +44,14 @@ built. Currently ships:
   package manifests, with symlink/non-regular-file safety) plus policy
   packs for MIT, Apache-2.0, GPL-3.0-only, AGPL-3.0-only and BUSL-1.1
   (this project's own licence).
-- A jurisdiction resolution engine with real packs for England & Wales and
-  US federal law (facts + primary authorities + structured questions, not
-  legal conclusions).
+- A jurisdiction resolution engine with real, independently fact-checked
+  packs for England & Wales, US federal, EU, France, Germany and Japan
+  (facts + primary authorities + structured questions, not legal
+  conclusions).
 - A sanitisation scanner, requirement/behavioural specification graph,
   cryptographically hashed handoff manifest, and a similarity engine
-  (lexical + Python AST structural + negative-control background
+  (lexical + Python AST / real tree-sitter structural via `ast-grep-py`
+  for JS/TS/Go/Rust/Java/Ruby/C/C++ + negative-control background
   comparison) now wired to a real `cleanroom similarity` command.
 - SBOM generation (SPDX + CycloneDX), and a heuristic legal-issue engine
   with adversarial-counsel and judicial-review **prompt generation** (the
@@ -128,7 +130,7 @@ Security issues: see [SECURITY.md](SECURITY.md).
 OSI-approved. Free to use, modify, self-host and run commercially
 in-house; you may not resell it, white-label it, or offer it to others as
 a hosted/SaaS product in competition with the Licensor. Converts to
-GPL-2.0-or-later on 2030-08-22. See [LICENSE](LICENSE) for the full terms
+GPL-3.0-or-later on 2030-08-22. See [LICENSE](LICENSE) for the full terms
 (including the Additional Use Grant) and [NOTICE](NOTICE) for a summary.
 This project practises the provenance standards it promotes — see its own
 [SBOM](evidence/) and [REUSE](REUSE.toml) configuration.
