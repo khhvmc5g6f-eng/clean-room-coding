@@ -559,13 +559,34 @@ change that should be evaluated on its own.
     (`cleanroom benchmark`, 8 ground-truth cases across Python/JS/Go); see
     "Benchmark suite" above for the measured 0.80 precision / 1.00 recall
     result and its one real documented false positive.
-11. Investigate the false positive `cleanroom benchmark` found: the
-    default 0.15 structural threshold is too sensitive for at least one
-    genuinely-independent JavaScript reimplementation in this corpus
-    (scores ~0.18). Worth exploring whether tree-sitter's JS node-kind
-    vocabulary needs a higher default threshold than Python's `ast`, or a
-    larger corpus to tell whether this is a real per-language pattern or
-    one fixture's idiosyncrasy -- not yet investigated.
+11. ~~Investigate the false positive `cleanroom benchmark` found~~ --
+    **done**, and it wasn't quite what it first looked like. Measured the
+    raw noise floor for genuinely-unrelated small JS snippets via
+    tree-sitter (mean ~0.05, one pair at 0.32) against the equivalent
+    Python `ast` noise floor (0.0 for all 15 pairs tested) -- JS's
+    tree-sitter node-kind vocabulary is real measurably noisier for
+    short/similarly-shaped code, but a longer, genuinely
+    structurally-distinct unrelated JS pair scored 0.02, comparable to
+    Python. So it's not a blanket "JS needs a higher default threshold"
+    finding. Tracing the specific `js-independent-clone` false positive
+    down to its actual overlapping shingles surfaced something more
+    useful: it shares near-identical boolean-condition phrasing with the
+    reference (`active && priority >= threshold`) -- exactly the
+    "conventional shared idiom, not copying" case `classify()`'s
+    negative-control background-score mechanism exists to handle. That
+    led to a real, separate, previously-untested bug (see "Fixed" below):
+    `negative_control.py`'s `background_scores()` never passed a
+    `language` hint to `structural_similarity()`, so background scoring
+    for any non-Python file always silently used the weak
+    `generic_fallback` method, never real tree-sitter, even when the
+    foreground comparison did. Fixed, and confirmed the fix actually
+    resolves this exact case: with a plausible negative-control JS corpus
+    configured, the same 0.181 score now classifies `conventional`, not
+    `suspicious`. The benchmark corpus itself doesn't wire in negative
+    controls (its manifest has no such concept yet) so its measured
+    0.80 precision stands as an honest "structural comparison alone, no
+    negative controls" number -- a real user running `cleanroom
+    similarity --negative-control ...` gets the benefit of this fix.
 12. Attempted **ScanCode Toolkit** as an optional `[licensecheck]` extra
     and hit a real, concrete blocker (a native `libmagic` dependency with
     no working plugin for arm64 macOS + Python 3.14) -- see "Competitive

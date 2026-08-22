@@ -111,10 +111,13 @@ def compare_trees(
     findings = []
     for i, (ref_file, impl_file) in enumerate(plan.pairs):
         ref_text = ref_file.read_text(encoding="utf-8", errors="replace")
+        language = SUFFIX_TO_ASTGREP_LANG.get(impl_file.suffix)
         if impl_file not in impl_text_cache:
             impl_text_cache[impl_file] = impl_file.read_text(encoding="utf-8", errors="replace")
             background_cache[impl_file] = (
-                background_scores(impl_text_cache[impl_file], negative_control_roots) if negative_control_roots else {}
+                background_scores(impl_text_cache[impl_file], negative_control_roots, language=language)
+                if negative_control_roots
+                else {}
             )
         impl_text = impl_text_cache[impl_file]
         background = background_cache[impl_file]
@@ -130,7 +133,6 @@ def compare_trees(
             ).to_dict()
         )
 
-        language = SUFFIX_TO_ASTGREP_LANG.get(impl_file.suffix)
         struct_score, struct_method = structural_similarity(ref_text, impl_text, language=language)
         # A generic bracket/keyword fallback is real but weaker evidence
         # than an actual AST/tree-sitter comparison (see structural.py's

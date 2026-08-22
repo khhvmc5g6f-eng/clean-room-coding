@@ -532,4 +532,38 @@ detail:
   a transitive dependency via `huggingface_hub`'s `httpx`, but not
   required -- falls through to urllib's own default context otherwise).
 
+### Fixed (fourteenth pass — investigated the benchmark's JS false positive, found a real bug behind it)
+
+- Investigated `js-independent-clone`'s false positive (see the previous
+  pass) properly rather than tuning the fixture until it passed. Measured
+  the raw structural-similarity noise floor for genuinely-unrelated small
+  JS snippets (tree-sitter) against equivalent unrelated Python snippets
+  (`ast`): JS's mean was ~0.05 (one pair as high as 0.32) versus exactly
+  0.0 across all 15 Python pairs tested -- real, but a longer,
+  structurally-distinct unrelated JS pair scored 0.02, so it's not simply
+  "JS always needs a higher threshold." Tracing the specific false
+  positive down to its actual overlapping AST shingles showed it shares
+  near-identical boolean-condition phrasing with the reference -- exactly
+  the "conventional shared idiom" case the negative-control background-
+  score mechanism exists to handle.
+- **That investigation surfaced a real, separate, previously-untested
+  bug**: `similarity/negative_control.py`'s `background_scores()` never
+  passed a `language` hint through to `structural_similarity()`, so
+  background scoring for any non-Python implementation always silently
+  used the weak `generic_fallback` method -- even when the actual
+  foreground reference-vs-implementation comparison used real
+  tree-sitter. A background score computed by a different, weaker method
+  than the foreground it's meant to be compared against isn't a valid
+  background at all. Fixed by adding an optional `language` parameter and
+  threading it through from `similarity/engine.py`'s `compare_trees()`
+  (which already derives the right language hint per file, just wasn't
+  passing it to background scoring). Confirmed the fix actually resolves
+  the original false positive: with a plausible negative-control JS
+  corpus configured, the same 0.181 score now classifies `conventional`
+  instead of `suspicious`.
+- New `tests/unit/test_negative_control.py` (no prior test file existed
+  for this module at all) plus a new engine-level regression test
+  confirming `compare_trees()` passes the derived language through to
+  `background_scores()`.
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD

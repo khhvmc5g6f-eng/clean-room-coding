@@ -106,6 +106,38 @@ def test_compare_trees_uses_treesitter_for_javascript_files(tmp_path: Path):
     assert struct_finding["structural_method"] == "treesitter:javascript"
 
 
+def test_compare_trees_passes_language_hint_to_background_scoring(tmp_path: Path, monkeypatch):
+    """Regression test: compare_trees() derives a per-impl-file language
+    hint for the foreground structural_similarity() call, but previously
+    never passed that same hint to background_scores() -- meaning a JS
+    (or any non-Python) implementation's background score was always
+    computed via the weaker generic_fallback method, never real
+    tree-sitter, even when the foreground comparison used it. Confirmed
+    by capturing what background_scores() was actually called with."""
+    ref = tmp_path / "ref"
+    impl = tmp_path / "impl"
+    control = tmp_path / "control"
+    ref.mkdir()
+    impl.mkdir()
+    control.mkdir()
+    (ref / "sort.js").write_text("function foo(x, y) { if (x) { return y; } }", encoding="utf-8")
+    (impl / "sort.js").write_text("function bar(p, q) { if (p) { return q; } }", encoding="utf-8")
+    (control / "unrelated.js").write_text("function unrelated() { return 42; }", encoding="utf-8")
+
+    import cleanroom.similarity.engine as engine_module
+
+    real_background_scores = engine_module.background_scores
+    calls = []
+
+    def spy(implementation_text, negative_control_roots, *, language=None):
+        calls.append(language)
+        return real_background_scores(implementation_text, negative_control_roots, language=language)
+
+    monkeypatch.setattr(engine_module, "background_scores", spy)
+    compare_trees(ref, impl, negative_control_roots=[control])
+    assert calls == ["javascript"]
+
+
 def test_findings_have_both_lexical_and_structural_methods(tmp_path: Path):
     ref = tmp_path / "ref"
     impl = tmp_path / "impl"
