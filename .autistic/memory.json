@@ -3,6 +3,24 @@
   "lastUpdated": "2026-08-22",
   "invariants": [
     {
+      "rule": "AgentRegistry.register() has exactly one CLI caller path per zone scope: cleanroom build (H+I) and, since this run, cleanroom recruit (R only). Both set prohibited_paths as an explicit belt-and-suspenders denial of the OTHER zones, not just omission from permitted_zones -- match this pattern for any future agent-registration command.",
+      "confidence": 0.9,
+      "evidence": ["src/cleanroom/cli.py build()/recruit()", "tests/integration/test_cli_end_to_end.py:test_recruit_registers_an_r_scoped_agent_explicitly_denied_zone_h_and_i"],
+      "confirmedRuns": 1
+    },
+    {
+      "rule": "A dataclass field with a default value (AgentRecord.tools, Tick.timestamp) can exist for years with zero writers and zero readers anywhere in the codebase -- grep every field name across src/ for real read/write sites before assuming it does anything, the same check that caught tools being completely dead before this run.",
+      "confidence": 0.9,
+      "evidence": ["src/cleanroom/orchestration/agents.py AgentRecord.tools had zero non-declaration hits before commit 99ede88"],
+      "confirmedRuns": 1
+    },
+    {
+      "rule": "release_allowed()'s gate-parameter shape is consistent: a computed bool (e.g. technical_gate, panel_diversity_gate) plus a require_* config-driven bool, both checked in report.py, both sourced from release_policy in .cleanroom.yml with additionalProperties:false in the schema (so a new gate needs schema.properties + config.py's default dict + the release_allowed() param, all three, or existing/new configs fail validation or silently default wrong).",
+      "confidence": 0.9,
+      "evidence": ["src/cleanroom/report.py release_allowed()", "schemas/config.schema.json release_policy", "src/cleanroom/config.py default_config()"],
+      "confirmedRuns": 1
+    },
+    {
       "rule": "schemas/config.schema.json can declare a field years before any code actually consumes it -- implementation.output_licence existed, documented, unused, until this run wired it into CaseBundle.output_licence_id and cli.py's legal command. Always check config.schema.json against real consumers (grep the field name in src/) before assuming a documented config field does anything.",
       "confidence": 0.85,
       "evidence": ["schemas/config.schema.json implementation.output_licence pre-existed", "src/cleanroom/legal/engine.py CaseBundle had no field for it until commit d7071c2"],
@@ -83,12 +101,22 @@
       "blastRadius": "medium",
       "status": "superseded",
       "supersededBy": "Partially modelled now (commit d7071c2): CaseBundle.output_licence_id + _compatible_licence_overlap() cross-reference EUPL-1.2's compatible_licences against the project's configured output licence, naming the specific overlap in the finding's alternative_explanation. Still does NOT auto-resolve to GREEN -- confirming the actual Article-5 merge remains a human question -- so the underlying limitation is narrowed, not eliminated."
+    },
+    {
+      "claim": "judge-adjudicate computes and reports panel_size_satisfied/diversity_satisfied per call, but this was a DELIBERATE design choice (documented in ROADMAP.md before this run) not to wire into release's global_decision gate -- recorded as evidentiary context only.",
+      "verified": true,
+      "blastRadius": "medium",
+      "status": "superseded",
+      "supersededBy": "Now optionally a real gate (commit 99ede88): release_policy.require_panel_diversity_gate (opt-in, default false, so every prior project is unaffected) + panel_completeness_across_findings() in legal/panels.py. Verified end-to-end: blocks release with a same-provider single-member adjudication, passes once a second different-provider member adjudicates. The original deliberate choice to keep it advisory-only by default still stands -- this adds an opt-in path, it doesn't reverse the original decision."
     }
   ],
   "loadBearingNodes": [
     { "name": "src/cleanroom/licence/policy.py:load_pack", "score": 8.5 },
     { "name": "src/cleanroom/legal/engine.py:_licence_terms_with_packs", "score": 8.0 },
     { "name": "src/cleanroom/licence/spdx.py:KNOWN_IDENTIFIERS", "score": 7.5 },
-    { "name": "src/cleanroom/jurisdiction/resolver.py:COUNTRY_TO_PACK", "score": 7.0 }
+    { "name": "src/cleanroom/jurisdiction/resolver.py:COUNTRY_TO_PACK", "score": 7.0 },
+    { "name": "src/cleanroom/orchestration/agents.py:AgentRegistry", "score": 7.5 },
+    { "name": "src/cleanroom/report.py:release_allowed", "score": 8.0 },
+    { "name": "src/cleanroom/legal/panels.py:panel_completeness_across_findings", "score": 6.5 }
   ]
 }
