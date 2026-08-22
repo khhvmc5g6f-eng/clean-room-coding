@@ -1,5 +1,7 @@
 # Clean Room Coding
 
+![Clean Room Coding](docs/assets/banner.png)
+
 A reproducible, auditable methodology and toolchain for independently
 reimplementing software functionality while managing copyright, open-source
 licensing, provenance, jurisdiction and evidential integrity.
