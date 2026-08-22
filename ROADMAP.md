@@ -1,16 +1,19 @@
 # Roadmap
 
-Clean Room Coding v0.1.0 is a **deep-but-narrow** first build: everything
-listed under "Built and tested" is real, working code with passing tests
--- nothing is scaffolded-but-fake. Everything under "Documented
-limitation" is a genuine gap, called out here (and usually inline in the
-relevant module's docstring) rather than silently claimed as complete.
+Clean Room Coding started as v0.1.0, a **deep-but-narrow** first build,
+and is now v0.2.0 after an internal code review, security audit,
+competitive-landscape research pass, and roughly two dozen further
+build-out passes (2026-08-22) -- see CHANGELOG.md for the full, dated
+history of every one. Everything listed under "Built and tested" is
+real, working code with passing tests -- nothing is scaffolded-but-fake.
+Everything under "Documented limitation" is a genuine gap, called out
+here (and usually inline in the relevant module's docstring) rather than
+silently claimed as complete.
 
-This roadmap was reviewed and extended after an internal code review,
-security audit, and a competitive-landscape research pass (2026-08-22) --
-see "External review findings" and "Competitive landscape" below.
+See "External review findings" and "Competitive landscape" below for the
+original review/audit/research pass this roadmap was first extended from.
 
-## Built and tested (v0.1.0)
+## Built and tested (v0.2.0)
 
 - Three-zone project model (`cleanroom init`, with an explicit
   `--target-language` prompt so the implementation language is always a

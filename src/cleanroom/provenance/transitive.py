@@ -29,9 +29,11 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any
 
+from cleanroom import __version__ as _cleanroom_version
+
 _TIMEOUT_SECONDS = 10
 _MAX_DEPTH = 5  # guards against pathological or (in principle) circular dependency graphs
-_USER_AGENT = "clean-room-coding/0.1.0 (+https://github.com/khhvmc5g6f-eng/clean-room-coding)"
+_USER_AGENT = f"clean-room-coding/{_cleanroom_version} (+https://github.com/khhvmc5g6f-eng/clean-room-coding)"
 
 # Ecosystems this module actually knows how to query a real registry for.
 # `sbom.discover_dependencies()` also lists Cargo/Composer direct

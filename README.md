@@ -29,12 +29,17 @@ review, and preserve the evidence demonstrating how the result was created.
 
 ## Status
 
-v0.1.0 — early, narrow-but-real core, since reviewed and hardened by an
+v0.2.0 — early, narrow-but-real core, since reviewed and hardened by an
 independent code review and security audit (see
 [ROADMAP.md](ROADMAP.md#external-review-findings-2026-08-22) for exactly
-what was found and fixed). ROADMAP.md is the source of truth for what's
-fully implemented, what is a documented limitation, and what is not yet
-built. Currently ships:
+what was found and fixed), then substantially extended (13 licence packs,
+opt-in `--agent-id` PathGuard enforcement, real SBOM checksums and
+Cargo/composer support, in-toto signing, judicial-panel provider
+diversity with a real opt-in release gate, and a Reference-side agent
+registration path -- see [CHANGELOG.md](CHANGELOG.md) for the full,
+dated history of every pass). ROADMAP.md is the source of truth for
+what's fully implemented, what is a documented limitation, and what is
+not yet built. Currently ships:
 
 - A full three-zone (Reference / Handoff / Implementation) project model
   with an allow-list-capable `PathGuard` and an append-only, hash-chained

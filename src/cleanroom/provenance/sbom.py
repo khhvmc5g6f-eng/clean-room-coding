@@ -32,6 +32,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from cleanroom import __version__ as cleanroom_version
 from cleanroom.licence.spdx import parse as parse_spdx_expression
 from cleanroom.util import new_id, utc_now_iso
 
@@ -256,7 +257,7 @@ def to_spdx(
         spdx_id="SPDXRef-DOCUMENT",
         name=f"{project_name}-sbom",
         document_namespace=f"https://cleanroom.dev/spdx/{project_name}-{new_id()}",
-        creators=[Actor(ActorType.TOOL, "clean-room-coding-0.1.0")],
+        creators=[Actor(ActorType.TOOL, f"clean-room-coding-{cleanroom_version}")],
         created=datetime.now(timezone.utc),
     )
     packages = [
@@ -410,7 +411,7 @@ def to_cyclonedx(
     # favour of describing the producing tool as a `Component` inside a
     # `ToolRepository` (confirmed: constructing with a bare `Tool` list
     # raises `SchemaDeprecationWarning1Dot5` under SchemaVersion.V1_5).
-    tool_component = Component(name="cleanroom", version="0.1.0", type=ComponentType.APPLICATION, group="Clean Room Coding")
+    tool_component = Component(name="cleanroom", version=cleanroom_version, type=ComponentType.APPLICATION, group="Clean Room Coding")
     bom = Bom(
         metadata=BomMetaData(
             component=root_component,

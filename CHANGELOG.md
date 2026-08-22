@@ -8,8 +8,15 @@ once it reaches 1.0.
 
 ## [Unreleased]
 
-Initial v0.1.0 build. This is early, alpha software — see
-[README.md](README.md) status section and
+Nothing yet — see [0.2.0] below for the current state.
+
+## [0.2.0] - 2026-08-22
+
+Initial v0.1.0 build, then twenty-five further build-out passes (all on
+2026-08-22) accumulated under this one version bump — this project never
+cut an intermediate 0.1.x release, so everything below reflects the
+actual state of `main` as of this version. This is early, alpha
+software — see [README.md](README.md) status section and
 [docs/legal-disclaimer.md](docs/legal-disclaimer.md).
 
 ### Added
@@ -1003,3 +1010,4 @@ detail:
   every one of the four changes.
 
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD
+[0.2.0]: https://github.com/khhvmc5g6f-eng/clean-room-coding/commits/main
