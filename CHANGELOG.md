@@ -566,4 +566,57 @@ detail:
   confirming `compare_trees()` passes the derived language through to
   `background_scores()`.
 
+### Added (fifteenth pass — legal-issue engine coverage 10/18 -> 17/18)
+
+- Seven new real heuristics in `legal/engine.py`: `patent_risk` and
+  `trademark_risk` (grounded in each reference/dependency licence's
+  policy pack `patent_grant`/`trademark_grant` fields -- not a patent/
+  trademark registry search, which this tool doesn't perform),
+  `linking` (whether the output is distributed as a library other
+  software links against, cross-referenced with reference licences'
+  copyleft strength -- distinct from `distribution`'s "did you hand out
+  copies" question), `confidentiality` and `trade_secrets` (grounded in
+  `access_authority` plus sanitisation-blocked history / open similarity
+  findings -- not the actual contract text), `database_rights` (a
+  per-jurisdiction fact table for the real sui generis database right,
+  EU Database Directive 96/9/EC and its national/retained-law
+  implementations -- verified England & Wales still has its own
+  post-Brexit database right under assimilated law before writing this
+  in, rather than assumed), and `contractual_permissions` (grounded in a
+  new `reverse_engineering_restriction` field added to all 5 existing
+  licence policy packs -- verified none of MIT/Apache-2.0/GPL-3.0-only/
+  AGPL-3.0-only/BUSL-1.1's actual licence text imposes one). Only
+  `protected_expression` remains `UNKNOWN`: idea/expression merger
+  judgment has no deterministic proxy this tool can compute, unlike the
+  other 17 issues.
+- `cleanroom legal` now also derives `sanitisation_blocked` from the
+  evidence ledger (any `cleanroom sanitise` run recorded `result=denied`)
+  and feeds it into the `CaseBundle` -- previously declared as a field
+  but never populated anywhere, so `confidentiality` could never
+  distinguish a clean sanitisation history from one that actually caught
+  something.
+- 33 new regression tests across `test_legal_engine_and_panels.py` and a
+  new CLI-level integration test proving the `sanitisation_blocked`
+  wiring end-to-end (writing a real secret-shaped string, confirming
+  `cleanroom sanitise` blocks it, then confirming `confidentiality`
+  correctly reports `RED`).
+
+### Fixed (fifteenth pass)
+
+- **Caught by real end-to-end manual CLI verification, not just the test
+  suite: `database_rights`' jurisdiction fact table used jurisdiction
+  *pack ids* (`"england-wales"`, `"usa-federal"`, `"france"`, `"germany"`,
+  `"japan"`) as its lookup keys, but `cli.py`'s `legal` command actually
+  sets `CaseBundle.jurisdiction` to the raw configured *market code*
+  (`"gb"`, `"us"`, `"fr"`, `"de"`, `"jp"` -- two different string spaces,
+  see `jurisdiction/resolver.py`'s `COUNTRY_TO_PACK`).** Every real
+  `cleanroom legal` run would have silently reported `database_rights` as
+  `UNKNOWN` for every actual jurisdiction, defeating the heuristic
+  entirely -- caught only because a real installed-CLI smoke test was run
+  before considering the feature done, not because any unit test (which
+  all used made-up bundles) exercised the mismatch. Fixed the constants
+  to use the real market-code strings, and added a regression test that
+  asserts pack-id strings specifically do NOT match (to prevent this
+  exact confusion recurring silently).
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD

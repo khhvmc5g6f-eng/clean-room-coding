@@ -161,3 +161,194 @@ def test_interoperability_provisions_green_when_pack_documents_acts():
     bundle = CaseBundle(interoperability_permitted_acts=[{"act": "decompilation for interoperability"}])
     findings = {f["issue"]: f for f in run(bundle)}
     assert findings["interoperability_provisions"]["decision_state"] == "GREEN_WITH_CONDITIONS"
+
+
+def test_protected_expression_is_always_unknown():
+    """The one issue with no heuristic in v0.1 -- idea/expression merger
+    has no deterministic proxy this tool can compute."""
+    bundle = CaseBundle(access_authority="public", licence_findings=[{"concluded": "MIT"}], reference_licence_ids=["MIT"])
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["protected_expression"]["decision_state"] == "UNKNOWN"
+    assert findings["protected_expression"]["confidence"] == "insufficient_evidence"
+
+
+def test_patent_risk_unknown_without_licence_discovery():
+    bundle = CaseBundle(reference_licence_ids=None)
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["patent_risk"]["decision_state"] == "UNKNOWN"
+
+
+def test_patent_risk_amber_for_licence_with_no_patent_grant():
+    bundle = CaseBundle(reference_licence_ids=["MIT"])
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["patent_risk"]["decision_state"] == "AMBER"
+
+
+def test_patent_risk_green_for_licence_with_patent_grant():
+    bundle = CaseBundle(reference_licence_ids=["Apache-2.0"])
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["patent_risk"]["decision_state"] == "GREEN_WITH_CONDITIONS"
+
+
+def test_trademark_risk_unknown_without_licence_discovery():
+    bundle = CaseBundle(reference_licence_ids=None)
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["trademark_risk"]["decision_state"] == "UNKNOWN"
+
+
+def test_trademark_risk_amber_when_licence_concluded():
+    bundle = CaseBundle(reference_licence_ids=["MIT"])
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["trademark_risk"]["decision_state"] == "AMBER"
+
+
+def test_linking_green_when_not_distributed_as_library():
+    bundle = CaseBundle(output_distribution_model=["binary"])
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["linking"]["decision_state"] == "GREEN_WITH_CONDITIONS"
+
+
+def test_linking_amber_for_library_against_strong_copyleft_reference():
+    bundle = CaseBundle(output_distribution_model=["library"], reference_licence_ids=["GPL-3.0-only"])
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["linking"]["decision_state"] == "AMBER"
+
+
+def test_linking_green_for_library_against_permissive_reference():
+    bundle = CaseBundle(output_distribution_model=["library"], reference_licence_ids=["MIT"])
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["linking"]["decision_state"] == "GREEN_WITH_CONDITIONS"
+
+
+def test_confidentiality_unknown_without_access_authority():
+    bundle = CaseBundle(access_authority=None)
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["confidentiality"]["decision_state"] == "UNKNOWN"
+
+
+def test_confidentiality_green_when_not_contractual():
+    bundle = CaseBundle(access_authority="public")
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["confidentiality"]["decision_state"] == "GREEN_WITH_CONDITIONS"
+
+
+def test_confidentiality_red_when_contractual_and_sanitisation_blocked():
+    bundle = CaseBundle(access_authority="contractual", sanitisation_blocked=True)
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["confidentiality"]["decision_state"] == "RED"
+
+
+def test_confidentiality_amber_when_contractual_and_sanitisation_clean():
+    bundle = CaseBundle(access_authority="contractual", sanitisation_blocked=False)
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["confidentiality"]["decision_state"] == "AMBER"
+
+
+def test_confidentiality_amber_when_contractual_and_sanitisation_not_run():
+    bundle = CaseBundle(access_authority="contractual", sanitisation_blocked=None)
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["confidentiality"]["decision_state"] == "AMBER"
+    assert findings["confidentiality"]["confidence"] == "low"
+
+
+def test_trade_secrets_green_when_public():
+    bundle = CaseBundle(access_authority="public")
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["trade_secrets"]["decision_state"] == "GREEN_WITH_CONDITIONS"
+
+
+def test_trade_secrets_red_when_contractual_and_material_finding():
+    bundle = CaseBundle(access_authority="contractual", similarity_findings=[{"id": "s1", "classification": "material"}])
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["trade_secrets"]["decision_state"] == "RED"
+
+
+def test_trade_secrets_amber_when_contractual_and_suspicious_finding():
+    bundle = CaseBundle(access_authority="contractual", similarity_findings=[{"id": "s1", "classification": "suspicious"}])
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["trade_secrets"]["decision_state"] == "AMBER"
+
+
+def test_trade_secrets_amber_when_contractual_and_no_findings():
+    bundle = CaseBundle(access_authority="contractual", similarity_findings=[])
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["trade_secrets"]["decision_state"] == "AMBER"
+
+
+def test_database_rights_amber_for_eu_jurisdiction():
+    # bundle.jurisdiction holds the raw market code cli.py's `legal`
+    # command actually sets it to (.cleanroom.yml's required_markets
+    # entries, e.g. "eu"/"gb"/"us"), NOT the jurisdiction *pack id* like
+    # "england-wales"/"usa-federal" -- these are two different strings
+    # (see jurisdiction/resolver.py's COUNTRY_TO_PACK). This regression
+    # test uses the real market-code strings deliberately.
+    bundle = CaseBundle(jurisdiction="eu")
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["database_rights"]["decision_state"] == "AMBER"
+
+
+def test_database_rights_amber_for_gb_retained_law():
+    bundle = CaseBundle(jurisdiction="gb")
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["database_rights"]["decision_state"] == "AMBER"
+
+
+def test_database_rights_amber_for_france_and_germany():
+    for market in ("fr", "de"):
+        bundle = CaseBundle(jurisdiction=market)
+        findings = {f["issue"]: f for f in run(bundle)}
+        assert findings["database_rights"]["decision_state"] == "AMBER", market
+
+
+def test_database_rights_green_for_us_no_sui_generis_right():
+    bundle = CaseBundle(jurisdiction="us")
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["database_rights"]["decision_state"] == "GREEN_WITH_CONDITIONS"
+
+
+def test_database_rights_green_for_jp_no_sui_generis_right():
+    bundle = CaseBundle(jurisdiction="jp")
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["database_rights"]["decision_state"] == "GREEN_WITH_CONDITIONS"
+
+
+def test_database_rights_unknown_for_unrecorded_jurisdiction():
+    bundle = CaseBundle(jurisdiction="atlantis")
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["database_rights"]["decision_state"] == "UNKNOWN"
+
+
+def test_database_rights_uses_the_market_code_cli_actually_sets_not_the_pack_id():
+    """Regression test for the exact bug caught by manual end-to-end CLI
+    verification: a jurisdiction PACK ID (e.g. 'england-wales',
+    'usa-federal') is never what bundle.jurisdiction actually holds in a
+    real cleanroom legal run -- it holds the raw configured market code.
+    Passing a pack id here must NOT match either jurisdiction set."""
+    for pack_id in ("england-wales", "usa-federal", "france", "germany", "japan"):
+        bundle = CaseBundle(jurisdiction=pack_id)
+        findings = {f["issue"]: f for f in run(bundle)}
+        assert findings["database_rights"]["decision_state"] == "UNKNOWN", pack_id
+
+
+def test_contractual_permissions_unknown_without_access_authority():
+    bundle = CaseBundle(access_authority=None)
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["contractual_permissions"]["decision_state"] == "UNKNOWN"
+
+
+def test_contractual_permissions_amber_when_access_is_contractual():
+    bundle = CaseBundle(access_authority="contractual")
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["contractual_permissions"]["decision_state"] == "AMBER"
+
+
+def test_contractual_permissions_green_for_known_oss_licence_no_restriction():
+    bundle = CaseBundle(access_authority="public", licence_findings=[{"concluded": "MIT"}])
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["contractual_permissions"]["decision_state"] == "GREEN_WITH_CONDITIONS"
+
+
+def test_contractual_permissions_amber_for_unmapped_licence():
+    bundle = CaseBundle(access_authority="public", licence_findings=[{"concluded": "Some-Unmapped-Licence"}])
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["contractual_permissions"]["decision_state"] == "AMBER"

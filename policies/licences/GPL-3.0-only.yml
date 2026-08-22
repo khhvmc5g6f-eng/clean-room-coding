@@ -26,6 +26,7 @@ network_use_triggers_obligations: false  # GPLv3 itself has no network-copyleft 
 patent_grant: true
 patent_retaliation_clause: true
 trademark_grant: false
+reverse_engineering_restriction: false  # the GPL-3.0 licence text imposes no reverse-engineering/study restriction -- the FSF's four freedoms explicitly include studying and modifying the work
 
 clean_room_relevance: >
   THE CENTRAL RISK THIS PACK EXISTS TO MANAGE: merely rewriting or

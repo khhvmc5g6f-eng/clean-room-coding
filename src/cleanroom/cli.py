@@ -928,6 +928,9 @@ def legal(ctx: Ctx, access_authority: str) -> None:
             classification = node["classification"]
             requirement_classifications[classification] = requirement_classifications.get(classification, 0) + 1
 
+    sanitise_events = [e for e in project.evidence.read_all() if e["action"] == "cleanroom sanitise"]
+    sanitisation_blocked = any(e["result"] == "denied" for e in sanitise_events) if sanitise_events else None
+
     j = project.config.data["jurisdiction"]
     markets = j["required_markets"] + [m for m in j.get("informational_markets", []) if m not in j["required_markets"]]
     findings: list[dict[str, Any]] = []
@@ -937,6 +940,7 @@ def legal(ctx: Ctx, access_authority: str) -> None:
         bundle = legal_engine.CaseBundle(
             access_authority=access_authority,
             licence_findings=licence_findings,
+            sanitisation_blocked=sanitisation_blocked,
             isolation_test_passed=isolation_ok,
             similarity_findings=similarity_findings,
             output_distribution_model=project.config.data.get("implementation", {}).get("distribution_model"),

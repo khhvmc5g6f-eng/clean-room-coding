@@ -262,6 +262,29 @@ def test_benchmark_command_does_not_require_a_cleanroom_project():
     assert 0.0 <= payload["precision"] <= 1.0
 
 
+def test_legal_picks_up_sanitisation_blocked_history(tmp_path: Path):
+    """Regression test: `cleanroom legal` never populated
+    CaseBundle.sanitisation_blocked at all (always None), so the
+    'confidentiality' heuristic could never distinguish a clean
+    sanitisation history from one that actually caught something. A
+    denied `cleanroom sanitise` run must now surface as
+    sanitisation_blocked=True and drive 'confidentiality' to RED when
+    access is contractual."""
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+
+    blocking_doc = project_dir / "zone-h" / "secret.md"
+    blocking_doc.write_text("api_key = 'sk-thisisadefinitelyrealsecretlookingvalue123456'\n", encoding="utf-8")
+    sanitise_result = runner.invoke(main, ["--project", str(project_dir), "sanitise", str(blocking_doc)])
+    assert sanitise_result.exit_code != 0  # blocked, as intended
+
+    legal_result = _run(runner, ["--project", str(project_dir), "--json", "legal", "--access-authority", "contractual"])
+    findings = {f["issue"]: f for f in json.loads(legal_result.output)["findings"]}
+    assert findings["confidentiality"]["decision_state"] == "RED"
+
+
 def test_legal_picks_up_similarity_and_requirement_graph_facts(tmp_path: Path):
     """Regression test: `cleanroom legal` previously never loaded
     evidence/similarity-findings.json or requirements.json into the

@@ -22,7 +22,29 @@ from typing import Any, Callable
 from cleanroom.licence import policy as licence_policy
 
 _COPYLEFT_LEVELS = {"strong", "weak", "delayed_copyleft"}
+_STRONG_COPYLEFT_LEVELS = {"strong", "network-strong"}
 _DISTRIBUTION_ACTS = {"source", "binary", "library", "container"}  # "saas" is handled separately below
+
+# Jurisdictions with a confirmed, real sui generis database right (EU
+# Database Directive 96/9/EC Art. 7, or a national implementation/
+# retained-law equivalent) -- verified per-jurisdiction, not assumed:
+# eu/france/germany implement the Directive directly; England & Wales
+# (gb/uk) retains its own database right post-Brexit under assimilated
+# law (Copyright and Rights in Databases Regulations 1997, SI 1997/3032),
+# confirmed against GOV.UK guidance, with qualification narrowed to UK
+# persons/businesses for databases made on or after 2021-01-01. Keyed by
+# the same raw market-code strings `bundle.jurisdiction` actually holds
+# (cli.py's `legal` command sets it from `.cleanroom.yml`'s
+# required_markets/informational_markets, e.g. "gb"/"us"/"fr" -- NOT the
+# jurisdiction *pack id* like "england-wales"/"usa-federal", which is a
+# different string; see jurisdiction/resolver.py's COUNTRY_TO_PACK).
+_DATABASE_RIGHT_JURISDICTIONS = {"eu", "gb", "uk", "fr", "de"}
+# Confirmed to have NO equivalent sui generis right: US Supreme Court's
+# Feist Publications v. Rural Telephone Service (1991) rejected "sweat of
+# the brow" database protection; Japan's Copyright Act has no separate
+# database right either (only ordinary copyright in a database's
+# creative selection/arrangement, Copyright Act Art. 12-2).
+_NO_DATABASE_RIGHT_JURISDICTIONS = {"us", "jp"}
 
 ISSUES = [
     "lawful_access",
@@ -364,12 +386,256 @@ def _interoperability_provisions(bundle: CaseBundle) -> dict[str, Any]:
     )
 
 
-# Issues not yet backed by a specific heuristic in v0.1 (patents, trademarks,
-# database_rights, confidentiality, trade_secrets, linking,
-# contractual_permissions, protected_expression) are honestly reported
-# UNKNOWN rather than simulated with a fake heuristic -- each would require
-# facts this tool cannot compute deterministically (contract text analysis,
-# registry lookups, idea/expression-merger judgment). See ROADMAP.md.
+def _licence_terms_with_packs(licence_ids: list[str]) -> tuple[list[str], list[str]]:
+    """Returns (known_terms, unknown_terms) across every term of every
+    given licence expression, deduplicated. Shared helper for the
+    patent/trademark/contractual heuristics below, all of which read a
+    per-licence fact off the same policy packs."""
+    known: set[str] = set()
+    unknown: set[str] = set()
+    for rid in licence_ids or []:
+        for term in licence_policy.split_terms(rid or ""):
+            if licence_policy.load_pack(term) is not None:
+                known.add(term)
+            else:
+                unknown.add(term)
+    return sorted(known), sorted(unknown)
+
+
+def _patent_risk(bundle: CaseBundle) -> dict[str, Any]:
+    if bundle.reference_licence_ids is None:
+        return _finding(
+            "patent_risk", bundle.jurisdiction, "UNKNOWN",
+            "No licence discovery has been run against the reference material, so no reference/dependency licence's patent grant terms are known.",
+            [], "insufficient_evidence",
+        )
+    known, unknown = _licence_terms_with_packs(bundle.reference_licence_ids)
+    if not known and not unknown:
+        return _finding(
+            "patent_risk", bundle.jurisdiction, "UNKNOWN",
+            "No reference/dependency licence was concluded, so no patent grant terms are known.",
+            [], "insufficient_evidence",
+        )
+    no_patent_grant = [t for t in known if licence_policy.load_pack(t) and not licence_policy.load_pack(t).get("patent_grant")]
+    if no_patent_grant:
+        return _finding(
+            "patent_risk", bundle.jurisdiction, "AMBER",
+            f"Reference/dependency licence(s) {no_patent_grant} carry no express patent grant per their policy pack -- this tool has no evidence about the licensor's (or a third party's) patent position on the functionality being reimplemented.",
+            [f"licences without patent_grant: {no_patent_grant}"], "low",
+            alternative_explanation="Absence of an express patent grant in the reference's licence does not itself mean a patent risk exists; it only means this tool found no contractual patent grant to point to. This is not a substitute for a patent landscape/freedom-to-operate search, which this tool does not perform.",
+        )
+    if unknown:
+        return _finding(
+            "patent_risk", bundle.jurisdiction, "AMBER",
+            f"Licence term(s) {unknown} have no matching policy pack in this installation -- their patent grant terms (if any) are unknown to this tool.",
+            [f"unknown licence terms: {unknown}"], "low",
+        )
+    return _finding(
+        "patent_risk", bundle.jurisdiction, "GREEN_WITH_CONDITIONS",
+        f"Every concluded reference/dependency licence term ({known}) carries an express patent grant per its policy pack.",
+        [f"licences with patent_grant: {known}"], "medium",
+        alternative_explanation="An express patent grant from the reference's licensor does not address a THIRD PARTY's patent claims against the reimplemented functionality -- this tool performs no patent landscape search.",
+    )
+
+
+def _trademark_risk(bundle: CaseBundle) -> dict[str, Any]:
+    if bundle.reference_licence_ids is None:
+        return _finding(
+            "trademark_risk", bundle.jurisdiction, "UNKNOWN",
+            "No licence discovery has been run against the reference material.",
+            [], "insufficient_evidence",
+        )
+    known, unknown = _licence_terms_with_packs(bundle.reference_licence_ids)
+    if not known and not unknown:
+        return _finding(
+            "trademark_risk", bundle.jurisdiction, "UNKNOWN",
+            "No reference/dependency licence was concluded.",
+            [], "insufficient_evidence",
+        )
+    return _finding(
+        "trademark_risk", bundle.jurisdiction, "AMBER",
+        "None of this project's known licence policy packs grant any trademark rights (per their trademark_grant field) -- a copyright/source licence never authorises using the original product's name, logo, or branding for the reimplementation.",
+        [f"concluded licence terms checked: {sorted(known + unknown)}"], "medium",
+        alternative_explanation="This is a general fact about licence scope, not evidence either way about whether THIS project's naming/branding actually infringes a trademark -- that depends on what name/marks the reimplementation actually uses, which this tool does not evaluate.",
+    )
+
+
+def _linking(bundle: CaseBundle) -> dict[str, Any]:
+    if bundle.output_distribution_model is None:
+        return _finding(
+            "linking", bundle.jurisdiction, "UNKNOWN",
+            "Intended distribution model for the implementation has not been configured.",
+            [], "insufficient_evidence",
+            alternative_explanation="Configure .cleanroom.yml's implementation.distribution_model.",
+        )
+    if "library" not in bundle.output_distribution_model:
+        return _finding(
+            "linking", bundle.jurisdiction, "GREEN_WITH_CONDITIONS",
+            "The implementation is not configured to be distributed as a library other software links against -- linking-specific copyleft extension (as distinct from ordinary distribution, see 'distribution') is not engaged.",
+            [f"output_distribution_model = {bundle.output_distribution_model}"], "medium",
+        )
+    strong_copyleft_refs: set[str] = set()
+    for rid in bundle.reference_licence_ids or []:
+        for term in licence_policy.split_terms(rid or ""):
+            pack = licence_policy.load_pack(term)
+            if pack and pack.get("copyleft") in _STRONG_COPYLEFT_LEVELS:
+                strong_copyleft_refs.add(term)
+    if strong_copyleft_refs:
+        return _finding(
+            "linking", bundle.jurisdiction, "AMBER",
+            f"The implementation is distributed as a library (other software will link against it), and reference/dependency licence(s) {sorted(strong_copyleft_refs)} carry strong copyleft -- unlike a standalone binary, a library that is a derivative work can extend copyleft obligations to whatever combines/links with it (the GPL family's 'derivative work via linking' theory), separately from whether the library itself is merely distributed.",
+            [f"output_distribution_model includes library", f"strong-copyleft reference licences: {sorted(strong_copyleft_refs)}"],
+            "medium",
+            alternative_explanation="Whether linking against this specific library actually creates a derivative work under the applicable licence (some licences, e.g. LGPL, have an explicit linking exception not modelled by any pack in this installation) is a question for qualified counsel, not resolved here.",
+        )
+    return _finding(
+        "linking", bundle.jurisdiction, "GREEN_WITH_CONDITIONS",
+        "The implementation is distributed as a library, but no reference/dependency licence with strong copyleft was detected.",
+        [f"output_distribution_model = {bundle.output_distribution_model}"], "medium",
+    )
+
+
+def _confidentiality(bundle: CaseBundle) -> dict[str, Any]:
+    if bundle.access_authority in (None, "unknown"):
+        return _finding(
+            "confidentiality", bundle.jurisdiction, "UNKNOWN",
+            "Access authority for the reference material has not been established.",
+            [], "insufficient_evidence",
+        )
+    if bundle.access_authority != "contractual":
+        return _finding(
+            "confidentiality", bundle.jurisdiction, "GREEN_WITH_CONDITIONS",
+            f"Access authority is declared '{bundle.access_authority}', not contractual -- no declared contractual confidentiality obligation is in scope.",
+            [f"intake.access_authority = {bundle.access_authority}"], "medium",
+        )
+    if bundle.sanitisation_blocked is None:
+        return _finding(
+            "confidentiality", bundle.jurisdiction, "AMBER",
+            "Access is declared contractual (implying a possible confidentiality obligation), and the sanitisation scanner has not been run to confirm no confidential material crossed into the handoff bundle.",
+            ["intake.access_authority = contractual"], "low",
+            alternative_explanation="Run 'cleanroom sanitise' on every candidate handoff document; this tool cannot read the actual contract's confidentiality terms.",
+        )
+    if bundle.sanitisation_blocked:
+        return _finding(
+            "confidentiality", bundle.jurisdiction, "RED",
+            "Access is declared contractual and the sanitisation scanner has, at some point, blocked a candidate handoff document -- verify no confidential material from the contractual access actually crossed into Zone H before proceeding.",
+            ["intake.access_authority = contractual", "a 'cleanroom sanitise' run recorded result=denied"], "high",
+        )
+    return _finding(
+        "confidentiality", bundle.jurisdiction, "AMBER",
+        "Access is declared contractual, but sanitisation runs on record have not blocked any candidate handoff document.",
+        ["intake.access_authority = contractual", "no recorded sanitisation denial"], "medium",
+        alternative_explanation="This tool cannot read the actual contract's confidentiality terms, only whether its own sanitisation scanner has caught anything; a clean sanitisation history is not the same as confirmed compliance with the contract.",
+    )
+
+
+def _trade_secrets(bundle: CaseBundle) -> dict[str, Any]:
+    if bundle.access_authority in (None, "unknown"):
+        return _finding(
+            "trade_secrets", bundle.jurisdiction, "UNKNOWN",
+            "Access authority for the reference material has not been established.",
+            [], "insufficient_evidence",
+        )
+    if bundle.access_authority == "public":
+        return _finding(
+            "trade_secrets", bundle.jurisdiction, "GREEN_WITH_CONDITIONS",
+            "Reference material was declared publicly accessible -- material that is genuinely public is not ordinarily capable of trade secret protection, which requires actual secrecy.",
+            ["intake.access_authority = public"], "medium",
+            alternative_explanation="If any specific portion of the 'public' material was in fact obtained or retained under a separate confidentiality obligation, that portion could still be a trade secret -- this is a general default, not a case-specific ruling.",
+        )
+    material_or_suspicious = [
+        f for f in (bundle.similarity_findings or []) if f.get("classification") in ("material", "suspicious")
+    ]
+    if material_or_suspicious:
+        return _finding(
+            "trade_secrets", bundle.jurisdiction, "RED" if any(f.get("classification") == "material" for f in material_or_suspicious) else "AMBER",
+            f"Access authority is '{bundle.access_authority}' (non-public) and {len(material_or_suspicious)} similarity finding(s) are open -- non-public access combined with unresolved similarity is the fact pattern trade secret misappropriation claims are built on; qualified counsel review is warranted before proceeding.",
+            [f["id"] for f in material_or_suspicious], "high",
+        )
+    return _finding(
+        "trade_secrets", bundle.jurisdiction, "AMBER",
+        f"Access authority is '{bundle.access_authority}' (non-public); no similarity findings are currently open, but this tool cannot independently confirm what confidentiality/trade-secret terms (if any) governed that access.",
+        [f"intake.access_authority = {bundle.access_authority}"], "low",
+    )
+
+
+def _database_rights(bundle: CaseBundle) -> dict[str, Any]:
+    jurisdiction_key = (bundle.jurisdiction or "").lower()
+    if jurisdiction_key in _DATABASE_RIGHT_JURISDICTIONS:
+        return _finding(
+            "database_rights", bundle.jurisdiction, "AMBER",
+            f"'{bundle.jurisdiction}' has a confirmed sui generis database right (EU Database Directive 96/9/EC Art. 7, or a national/retained-law implementation) that applies independently of copyright -- if the reference material includes a substantial database (by verification or investment of obtaining/verifying/presenting its contents), this is a separate question from ordinary copyright/similarity analysis.",
+            [f"jurisdiction = {bundle.jurisdiction}"], "medium",
+            alternative_explanation="This flags that the regime exists in this jurisdiction, not that the specific reference material qualifies as a protected database -- that is a fact question this tool does not evaluate.",
+        )
+    if jurisdiction_key in _NO_DATABASE_RIGHT_JURISDICTIONS:
+        return _finding(
+            "database_rights", bundle.jurisdiction, "GREEN_WITH_CONDITIONS",
+            f"'{bundle.jurisdiction}' has no sui generis database right (confirmed: US -- Feist Publications v. Rural Telephone Service rejected 'sweat of the brow' protection; Japan -- no separate database right, only ordinary copyright in a creative selection/arrangement under Copyright Act Art. 12-2).",
+            [f"jurisdiction = {bundle.jurisdiction}"], "medium",
+        )
+    return _finding(
+        "database_rights", bundle.jurisdiction, "UNKNOWN",
+        f"Whether '{bundle.jurisdiction}' has a sui generis database right is not recorded in this tool for this jurisdiction.",
+        [], "insufficient_evidence",
+    )
+
+
+def _contractual_permissions(bundle: CaseBundle) -> dict[str, Any]:
+    if bundle.access_authority in (None, "unknown"):
+        return _finding(
+            "contractual_permissions", bundle.jurisdiction, "UNKNOWN",
+            "Access authority for the reference material has not been established.",
+            [], "insufficient_evidence",
+        )
+    if bundle.access_authority == "contractual":
+        return _finding(
+            "contractual_permissions", bundle.jurisdiction, "AMBER",
+            "Access is declared contractual; this tool cannot read the actual contract/NDA text to confirm the specific act performed (e.g. reverse engineering, benchmarking) is contractually permitted.",
+            ["intake.access_authority = contractual"], "low",
+            alternative_explanation="A human must read the actual agreement and confirm the specific act is within its terms.",
+        )
+    if not bundle.licence_findings:
+        return _finding(
+            "contractual_permissions", bundle.jurisdiction, "UNKNOWN",
+            "No licence discovery has been run against the reference material.",
+            [], "insufficient_evidence",
+        )
+    concluded = sorted({f["concluded"] for f in bundle.licence_findings if f.get("concluded")})
+    if not concluded:
+        return _finding(
+            "contractual_permissions", bundle.jurisdiction, "AMBER",
+            "No licence was concluded for the reference material, so no licence-text-based reverse-engineering permission (or restriction) is known.",
+            [f"{len(bundle.licence_findings)} location(s) scanned, 0 concluded"], "low",
+        )
+    known, unknown = _licence_terms_with_packs(concluded)
+    restricting = [t for t in known if licence_policy.load_pack(t) and licence_policy.load_pack(t).get("reverse_engineering_restriction")]
+    if restricting:
+        return _finding(
+            "contractual_permissions", bundle.jurisdiction, "RED",
+            f"Concluded reference licence(s) {restricting} are recorded as containing a reverse-engineering/study restriction in their policy pack.",
+            [f"restricting licences: {restricting}"], "high",
+        )
+    if unknown:
+        return _finding(
+            "contractual_permissions", bundle.jurisdiction, "AMBER",
+            f"Concluded licence term(s) {unknown} have no matching policy pack in this installation -- whether they impose a reverse-engineering restriction is unknown to this tool.",
+            [f"unknown licence terms: {unknown}"], "low",
+        )
+    return _finding(
+        "contractual_permissions", bundle.jurisdiction, "GREEN_WITH_CONDITIONS",
+        f"Concluded reference licence(s) {known} are known open-source/source-available licences with no reverse-engineering restriction recorded in their policy pack.",
+        [f"concluded licences checked: {known}"], "medium",
+        alternative_explanation="This checks the licence TEXT only; a separate contract, NDA, or terms-of-service the material was accessed under (if any) is not evaluated here -- see 'lawful_access'.",
+    )
+
+
+# Issue with no heuristic in v0.1: protected_expression (idea/expression
+# merger analysis is irreducibly a human/expert judgement call this tool
+# has no deterministic proxy for -- unlike the other 17 issues, no
+# combination of existing facts distinguishes protectable expression from
+# unprotectable idea/function/method of operation). Honestly reported
+# UNKNOWN rather than simulated with a fake heuristic. See ROADMAP.md.
 _HEURISTICS: dict[str, Callable[[CaseBundle], list[dict[str, Any]]]] = {
     "lawful_access": lambda b: [_lawful_access(b)],
     "copyright_subsistence": lambda b: [_copyright_subsistence(b)],
@@ -380,6 +646,13 @@ _HEURISTICS: dict[str, Callable[[CaseBundle], list[dict[str, Any]]]] = {
     "distribution": lambda b: [_distribution(b)],
     "derivative_work_question": lambda b: [_derivative_work_question(b)],
     "interoperability_provisions": lambda b: [_interoperability_provisions(b)],
+    "patent_risk": lambda b: [_patent_risk(b)],
+    "trademark_risk": lambda b: [_trademark_risk(b)],
+    "linking": lambda b: [_linking(b)],
+    "confidentiality": lambda b: [_confidentiality(b)],
+    "trade_secrets": lambda b: [_trade_secrets(b)],
+    "database_rights": lambda b: [_database_rights(b)],
+    "contractual_permissions": lambda b: [_contractual_permissions(b)],
 }
 
 

@@ -63,8 +63,9 @@ keeps the deterministic core honestly deterministic.
 See [ROADMAP.md](../ROADMAP.md) for the full list -- e.g. structural
 similarity has real AST/tree-sitter support for Python, JavaScript,
 TypeScript, Go, Rust, Java, Ruby, C and C++ (generic-fallback for other
-languages), SBOM dependency discovery reads direct declared dependencies
-only (no transitive resolution), and the legal issue engine implements 10
-of 18 issues with a real heuristic (the rest are honestly `UNKNOWN`
-pending either more heuristics or a human reviewer, never a fabricated
-answer).
+languages), SBOM transitive dependency resolution is opt-in
+(`cleanroom provenance --resolve-transitive`) rather than automatic, and
+the legal issue engine implements 17 of 18 issues with a real heuristic
+-- only `protected_expression` is honestly `UNKNOWN`, since idea/
+expression merger judgment has no deterministic proxy this tool can
+compute, never a fabricated answer.

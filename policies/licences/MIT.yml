@@ -22,6 +22,7 @@ distribution_triggers: [source, binary, saas, library, container]
 network_use_triggers_obligations: false
 patent_grant: false
 trademark_grant: false
+reverse_engineering_restriction: false  # the MIT licence text imposes no reverse-engineering/study restriction
 
 combination_notes: >
   Widely treated as compatible with essentially all other OSI-approved

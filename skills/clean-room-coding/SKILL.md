@@ -166,7 +166,9 @@ machine-readable output) over re-deriving its logic by hand.
 14. **Legal / Judge** -- `cleanroom legal --access-authority ...` runs the
     heuristic legal-issue engine (Part XLIV-style: 18 distinct questions,
     each independently UNKNOWN/GREEN_WITH_CONDITIONS/AMBER/RED with
-    evidence -- never fabricated). `cleanroom judge` then writes
+    evidence -- never fabricated). 17 of the 18 now have real
+    deterministic logic; only `protected_expression` stays `UNKNOWN`
+    (idea/expression merger judgment has no deterministic proxy). `cleanroom judge` then writes
     Applicant-Counsel / Challenger-Counsel / Judicial-Review **prompts**
     to `evidence/judicial-review/`. Read `references/legal-and-judicial-panels.md`
     before answering these prompts yourself (e.g. via the Task/Agent tool)

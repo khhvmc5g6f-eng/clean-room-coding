@@ -22,6 +22,7 @@ network_use_triggers_obligations: true
 patent_grant: true
 patent_retaliation_clause: true
 trademark_grant: false
+reverse_engineering_restriction: false  # inherits GPL-3.0-only's terms (see GPL-3.0-only.yml) -- no reverse-engineering/study restriction
 
 clean_room_relevance: >
   For a SaaS-distributed reimplementation, this is the single most

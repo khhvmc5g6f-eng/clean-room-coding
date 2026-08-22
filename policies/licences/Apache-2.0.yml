@@ -22,6 +22,7 @@ network_use_triggers_obligations: false
 patent_grant: true
 patent_retaliation_clause: true
 trademark_grant: false
+reverse_engineering_restriction: false  # the Apache-2.0 licence text imposes no reverse-engineering/study restriction
 
 combination_notes: >
   Apache-2.0 is compatible with GPL-3.0-or-later's stated compatibility

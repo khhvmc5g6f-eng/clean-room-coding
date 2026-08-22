@@ -28,6 +28,7 @@ distribution_triggers: [source, binary, saas, library, container]
 network_use_triggers_obligations: variable  # depends entirely on the specific Additional Use Grant
 patent_grant: false
 trademark_grant: false
+reverse_engineering_restriction: false  # the base BUSL-1.1 template text imposes no reverse-engineering/study restriction -- but see clean_room_relevance below: a specific project's Additional Use Grant could in principle add one and must still be read directly
 
 clean_room_relevance: >
   Because BUSL is a template licence with a mandatory, project-specific

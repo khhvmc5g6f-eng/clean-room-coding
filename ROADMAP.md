@@ -64,20 +64,21 @@ see "External review findings" and "Competitive landscape" below.
   schema-conformant with each library's own validator
   (`validate_full_spdx_document`, `make_schemabased_validator`), including
   a fix-up for a real spdx-tools 0.8.5 quirk (see "Fixed" below).
-- A heuristic legal-issue engine covering 10 of Part XLIV's 18 issues with
+- A heuristic legal-issue engine covering 17 of Part XLIV's 18 issues with
   real deterministic logic (`lawful_access`, `copyright_subsistence`,
   `permitted_acts`, `copying`/`substantiality`, `saas_network_provision`,
   `licence_obligations`, `distribution`, `derivative_work_question`,
-  `interoperability_provisions`); the remaining 8 (`patent_risk`,
-  `trademark_risk`, `database_rights`, `confidentiality`, `trade_secrets`,
-  `linking`, `contractual_permissions`, `protected_expression`) are
-  honestly `UNKNOWN` pending more heuristics or human review -- never
-  fabricated. `cleanroom legal` now actually feeds the engine real
-  similarity findings and requirement-graph classifications (see "Fixed"
-  below -- this was previously a silent gap: the CLI built every
-  `CaseBundle` without them, so `copying`/`substantiality` and
-  `derivative_work_question` reported `UNKNOWN` even after `cleanroom
-  similarity`/`cleanroom specify` had produced real facts).
+  `interoperability_provisions`, `patent_risk`, `trademark_risk`,
+  `linking`, `confidentiality`, `trade_secrets`, `database_rights`,
+  `contractual_permissions`). Only `protected_expression` remains
+  honestly `UNKNOWN` -- idea/expression merger analysis has no
+  deterministic proxy this tool can compute, unlike the other 17, so it's
+  reported UNKNOWN rather than simulated. `cleanroom legal` now actually
+  feeds the engine real similarity findings, requirement-graph
+  classifications, and sanitisation-blocked history (see "Fixed" below --
+  these were previously silent gaps: the CLI built every `CaseBundle`
+  without them, so several heuristics reported `UNKNOWN` even after the
+  facts they needed had already been produced elsewhere).
 - Adversarial-counsel + judicial-review **prompt generation**
   (`cleanroom judge`) for whatever LLM harness answers them, plus
   deterministic decision-state aggregation that can never produce an
@@ -436,13 +437,21 @@ change that should be evaluated on its own.
   `cleanroom` as a library (e.g. an orchestration harness that spawns
   implementation subagents) can and should gate their file access through
   `PathGuard` directly; the CLI itself doesn't yet do this automatically.
-- **Legal-issue engine**: 8 of 18 issues (`contractual_permissions`,
-  `protected_expression`, `linking`, `patent_risk`, `trademark_risk`,
-  `database_rights`, `confidentiality`, `trade_secrets`) have no dedicated
-  heuristic yet -- always `UNKNOWN`. Each would need facts this tool
-  cannot compute deterministically (actual contract/NDA text analysis,
-  patent/trademark/database-right registry lookups, or idea/expression-
-  merger judgment), not just a missing feature.
+- **Legal-issue engine**: only `protected_expression` has no dedicated
+  heuristic -- always `UNKNOWN`. Idea/expression merger judgment has no
+  deterministic proxy this tool can compute, unlike the other 17 issues.
+  `patent_risk`/`trademark_risk` (via each licence policy pack's
+  `patent_grant`/`trademark_grant` fields, not a registry/freedom-to-
+  operate search), `database_rights` (via a per-jurisdiction fact table,
+  not a database-content classifier), `confidentiality`/`trade_secrets`
+  (via `access_authority` + sanitisation history/similarity findings,
+  not the actual contract text), `linking` (via `output_distribution_model`
+  + reference licence copyleft strength), and `contractual_permissions`
+  (via each policy pack's `reverse_engineering_restriction` field for the
+  5 currently-known licences, not the actual contract if access is
+  `contractual`) are all real but narrower-than-a-full-analysis triage
+  signals -- each documents exactly what it does and doesn't establish in
+  its own `alternative_explanation` field.
 - **Jurisdiction packs**: England & Wales, US federal, EU, France, Germany
   and Japan now exist (6 of the 6 originally mentioned in the design
   brief). Adding a further jurisdiction is still a real research task (see
@@ -534,11 +543,13 @@ change that should be evaluated on its own.
    detection is needed beyond the current fingerprint scanner.
 3. ~~`ast-grep-py`-based structural similarity for JS/Go/Rust/Java~~ --
    **done**, and extended to also cover TypeScript/TSX/Ruby/C/C++.
-4. ~~More legal-issue heuristics (particularly `distribution`,
-   `licence_obligations`, `derivative_work_question`)~~ -- **done**, along
-   with `interoperability_provisions`. The remaining 8 issues each need
-   facts this tool cannot compute deterministically (see "Documented
-   limitations").
+4. ~~More legal-issue heuristics~~ -- **done**, all the way to 17 of 18
+   (`distribution`, `licence_obligations`, `derivative_work_question`,
+   `interoperability_provisions`, `patent_risk`, `trademark_risk`,
+   `linking`, `confidentiality`, `trade_secrets`, `database_rights`,
+   `contractual_permissions`). Only `protected_expression` remains
+   `UNKNOWN` -- it has no deterministic proxy this tool can compute (see
+   "Documented limitations").
 5. ~~`spdx-tools`/`cyclonedx-python-lib` to replace the hand-rolled SBOM
    serialization in `provenance/sbom.py`~~ -- **done**, confirmed schema-
    valid against each library's own validator.
