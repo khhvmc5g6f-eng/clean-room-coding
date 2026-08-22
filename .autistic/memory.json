@@ -66,6 +66,11 @@
       "blastRadius": "low"
     },
     {
+      "claim": "gnu.org (the FSF's own site) is unreachable from this environment at the network level -- both WebFetch and the browser tool's navigate were denied outright, not just rate-limited or robots-blocked. FSF's own stated rationale for a licence's non-free classification (attempted for NASA-1.3) cannot be independently verified here; SPDX's license-list-data isFsfLibre field remains the best available primary-source fact, without the accompanying reasoning text.",
+      "verified": true,
+      "blastRadius": "low"
+    },
+    {
       "claim": "US federal government works are public domain by statute (17 U.S.C. Sec. 105), not by a licence -- SPDX only has narrower agency-specific identifiers (NIST-PD, NASA-1.3, NTIA-PD), no general 'US government work' licence pack is the right shape here.",
       "verified": true,
       "blastRadius": "low",
