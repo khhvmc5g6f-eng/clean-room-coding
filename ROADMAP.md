@@ -25,8 +25,12 @@ see "External review findings" and "Competitive landscape" below.
 - Deterministic licence discovery (LICENSE/NOTICE/COPYING files, SPDX
   headers, `package.json`/`pyproject.toml`/`Cargo.toml`/`composer.json`
   manifests, with symlink/non-regular-file safety) and policy evaluation,
-  with 5 licence packs: MIT, Apache-2.0, GPL-3.0-only, AGPL-3.0-only,
-  BUSL-1.1 (this project's own licence).
+  with 6 licence packs: MIT, Apache-2.0, GPL-3.0-only, AGPL-3.0-only,
+  BUSL-1.1 (this project's own licence), and OGL-UK-3.0 (the UK Open
+  Government Licence -- a real, SPDX-recognised public sector data/
+  information licence, not a conventional OSS software licence; see
+  "Update (2026-08-22): OGL-UK-3.0 pack, and a real correctness fix it
+  surfaced" below).
 - SPDX expression parsing backed by the real `license-expression` library
   (`AND`/`OR`/`WITH`, the full real SPDX licence list via
   `get_spdx_licensing()`, `LicenseRef-*` always flagged for manual review)
@@ -312,6 +316,46 @@ never reset the fill colour it set for the coloured "Global decision"
 chip, which fpdf2's table cells silently inherited for every column, not
 just the intentionally-coloured one -- found by visually reading a
 rendered sample report, not just running the test suite.
+
+**Update (2026-08-22): OGL-UK-3.0 pack, and a real correctness fix it
+surfaced.** Added `policies/licences/OGL-UK-3.0.yml` for the UK Open
+Government Licence v3.0, verified against its primary source (The
+National Archives' own licence text) and cross-checked against SPDX's own
+list entry -- not written from recollection. It's a genuinely different
+kind of pack from the other five: a public sector information/data
+licence (`family: public_sector_data`), not a software OSS licence, with
+its own real exclusions (personal data, unlawfully-accessed information,
+government logos/crests, third-party IP) recorded as `key_exclusions`,
+and cross-referenced against the existing `database_rights` heuristic
+since OGLv3.0 explicitly licenses "copyright OR database right material."
+
+Building it out (with a systematic map of how licence packs, the
+`legal/engine.py` heuristics that consume them, and jurisdiction packs
+interconnect) surfaced a real, independent bug, unrelated to OGL itself:
+**`_distribution()` and `_linking()` in `legal/engine.py` silently treated
+a licence term with NO matching policy pack exactly the same as a term
+confirmed non-copyleft**, both falling through to the same
+`GREEN_WITH_CONDITIONS` result -- a real, SPDX-recognised copyleft
+licence with no pack yet (confirmed reproduced with `EUPL-1.2`, which
+`cleanroom licence` already concludes at high confidence via
+`license-expression`'s own SPDX symbol table, but which had no
+`policies/licences/EUPL-1.2.yml`) got a falsely reassuring GREEN instead
+of an honest "unknown to this tool." Every OTHER heuristic that reads
+`load_pack()` results (`_licence_obligations`, `_patent_risk`,
+`_trademark_risk`, `_contractual_permissions`) already used the shared
+`_licence_terms_with_packs()` helper to draw this distinction correctly
+-- `_distribution`/`_linking` predated that helper and had their own
+inline lookup that never got migrated. Fixed by switching both to the
+shared helper and returning AMBER ("no matching policy pack... unknown to
+this tool, not confirmed absent") when a concluded term is unpacked,
+exactly like the other four heuristics. Verified by direct reproduction
+both via 2 new unit tests and a real end-to-end `cleanroom legal` run
+against an EUPL-1.2-licensed reference with a configured distribution
+model, confirming `distribution`/`linking` now report AMBER instead of
+the previous GREEN_WITH_CONDITIONS. This fix benefits every currently-
+unpacked-but-SPDX-recognised copyleft licence a project might reference
+(LGPL variants, MPL-2.0, EPL-2.0, EUPL, CDDL, OSL-3.0, etc.), not just
+OGL or EUPL specifically.
 
 ## Competitive landscape (researched 2026-08-22)
 

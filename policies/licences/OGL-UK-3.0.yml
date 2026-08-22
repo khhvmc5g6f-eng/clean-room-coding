@@ -1,0 +1,96 @@
+# Licence policy pack: OGL-UK-3.0 (Open Government Licence v3.0, UK)
+# Verified against the primary source (The National Archives' own licence
+# text, http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/)
+# and cross-checked against SPDX's own OGL-UK-3.0 list entry, not written
+# from general recollection.
+#
+# This is genuinely a different kind of pack from the other five in this
+# directory: OGL-UK-3.0 is a UK PUBLIC SECTOR INFORMATION/DATA licence, not
+# a software licence. It appears here because a clean-room project's
+# reference material can legitimately include OGL-licensed government data
+# (Ordnance Survey, ONS, Companies House, Ordnance Survey boundary/mapping
+# data, etc.), and this project's licence engine should recognise its real
+# terms rather than reporting "unknown" -- `license-expression`'s own SPDX
+# symbol table already lists OGL-UK-1.0/2.0/3.0 (and OGL-Canada-2.0) as
+# known identifiers, so `licence/discovery.py` would already conclude the
+# licence at high confidence; this pack adds the structured facts/
+# obligations/prompts the other five get.
+
+spdx_id: OGL-UK-3.0
+family: public_sector_data
+osi_approved: false
+fsf_libre: false
+copyleft: none
+
+summary: >
+  The UK Government's standard licence for public sector information and
+  data (The National Archives / Controller of HMSO). Permits copying,
+  publishing, distributing, transmitting, adapting, and exploiting the
+  licensed Information both commercially and non-commercially, subject to
+  an attribution requirement and a defined set of exclusions. Not a
+  share-alike (copyleft) licence -- OGLv3.0 is Open Definition compliant
+  and the National Archives states it is compatible with the Creative
+  Commons Attribution 4.0 licence and the Open Data Commons Attribution
+  License, so an adaptation may be relicensed under different terms
+  provided the attribution obligation toward the original Information is
+  still discharged.
+
+key_obligations:
+  - "Acknowledge the source of the Information by including or linking to any attribution statement specified by the Information Provider(s)."
+  - "Where no specific attribution statement is given, use the default: \"Contains public sector information licensed under the Open Government Licence v3.0.\""
+  - "The Information is licensed 'as is', with no warranty of any kind -- do not represent the Information Provider as endorsing any use made of it."
+  - "Do not use the Information in a way that suggests any official status or that the Information Provider endorses the licensee or their use of the Information."
+
+distribution_triggers: [source, binary, saas, library, container]
+network_use_triggers_obligations: false
+patent_grant: false
+trademark_grant: false  # government logos, crests and other departmental/organisational identifiers are expressly EXCLUDED from what OGLv3.0 licenses -- see key_exclusions below
+reverse_engineering_restriction: false  # the OGLv3.0 text imposes no reverse-engineering/study restriction
+
+key_exclusions:
+  - "Personal data in the Information."
+  - "Information that has not been accessed lawfully, or that was accessed other than under information access legislation (including the Freedom of Information Act 2000 and the Environmental Information Regulations 2004) and is not otherwise made available under this licence."
+  - "Departmental or organisational logos, crests, and the Royal Arms (except where they are an integral part of a document or dataset)."
+  - "Military insignia."
+  - "Third-party rights the Information Provider is not authorised to license, including other third parties' intellectual property rights (e.g. patents, trademarks, design rights)."
+  - "Identity documents such as passports."
+
+combination_notes: >
+  Not a share-alike licence: OGLv3.0's own guidance states it is compatible
+  with the Creative Commons Attribution 4.0 licence and the Open Data
+  Commons Attribution License, so combining OGL-licensed data with
+  differently-licensed material, or relicensing an adaptation, does not by
+  itself breach OGLv3.0 -- the attribution obligation toward the original
+  Information must still be discharged regardless of the combined work's
+  own licence.
+
+clean_room_relevance: >
+  OGLv3.0 licenses "copyright OR DATABASE RIGHT material" -- UK/EU
+  database right (a separate, sui generis right from copyright) is exactly
+  what this project's `database_rights` legal-issue heuristic already
+  checks for jurisdictions gb/uk/fr/de/eu. A reference dataset held under
+  OGLv3.0 should be checked for both facts, not just copyright licence
+  compliance. The stated exclusions (personal data, unlawfully-accessed
+  information, third-party IP the Information Provider was never
+  authorised to license) are exactly the class of thing a clean-room
+  intake/sanitisation pass should be alert to when a reference includes
+  government open data, since those exclusions mean the Information
+  Provider's OGL grant may not actually cover everything present in a
+  dataset that merely carries an OGL attribution notice.
+
+structured_issue_prompts:
+  - "Has the attribution statement actually specified by the Information Provider been used, or (if none is specified) has the default OGLv3.0 statement been included?"
+  - "Does the reference dataset contain any of OGLv3.0's stated exclusions (personal data, government logos/crests, third-party IP the Information Provider wasn't authorised to license) that would need separate clearance?"
+  - "Is any part of the reference material's protection actually UK/EU database right rather than copyright -- and if so, has the `database_rights` finding for this jurisdiction been reviewed alongside this licence pack?"
+  - "Is the specific OGL version actually in force OGLv3.0, or an older version (OGL-UK-1.0/2.0) with its own text -- has the correct version's text been checked rather than assumed?"
+
+uncertainty_notes: >
+  OGLv3.0 is a public sector information/data licence, not a software
+  licence in the OSI/FSF sense -- it has no OSI-approval or FSF Free
+  Software designation to report, and "osi_approved"/"fsf_libre" are set
+  false here as an honest "not applicable/not found" rather than
+  fabricated. Whether a specific dataset's OGL attribution notice actually
+  covers everything present in it (see key_exclusions above), and whether
+  UK database right also attaches, are questions this tool can flag but
+  not resolve -- that remains a matter for the jurisdiction-specific legal
+  panel and, ultimately, qualified counsel.

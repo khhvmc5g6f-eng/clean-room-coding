@@ -797,4 +797,59 @@ detail:
   end-to-end) plus 1 new `transitive.py` test proving the unsupported-
   ecosystem path never reaches the PyPI lookup.
 
+### Added (twenty-second pass — OGL-UK-3.0 licence pack)
+
+- `policies/licences/OGL-UK-3.0.yml` for the UK Open Government Licence
+  v3.0, verified against its primary source (The National Archives' own
+  licence text) and cross-checked against SPDX's own list entry. A
+  genuinely different kind of pack from the other five: a public sector
+  information/data licence (`family: public_sector_data`), not a
+  conventional OSS software licence -- no share-alike obligation, no
+  patent grant, and its own real `key_exclusions` (personal data,
+  unlawfully-accessed information, government logos/crests, third-party
+  IP the Information Provider wasn't authorised to license) recorded
+  rather than glossed over. Cross-referenced against the existing
+  `database_rights` heuristic, since OGLv3.0 explicitly licenses
+  "copyright OR database right material."
+- `license-expression`'s own SPDX symbol table already recognised
+  OGL-UK-1.0/2.0/3.0 (and OGL-Canada-2.0) before this pack existed, so
+  `cleanroom licence` already concluded OGL-UK-3.0 at high confidence --
+  this pack adds the structured obligations/exclusions/prompts the other
+  five packs get, it doesn't change discovery confidence (confirmed by
+  direct testing: removing the pack and re-running discovery on the same
+  fixture still concludes the licence at `high` confidence, since that's
+  driven entirely by the SPDX symbol table, not pack existence).
+- 3 new unit tests (manifest discovery at high confidence, the pack's
+  own structured facts, `evaluate()`'s obligations surfacing).
+
+### Fixed (same pass — `_distribution`/`_linking` silently treated an unpacked licence as non-copyleft)
+
+- Building the OGL pack out required mapping how licence packs,
+  `legal/engine.py`'s heuristics, and jurisdiction packs interconnect --
+  that map surfaced a real, independent bug: `_distribution()` and
+  `_linking()` computed their own inline `load_pack()` lookup and only
+  added a term to their "found copyleft" set when a matching pack existed
+  AND was copyleft -- a term with NO matching pack (a real, SPDX-
+  recognised licence `cleanroom licence` concludes at high confidence,
+  just with no `policies/licences/<id>.yml` yet) silently fell through to
+  exactly the same `GREEN_WITH_CONDITIONS` result as a term confirmed
+  non-copyleft. Every other heuristic reading `load_pack()` results
+  (`_licence_obligations`, `_patent_risk`, `_trademark_risk`,
+  `_contractual_permissions`) already drew this distinction correctly via
+  the shared `_licence_terms_with_packs()` helper; `_distribution`/
+  `_linking` predated that helper and were never migrated to it.
+- Fixed by switching both to `_licence_terms_with_packs()` and returning
+  AMBER ("have no matching policy pack in this installation -- ... is
+  unknown to this tool, not confirmed absent") for an unpacked term,
+  matching the other four heuristics. This benefits every currently-
+  unpacked-but-SPDX-recognised copyleft licence a project might
+  reference (LGPL variants, MPL-2.0, EPL-2.0, EUPL, CDDL, OSL-3.0, etc.),
+  not just OGL or EUPL specifically.
+- Verified by direct reproduction: a real end-to-end `cleanroom legal`
+  run against an EUPL-1.2-licensed reference (a real SPDX-recognised
+  copyleft licence with no pack) with a configured `binary`/`library`
+  distribution model now reports AMBER for both `distribution` and
+  `linking`, where it previously reported a false `GREEN_WITH_CONDITIONS`.
+- 2 new regression tests confirming this exact case.
+
 [Unreleased]: https://github.com/khhvmc5g6f-eng/clean-room-coding/compare/HEAD

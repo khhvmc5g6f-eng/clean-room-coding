@@ -29,6 +29,17 @@ def test_package_json_declared_licence(tmp_path: Path):
     assert any(f.declared == "MIT" for f in findings)
 
 
+def test_ogl_uk_3_0_declared_in_manifest_concludes_at_high_confidence(tmp_path: Path):
+    """OGL-UK-3.0 is a real SPDX-recognised identifier (`license-expression`'s
+    own SPDX symbol table lists OGL-UK-1.0/2.0/3.0), so a manifest that
+    declares it must be concluded at high confidence like any other known
+    identifier -- not treated as an unrecognised string just because it's a
+    government data licence rather than a conventional OSS one."""
+    (tmp_path / "package.json").write_text('{"name": "open-data-project", "license": "OGL-UK-3.0"}', encoding="utf-8")
+    findings = discover(tmp_path)
+    assert any(f.concluded == "OGL-UK-3.0" and f.confidence == "high" for f in findings)
+
+
 def test_conflicting_licence_texts_are_flagged_not_silently_resolved(tmp_path: Path):
     # A LICENSE file containing fragments of two fingerprints should be
     # low-confidence/conflicting, never silently picked as one or the other.

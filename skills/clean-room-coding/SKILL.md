@@ -77,8 +77,10 @@ machine-readable output) over re-deriving its logic by hand.
    For obligations of a *specific* SPDX identifier, read the matching pack
    under `/policies/licences/<SPDX-ID>.yml` only when you need it
    (progressive disclosure -- don't load all of them up front; v0.1 ships
-   MIT, Apache-2.0, GPL-3.0-only, AGPL-3.0-only, and BUSL-1.1 -- the
-   licence this project itself ships under).
+   MIT, Apache-2.0, GPL-3.0-only, AGPL-3.0-only, BUSL-1.1 -- the licence
+   this project itself ships under -- and OGL-UK-3.0, the UK Open
+   Government Licence, a public sector data/information licence rather
+   than a software one).
 
 5. **Jurisdiction** -- `cleanroom jurisdiction` builds `JURISDICTION_MATRIX.json`
    from `.cleanroom.yml`'s configured markets. Never assume a single

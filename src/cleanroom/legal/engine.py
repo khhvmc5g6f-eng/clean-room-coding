@@ -303,12 +303,12 @@ def _distribution(bundle: CaseBundle) -> dict[str, Any]:
             "Configured distribution model includes no source/binary/library/container distribution act (network/SaaS provision, if configured, is assessed separately under 'saas_network_provision').",
             [f"output_distribution_model = {bundle.output_distribution_model}"], "medium",
         )
+    known, unknown = _licence_terms_with_packs(bundle.reference_licence_ids or [])
     triggered: set[str] = set()
-    for rid in bundle.reference_licence_ids or []:
-        for term in licence_policy.split_terms(rid or ""):
-            pack = licence_policy.load_pack(term)
-            if pack and pack.get("copyleft") in _COPYLEFT_LEVELS and acts & set(pack.get("distribution_triggers", [])):
-                triggered.add(term)
+    for term in known:
+        pack = licence_policy.load_pack(term)
+        if pack and pack.get("copyleft") in _COPYLEFT_LEVELS and acts & set(pack.get("distribution_triggers", [])):
+            triggered.add(term)
     if triggered:
         return _finding(
             "distribution", bundle.jurisdiction, "AMBER",
@@ -316,6 +316,20 @@ def _distribution(bundle: CaseBundle) -> dict[str, Any]:
             [f"output_distribution_model = {bundle.output_distribution_model}", f"reference_licence_ids = {bundle.reference_licence_ids}"],
             "medium",
             alternative_explanation="This flags an overlap only; whether the distributed work is actually a derivative/combined work under that licence is a separate, human question (see 'derivative_work_question').",
+        )
+    if unknown:
+        # A term with no matching policy pack must never be silently
+        # treated the same as a term confirmed non-copyleft -- whether it
+        # carries a copyleft distribution trigger is genuinely unknown to
+        # this tool, not "checked and clear" (the same known/unknown split
+        # `_patent_risk`/`_trademark_risk` already draw via this same
+        # helper; this heuristic previously computed its own inline pack
+        # lookup and didn't).
+        return _finding(
+            "distribution", bundle.jurisdiction, "AMBER",
+            f"Reference/dependency licence term(s) {unknown} have no matching policy pack in this installation -- whether they carry a copyleft distribution trigger for act(s) {sorted(acts)} is unknown to this tool, not confirmed absent.",
+            [f"output_distribution_model = {bundle.output_distribution_model}", f"unknown licence terms: {unknown}"], "low",
+            alternative_explanation="Add a policy pack for this licence (policies/licences/) or consult qualified counsel.",
         )
     return _finding(
         "distribution", bundle.jurisdiction, "GREEN_WITH_CONDITIONS",
@@ -474,12 +488,12 @@ def _linking(bundle: CaseBundle) -> dict[str, Any]:
             "The implementation is not configured to be distributed as a library other software links against -- linking-specific copyleft extension (as distinct from ordinary distribution, see 'distribution') is not engaged.",
             [f"output_distribution_model = {bundle.output_distribution_model}"], "medium",
         )
+    known, unknown = _licence_terms_with_packs(bundle.reference_licence_ids or [])
     strong_copyleft_refs: set[str] = set()
-    for rid in bundle.reference_licence_ids or []:
-        for term in licence_policy.split_terms(rid or ""):
-            pack = licence_policy.load_pack(term)
-            if pack and pack.get("copyleft") in _STRONG_COPYLEFT_LEVELS:
-                strong_copyleft_refs.add(term)
+    for term in known:
+        pack = licence_policy.load_pack(term)
+        if pack and pack.get("copyleft") in _STRONG_COPYLEFT_LEVELS:
+            strong_copyleft_refs.add(term)
     if strong_copyleft_refs:
         return _finding(
             "linking", bundle.jurisdiction, "AMBER",
@@ -487,6 +501,15 @@ def _linking(bundle: CaseBundle) -> dict[str, Any]:
             [f"output_distribution_model includes library", f"strong-copyleft reference licences: {sorted(strong_copyleft_refs)}"],
             "medium",
             alternative_explanation="Whether linking against this specific library actually creates a derivative work under the applicable licence (some licences, e.g. LGPL, have an explicit linking exception not modelled by any pack in this installation) is a question for qualified counsel, not resolved here.",
+        )
+    if unknown:
+        # Same fix as `_distribution`: a term with no matching pack must
+        # read as unknown, not as "checked, no strong copyleft found."
+        return _finding(
+            "linking", bundle.jurisdiction, "AMBER",
+            f"Reference/dependency licence term(s) {unknown} have no matching policy pack in this installation -- whether they carry strong copyleft that would extend to a linking work is unknown to this tool, not confirmed absent.",
+            [f"output_distribution_model includes library", f"unknown licence terms: {unknown}"], "low",
+            alternative_explanation="Add a policy pack for this licence (policies/licences/) or consult qualified counsel.",
         )
     return _finding(
         "linking", bundle.jurisdiction, "GREEN_WITH_CONDITIONS",

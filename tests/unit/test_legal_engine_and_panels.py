@@ -118,6 +118,31 @@ def test_distribution_green_when_no_reference_copyleft():
     assert findings["distribution"]["decision_state"] == "GREEN_WITH_CONDITIONS"
 
 
+def test_distribution_amber_not_green_when_reference_licence_has_no_pack():
+    """Regression: `_distribution` used to compute its own inline pack
+    lookup and treated a term with NO matching policy pack exactly like a
+    term confirmed non-copyleft -- both silently fell through to the same
+    GREEN_WITH_CONDITIONS fallback. A real, SPDX-recognised copyleft
+    licence with no pack yet (e.g. EUPL-1.2, which `license-expression`
+    already resolves at high confidence via `cleanroom licence`, but which
+    has no policies/licences/EUPL-1.2.yml as of this test) must report
+    AMBER "unknown to this tool", exactly like `_patent_risk`/
+    `_trademark_risk` already do via the same `_licence_terms_with_packs`
+    helper -- never a false-clean GREEN."""
+    bundle = CaseBundle(output_distribution_model=["binary"], reference_licence_ids=["EUPL-1.2"])
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["distribution"]["decision_state"] == "AMBER"
+    assert "no matching policy pack" in findings["distribution"]["finding"]
+
+
+def test_linking_amber_not_green_when_reference_licence_has_no_pack():
+    """Same regression as `_distribution`, for `_linking`."""
+    bundle = CaseBundle(output_distribution_model=["library"], reference_licence_ids=["EUPL-1.2"])
+    findings = {f["issue"]: f for f in run(bundle)}
+    assert findings["linking"]["decision_state"] == "AMBER"
+    assert "no matching policy pack" in findings["linking"]["finding"]
+
+
 def test_derivative_work_question_unknown_without_requirement_graph():
     bundle = CaseBundle(requirement_classifications=None)
     findings = {f["issue"]: f for f in run(bundle)}

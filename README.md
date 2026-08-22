@@ -42,8 +42,9 @@ built. Currently ships:
   corrupted/interrupted write.
 - Deterministic licence discovery (LICENSE/NOTICE files, SPDX headers,
   package manifests, with symlink/non-regular-file safety) plus policy
-  packs for MIT, Apache-2.0, GPL-3.0-only, AGPL-3.0-only and BUSL-1.1
-  (this project's own licence).
+  packs for MIT, Apache-2.0, GPL-3.0-only, AGPL-3.0-only, BUSL-1.1
+  (this project's own licence), and OGL-UK-3.0 (the UK Open Government
+  Licence, for reference material that includes public sector data).
 - A jurisdiction resolution engine with real, independently fact-checked
   packs for England & Wales, US federal, EU, France, Germany and Japan
   (facts + primary authorities + structured questions, not legal

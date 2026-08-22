@@ -31,10 +31,12 @@ block` (the default).
 
 ## Licence policy packs
 
-`/policies/licences/*.yml` (MIT, Apache-2.0, GPL-3.0-only, AGPL-3.0-only, BUSL-1.1 in
-v0.1) are FACTS + structured review questions, never verdicts --
-`key_obligations`, `distribution_triggers`, `network_use_triggers_obligations`,
-`clean_room_relevance`, `structured_issue_prompts`, `uncertainty_notes`.
+`/policies/licences/*.yml` (MIT, Apache-2.0, GPL-3.0-only, AGPL-3.0-only, BUSL-1.1,
+and OGL-UK-3.0 -- the UK Open Government Licence, a public sector data/
+information licence rather than a software one -- in v0.1) are FACTS + structured
+review questions, never verdicts -- `key_obligations`, `distribution_triggers`,
+`network_use_triggers_obligations`, `clean_room_relevance`,
+`structured_issue_prompts`, `uncertainty_notes`.
 Read the specific pack for the licence in play before advising a user on
 what a licence "requires" -- don't rely on general knowledge, since the
 pack captures this project's considered, versioned position (and any
