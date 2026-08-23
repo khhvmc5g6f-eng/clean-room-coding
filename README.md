@@ -29,17 +29,21 @@ review, and preserve the evidence demonstrating how the result was created.
 
 ## Status
 
-v0.2.0 — early, narrow-but-real core, since reviewed and hardened by an
+v0.3.0 — early, narrow-but-real core, since reviewed and hardened by an
 independent code review and security audit (see
 [ROADMAP.md](ROADMAP.md#external-review-findings-2026-08-22) for exactly
-what was found and fixed), then substantially extended (13 licence packs,
-opt-in `--agent-id` PathGuard enforcement, real SBOM checksums and
-Cargo/composer support, in-toto signing, judicial-panel provider
-diversity with a real opt-in release gate, a Reference-side agent
-registration path, a mechanically-enforced Clean-Room Gate between
-Sanitise and Handoff, and a real, opt-in orchestration harness with
-distinct default models on each side of the clean line -- see
-[CHANGELOG.md](CHANGELOG.md) for the full, dated history of every pass).
+what was found and fixed), then substantially extended: 13 licence
+packs, fail-closed `--agent-id` PathGuard enforcement once an
+implementation agent exists, real SBOM checksums and Cargo/composer
+support, in-toto signing, judicial-panel provider diversity with a real
+opt-in release gate, a Reference-side agent registration path, a
+mechanically-enforced Clean-Room Gate between Sanitise and Handoff, a
+real opt-in orchestration harness with distinct default models on each
+side of the clean line, protocol/schema similarity coverage,
+capability-regression coverage checking, structured facts-only
+handoffs, and a guarded web-lookup contract for implementation agents
+(see [CHANGELOG.md](CHANGELOG.md) for the full, dated history of every
+pass, and "Version history" below for the release-by-release summary).
 ROADMAP.md is the source of truth for what's fully implemented, what is
 a documented limitation, and what is not yet built. Currently ships:
 
@@ -64,8 +68,12 @@ a documented limitation, and what is not yet built. Currently ships:
 - A sanitisation scanner, requirement/behavioural specification graph,
   cryptographically hashed handoff manifest, and a similarity engine
   (lexical + Python AST / real tree-sitter structural via `ast-grep-py`
-  for JS/TS/Go/Rust/Java/Ruby/C/C++ + negative-control background
-  comparison) now wired to a real `cleanroom similarity` command.
+  for JS/TS/Go/Rust/Java/Ruby/C/C++, lexical-only for
+  `.proto`/`.thrift`/`.avsc`/`.graphql`/`.gql`, + negative-control
+  background comparison) now wired to a real `cleanroom similarity`
+  command. `cleanroom diff-reference` re-checks a project's registered
+  Zone R source against its original tree hash to catch silent drift
+  after intake.
 - SBOM generation (SPDX + CycloneDX), and a heuristic legal-issue engine
   with adversarial-counsel and judicial-review **prompt generation**
   (`cleanroom judge`) that any external LLM harness can answer by hand
@@ -79,6 +87,22 @@ a documented limitation, and what is not yet built. Currently ships:
   exact version. The human decision is always authoritative; overriding
   an `insufficient` signal to PASS requires an explicit acknowledgment
   and is recorded as such, never conflated with a genuinely clean pass.
+- A **structured, facts-only handoff format** (`cleanroom handoff
+  --format facts-json`, alongside the default free-form Markdown
+  document): schema-validated field/enum name+number+type tuples for
+  protocol/schema clean-room work, mechanically rejecting anything that
+  reads like leaked prose or commentary from the reference.
+- **Capability-regression coverage checking** (`cleanroom coverage`,
+  Part XCVI): does a Zone I implementation still reference everything a
+  project's pre-migration/legacy code actually used, banded by
+  confidence rather than a binary pass/fail — a non-blocking advisory
+  surfaced by `cleanroom gate` and `cleanroom report`.
+- A **guarded web-lookup contract** for implementation-zone agents
+  (`cleanroom check-url`/`cleanroom exclude-source`): blocks a URL that
+  matches a project's own registered reference source (or its
+  raw-content mirrors), allows unrelated ones, and records every check
+  to the evidence ledger — an integration contract for an orchestrating
+  harness to call, not a network sandbox this tool enforces on its own.
 - A **remediation feedback loop** (`cleanroom remediate`): a RED legal
   finding or a suspicious/material similarity finding is automatically
   routed back to the implementation team as a blocked requirement, and
@@ -95,7 +119,7 @@ a documented limitation, and what is not yet built. Currently ships:
   JSON/Markdown) covering what the project started with, what it did,
   functional coverage, remediation status, and the jurisdiction-by-
   jurisdiction decision.
-- A 32-command CLI (`cleanroom ...`) with `--json` output, an actually-wired
+- A 36-command CLI (`cleanroom ...`) with `--json` output, an actually-wired
   `--config` override, and documented exit codes for CI/CD.
 - A real, opt-in **orchestration harness** (`cleanroom council` /
   `cleanroom implement`, `pip install cleanroom[orchestrate]`): the first
@@ -126,6 +150,20 @@ a documented limitation, and what is not yet built. Currently ships:
   end-to-end proof of.
 - An Agent Skill at [skills/clean-room-coding/SKILL.md](skills/clean-room-coding/SKILL.md)
   for use from Claude Code.
+
+## Version history
+
+Pre-1.0 alpha — see [SECURITY.md](SECURITY.md) for which line currently
+gets fixes. Each version below folds in every build-out pass since the
+previous one; [CHANGELOG.md](CHANGELOG.md) has the full, dated write-up
+of every individual pass (what changed, what was verified, what's still
+unproven) rather than just the one-line summary here.
+
+| Version | Date | Highlights |
+| --- | --- | --- |
+| **0.3.0** | 2026-08-23 | Mechanically-enforced **Clean-Room Gate** between Sanitise and Handoff; real opt-in **LLM orchestration harness** (`cleanroom council`/`cleanroom implement`) with distinct default models per side of the clean line; fail-closed `--agent-id` zone enforcement once an implementation agent exists; structured facts-only handoffs (`--format facts-json`); capability-regression **coverage** checking; guarded web-lookup contract for implementation agents; protocol/schema (`.proto`/`.thrift`/`.avsc`/`.graphql`) similarity coverage; a real GPL/AGPL licence-detection false positive fixed. |
+| **0.2.0** | 2026-08-22 | The `v0.1.0` core, reviewed by an internal code review + security audit and then substantially extended in ~25 further passes on the same day: 13 licence policy packs, 6 jurisdiction packs, the similarity engine (Python AST + tree-sitter structural), SBOM generation (SPDX + CycloneDX) with real transitive-dependency checksums, the heuristic legal-issue engine (17/18 issues) with adversarial-counsel/judicial-review prompt generation and a provider-diversity release gate, the remediation feedback loop, optional AI-model suggestion, SLSA build provenance and in-toto signing, a measured similarity benchmark, and the Agent Skill. |
+| **0.1.0** | 2026-08-22 | Initial **deep-but-narrow** first build: the three-zone (Reference/Handoff/Implementation) project model, `PathGuard` isolation, the append-only hash-chained evidence ledger, and the core CLI pipeline. Never cut as a standalone release — folded directly into 0.2.0's CHANGELOG entry the same day, so there is no separate `v0.1.0` tag or changelog section to link to. |
 
 ## How this compares
 

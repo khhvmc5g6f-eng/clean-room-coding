@@ -2,14 +2,14 @@
 
 ## Supported versions
 
-Clean Room Coding is pre-1.0 alpha software. Only the current `0.2.x`
+Clean Room Coding is pre-1.0 alpha software. Only the current `0.3.x`
 line is supported with security fixes; there is no long-term-support
 branch yet.
 
 | Version | Supported |
 | ------- | --------- |
-| 0.2.x   | Yes       |
-| < 0.2.0 | No        |
+| 0.3.x   | Yes       |
+| < 0.3.0 | No        |
 
 This table will be revised once a 1.0 release exists.
 

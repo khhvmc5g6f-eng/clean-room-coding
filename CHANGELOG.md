@@ -8,6 +8,77 @@ once it reaches 1.0.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-23
+
+Four further build-out passes (26-29) on top of the 0.2.0 cut: a
+mechanically-enforced Clean-Room Gate between Sanitise and Handoff, a
+real opt-in LLM orchestration harness (`cleanroom council`/`cleanroom
+implement`) with distinct default models per side of the clean line, and
+a wave of correctness/hardening work (a real licence-detection false
+positive fixed, protocol/schema similarity coverage, fail-closed zone
+access, structured facts-only handoffs, capability-regression coverage
+checking, and a guarded web-lookup contract for implementation agents).
+This is early, alpha software — see [README.md](README.md) status
+section and [docs/legal-disclaimer.md](docs/legal-disclaimer.md).
+
+### Added (twenty-ninth pass — protocol/schema similarity, fail-closed zone access, structured facts-only handoffs, capability-coverage checks, guarded web-lookup)
+
+- **Fixed a real false positive:** licence discovery's AGPL exclusion
+  marker was checked against a reference file's full body, not just its
+  title/preamble -- canonical GPL-3.0 text's own Section 13 (the
+  AGPL-combination clause) was causing every genuine GPL-3.0 file to be
+  misclassified as AGPL-3.0-only.
+- Similarity engine: lexical-only support for `.proto`/`.thrift`/`.avsc`/
+  `.graphql`/`.gql` (structural/ast-grep comparison remains unsupported
+  for these, by design, not silently). `comparisons_run: 0` can no
+  longer read ambiguously as either "verified clean" or "never actually
+  checked" -- an unrecognised extension is now always reported
+  explicitly rather than folded into a silent zero.
+- New `cleanroom diff-reference`: re-clones a project's already-recruited
+  Zone R source and diffs it against the originally-registered tree
+  hash, gated by the same `PathGuard` enforcement as `recruit`/`inspect`
+  -- catches reference material silently drifting after intake.
+- **Fail-closed zone access:** once a project has any registered
+  implementation agent, every zone-scoped command
+  (`inspect`/`licence`/`similarity`/`sanitise`/`diff-reference`) now
+  *requires* a valid `--agent-id` and errors clearly if it's omitted,
+  instead of silently falling back to ungated access. Before any
+  implementation agent is registered (initial init/recruit/pre-build
+  analysis), `--agent-id` stays optional -- no change to that earlier
+  workflow.
+- New structured `cleanroom handoff --format facts-json` (also `--format
+  both`): a schema-validated (`schemas/handoff-facts.schema.json`),
+  facts-only handoff format (field/enum name + number + type tuples
+  only) for protocol/schema clean-room work, mechanically rejecting
+  anything that looks like leaked prose/commentary from the reference --
+  additional to, not a replacement for, the existing free-form Markdown
+  handoff doc.
+- New `cleanroom coverage` (Part XCVI, `src/cleanroom/coverage.py`,
+  `schemas/coverage-finding.schema.json`): checks a Zone I
+  implementation against what a project's pre-migration/legacy code
+  actually referenced, banded by confidence
+  (`CONFIRMED`/`PLAUSIBLE`/`insufficient_evidence`) rather than a binary
+  pass/fail. Wired as a non-blocking advisory into `cleanroom gate`
+  (surfaced, never required -- a from-scratch clean-room build
+  legitimately has no legacy code to compare against) and into
+  `cleanroom report`.
+- New guarded web-lookup for implementation-zone agents
+  (`src/cleanroom/webguard.py`, `cleanroom exclude-source`, `cleanroom
+  check-url`): blocks URLs matching a project's own registered reference
+  source (and its raw-content mirrors), allows unrelated sources, and
+  records every check to the project's hash-chained evidence ledger. See
+  `docs/web-lookup-guard.md` -- this is a decision function +
+  integration contract for an orchestrating harness to call, not a
+  network sandbox `cleanroom` can itself enforce on its own.
+- **Governance note:** `schemas/coverage-finding.schema.json` and
+  `schemas/handoff-facts.schema.json` are new files under `schemas/`,
+  which this project's own `GOVERNANCE.md` requires explicit maintainer
+  sign-off for (lazy consensus does not apply to `schemas/`). Tests pass
+  (403/403 at the time of this cut) but that sign-off is recorded here
+  as outstanding, not silently assumed granted by a green test suite.
+- Developed in the same working tree as a concurrent session's
+  Clean-Room Gate pass (above); reconciled without data loss.
+
 ### Added (twenty-eighth pass — a real orchestration harness, and correct per-role model provenance)
 
 - New `orchestration/backends.py`: a real, pluggable `AgentBackend`

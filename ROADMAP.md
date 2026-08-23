@@ -1,19 +1,26 @@
 # Roadmap
 
 Clean Room Coding started as v0.1.0, a **deep-but-narrow** first build,
-and is now v0.2.0 after an internal code review, security audit,
-competitive-landscape research pass, and roughly two dozen further
-build-out passes (2026-08-22) -- see CHANGELOG.md for the full, dated
-history of every one. Everything listed under "Built and tested" is
-real, working code with passing tests -- nothing is scaffolded-but-fake.
-Everything under "Documented limitation" is a genuine gap, called out
-here (and usually inline in the relevant module's docstring) rather than
-silently claimed as complete.
+reached v0.2.0 (2026-08-22) after an internal code review, security
+audit, competitive-landscape research pass, and roughly two dozen
+further build-out passes, and is now v0.3.0 (2026-08-23) after four more
+build-out passes (26-29): a mechanically-enforced Clean-Room Gate, a real
+opt-in LLM orchestration harness (`cleanroom council`/`cleanroom
+implement`), and a wave of correctness/hardening work -- a real licence-
+detection false positive fixed, protocol/schema similarity coverage,
+fail-closed zone access, structured facts-only handoffs, capability-
+regression coverage checking, and a guarded web-lookup contract for
+implementation agents. See CHANGELOG.md for the full, dated history of
+every pass. Everything listed under "Built and tested" is real, working
+code with passing tests -- nothing is scaffolded-but-fake. Everything
+under "Documented limitation" is a genuine gap, called out here (and
+usually inline in the relevant module's docstring) rather than silently
+claimed as complete.
 
 See "External review findings" and "Competitive landscape" below for the
 original review/audit/research pass this roadmap was first extended from.
 
-## Built and tested (v0.2.0)
+## Built and tested (v0.3.0)
 
 - Three-zone project model (`cleanroom init`, with an explicit
   `--target-language` prompt so the implementation language is always a
@@ -193,6 +200,68 @@ original review/audit/research pass this roadmap was first extended from.
     Set one and run `cleanroom council`/`cleanroom implement` yourself
     for the first live proof that a real model's response round-trips
     correctly through this pipeline.
+- **A mechanically-enforced Clean-Room Gate** (`cleanroom gate`, Part
+  XCIV, `src/cleanroom/gate.py`): a recorded PASS/FAIL decision, checked
+  against a real deterministic signal (requirement-graph handoff-eligible
+  coverage + sanitisation-report cleanliness), required between Sanitise
+  and Handoff. `cleanroom handoff` refuses outright (`PolicyFailure`,
+  exit 3) to build a manifest for a specification version without a
+  matching PASS already on record for that exact version -- previously
+  only a documented recommendation, not something the tool itself
+  enforced. Overriding an `insufficient` automated signal to PASS
+  requires an explicit acknowledgment and is always recorded as such
+  (`overrode_automated_signal: true`), never conflated with a genuinely
+  sufficient specification. Every decision, pass or fail, is appended
+  (never overwritten) to `GATE_DECISIONS.json` and the evidence ledger.
+- **Fixed a real licence-detection false positive**: the AGPL exclusion
+  marker in licence discovery was being checked against a reference
+  file's full body, not just its title/preamble -- canonical GPL-3.0
+  license text's own Section 13 (the AGPL-combination clause) was
+  causing every genuine GPL-3.0 file to be misclassified as
+  AGPL-3.0-only.
+- **Protocol/schema similarity coverage**: the similarity engine now has
+  real lexical-only support for `.proto`/`.thrift`/`.avsc`/`.graphql`/
+  `.gql` files (structural/ast-grep comparison remains unsupported for
+  these by design). `comparisons_run: 0` can no longer be silently
+  ambiguous between "verified clean" and "never actually checked" -- an
+  unrecognised extension is now always reported explicitly.
+- **`cleanroom diff-reference`**: re-fetches a project's already-
+  recruited Zone R reference source and diffs it against the originally-
+  registered tree hash, gated by the same `PathGuard` enforcement as
+  `recruit`/`inspect` -- catches reference material silently drifting
+  after intake.
+- **Fail-closed zone access once any implementation agent exists**: once
+  a project has registered at least one implementation agent,
+  `inspect`/`licence`/`similarity`/`sanitise`/`diff-reference` all now
+  *require* a valid `--agent-id` and error clearly if it's omitted,
+  instead of silently falling back to ungated access. Before any
+  implementation agent is registered, `--agent-id` remains optional, so
+  early-project workflows (init/recruit/pre-build analysis) are
+  unaffected.
+- **`cleanroom handoff --format facts-json`** (also `--format both`): a
+  schema-validated (`schemas/handoff-facts.schema.json`), facts-only
+  handoff format (field/enum name + number + type tuples only) for
+  protocol/schema clean-room work, mechanically rejecting anything that
+  looks like leaked prose/commentary from the reference -- additional to,
+  not a replacement for, the existing free-form Markdown handoff
+  document.
+- **`cleanroom coverage`** (Part XCVI, `src/cleanroom/coverage.py`,
+  `schemas/coverage-finding.schema.json`): capability-regression
+  checking -- does a Zone I implementation still reference everything a
+  project's pre-migration/legacy code actually used -- banded by
+  confidence (`CONFIRMED`/`PLAUSIBLE`/`insufficient_evidence`) rather
+  than a binary pass/fail. Wired as a non-blocking advisory into
+  `cleanroom gate` and `cleanroom report`, never required (a from-scratch
+  clean-room build legitimately has no legacy code to compare against).
+- **Guarded web-lookup contract for implementation-zone agents**
+  (`src/cleanroom/webguard.py`, `cleanroom exclude-source`, `cleanroom
+  check-url`, see `docs/web-lookup-guard.md`): a decision function that
+  blocks URLs matching a project's own registered reference source (and
+  its raw-content mirrors), allows unrelated sources, and records every
+  check to the hash-chained evidence ledger. This is an integration
+  contract for an orchestrating harness to call before letting an agent
+  fetch a URL, not a network sandbox `cleanroom` enforces on its own --
+  see "Documented limitations" below.
 - Optional AI-model suggestion (`cleanroom ai-suggest`): asks explicitly
   whether AI/ML capability should be added, and if so searches the real
   Hugging Face Hub, classifying each candidate as `embeddable` (ships an
@@ -210,11 +279,13 @@ original review/audit/research pass this roadmap was first extended from.
   fragile system-library dependency) covering what the project started
   with, what it did (derived from the evidence ledger), functional
   coverage, remediation status, jurisdictions, and outstanding issues.
-- 28-command CLI (`init`, `doctor`, `intake`, `inspect`, `licence`,
-  `jurisdiction`, `analyse`, `specify`, `sanitise`, `handoff`, `architect`,
-  `ai-suggest`, `build`, `heartbeat`, `test`, `compare`, `similarity`,
-  `provenance`, `audit`, `legal`, `judge`, `judge-adjudicate`, `remediate`,
-  `verify`, `report`, `release`, `status`, `benchmark`) with
+- 36-command CLI (`init`, `doctor`, `intake`, `inspect`, `licence`,
+  `jurisdiction`, `analyse`, `specify`, `sanitise`, `gate`, `handoff`,
+  `architect`, `ai-suggest`, `build`, `recruit`, `heartbeat`, `test`,
+  `compare`, `similarity`, `diff-reference`, `provenance`, `coverage`,
+  `audit`, `legal`, `judge`, `judge-adjudicate`, `council`, `implement`,
+  `remediate`, `verify`, `report`, `release`, `status`, `benchmark`,
+  `exclude-source`, `check-url`) with
   `--json`/`--quiet`/`--verbose`/`--project`/`--config` (now actually
   wired to an explicit config path, not silently ignored) and documented
   exit codes; Click-based
@@ -689,8 +760,9 @@ change that should be evaluated on its own.
 ## Documented limitations (not silently overclaimed)
 
 - **`PathGuard` is now wired into real per-invocation reads for a subset
-  of commands, opt-in.** `inspect`/`licence`/`similarity`/`sanitise` now
-  call `Ctx.enforce_zone_access()` before reading their target path, which
+  of commands, mandatory once an implementation agent exists.**
+  `inspect`/`licence`/`similarity`/`sanitise`/`diff-reference` all call
+  `Ctx.enforce_zone_access()` before reading their target path, which
   looks up a real `AgentRegistry` record for whatever agent id is passed
   via the global `--agent-id <id>` option and runs a real
   `PathGuard.check()` against that agent's actual registered scope --
@@ -700,16 +772,19 @@ change that should be evaluated on its own.
   PathGuard exists to police -- and the allow path, an `R`-scoped agent
   let through `licence`, an `H`-scoped agent let through `sanitise`)
   against real projects, not just `run_pathguard_self_test`'s synthetic
-  probe. Without `--agent-id`, every command's behaviour is unchanged from
-  before this existed. **Still a real, narrower gap, not fully solved:**
-  only those four commands are wired, and only when `--agent-id` is
-  actually passed -- every other command, and any invocation that omits
-  the flag, still reads files directly with no gate. `compare` and
-  `similarity --negative-control` are deliberately excluded (see "Likely
-  next additions" #1 for why). Extending coverage to every remaining
-  zone-touching command, and to a real multi-agent orchestration harness
-  built on top of this library that calls `enforce_zone_access` for every
-  subagent file read, remains future work.
+  probe. Before any implementation agent is registered for a project,
+  `--agent-id` remains optional and omitting it behaves exactly as
+  before this existed. **Update (2026-08-23): fail-closed once an agent
+  exists.** Once a project has registered at least one implementation
+  agent (i.e. `cleanroom build` has run at least once), these five
+  commands now *require* `--agent-id` and error clearly if it's omitted,
+  rather than silently falling back to ungated reads. **Still a real,
+  narrower gap, not fully solved:** only those five commands are wired;
+  every other zone-touching command still reads files directly with no
+  gate regardless of agent registration state. `compare` and `similarity
+  --negative-control` are deliberately excluded (see "Likely next
+  additions" #1 for why). Extending coverage to every remaining
+  zone-touching command remains future work.
 - **Legal-issue engine**: only `protected_expression` has no dedicated
   heuristic -- always `UNKNOWN`. Idea/expression merger judgment has no
   deterministic proxy this tool can compute, unlike the other 17 issues.
@@ -887,10 +962,15 @@ change that should be evaluated on its own.
    deliberately unguarded -- those are explicitly meant to be *outside*
    the three zones (unrelated background corpora), so PathGuard-checking
    them would be semantically wrong, not just incomplete. Remaining:
-   `compare` (if a future pass decides the behaviour change is worth it)
-   and making enforcement the default (or otherwise mandatory) rather than
-   opt-in, for whatever orchestration harness this library is embedded
-   in.
+   `compare` (if a future pass decides the behaviour change is worth it).
+   **Update (2026-08-23): mandatory enforcement -- done, conditionally.**
+   Once a project has registered at least one implementation agent,
+   `inspect`/`licence`/`similarity`/`sanitise`/`diff-reference` all now
+   *require* a valid `--agent-id` (fail-closed) instead of silently
+   reading ungated; before any implementation agent exists, `--agent-id`
+   stays optional so early-project workflows are unaffected. Not yet
+   mandatory from project creation, by design -- see "Fail-closed zone
+   access" above.
 2. ~~Depend on `license-expression`~~ -- **done**: `spdx.py` is now backed
    by the real `license-expression` library. ScanCode Toolkit remains an
    option for a future optional `[licensecheck]` extra (not a base
