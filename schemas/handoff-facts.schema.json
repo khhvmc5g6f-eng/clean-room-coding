@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroom.dev/schemas/handoff-facts.schema.json",
+  "title": "CLEAN_ROOM_HANDOFF_FACTS.json",
+  "description": "A strict, mechanically-checkable 'facts only' handoff format -- the common case for protocol/schema clean-room work (wire-format field/enum enumeration) where a handoff document should contain bare facts (names, numbers, types) and nothing else: no prose, no commentary, no structure leaked verbatim from Zone R. This is an ADDITIONAL, stricter option alongside the free-form Markdown handoff (CLEAN_ROOM_HANDOFF.md) produced by 'cleanroom handoff' -- it does not replace it, and is not a fit for clean-room work that genuinely needs prose (e.g. behavioural/algorithmic specifications). Every string field is deliberately short and identifier-shaped (no newlines, small max lengths) so that a document trying to smuggle a paragraph of copied commentary through as a 'name' or 'notes' value fails schema validation rather than relying purely on an analyst's judgement. NOTE per this project's CONTRIBUTING.md/GOVERNANCE.md: this file lives under schemas/ and requires human legal/governance review beyond a passing test run, same as every other schema in this directory.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "facts"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "source_note": {
+      "type": "string",
+      "description": "Optional short, non-prose provenance label (e.g. 'meshtastic mesh.proto v2.6'). Not a place for commentary.",
+      "maxLength": 120,
+      "pattern": "^[^\\n\\r]{0,120}$"
+    },
+    "facts": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/fact" }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_.]{0,127}$"
+    },
+    "short_type_expr": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_.<>\\[\\], ]{0,63}$"
+    },
+    "short_note": {
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^[^\\n\\r]{0,80}$"
+    },
+    "fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "container", "name"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["enum_value", "field", "constant", "message", "method", "unit"],
+          "description": "What sort of bare fact this is. Intentionally a closed, small set -- a new kind of fact is a schema change (human-reviewed), not a free-text tag."
+        },
+        "container": {
+          "$ref": "#/$defs/identifier",
+          "description": "The enclosing enum/message/service name, e.g. 'HardwareModel' or 'EnvironmentMetrics'."
+        },
+        "name": {
+          "$ref": "#/$defs/identifier",
+          "description": "The bare field/enum-value/constant/method name, e.g. 'lightning_strike_count_1h'."
+        },
+        "number": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Wire/field/enum ordinal number, where applicable."
+        },
+        "value": {
+          "type": ["integer", "number", "string", "boolean"],
+          "description": "A bare scalar value (e.g. an enum's numeric value). If a string, it must still satisfy short_type_expr-like brevity -- validated additionally by the facts-json handoff validator beyond what JSON Schema alone can express."
+        },
+        "type": {
+          "$ref": "#/$defs/short_type_expr",
+          "description": "The wire/field type, e.g. 'uint32', 'string', 'repeated Position'."
+        },
+        "optional": { "type": "boolean" },
+        "repeated": { "type": "boolean" },
+        "deprecated": { "type": "boolean" },
+        "unit": {
+          "$ref": "#/$defs/short_type_expr",
+          "description": "Physical/measurement unit, e.g. 'meters', 'celsius', where applicable."
+        },
+        "notes": {
+          "$ref": "#/$defs/short_note",
+          "description": "An optional short, single-line annotation -- never a place for copied prose or commentary. Long or multi-line content belongs in a free-form Markdown handoff instead, not here."
+        }
+      }
+    }
+  }
+}

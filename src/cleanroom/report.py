@@ -96,6 +96,7 @@ def build_certificate(
     remediation: dict[str, int] | None = None,
     project_summary: dict[str, Any] | None = None,
     phases_completed: list[str] | None = None,
+    capability_coverage_result: str | None = None,
 ) -> dict[str, Any]:
     body = {
         "schema_version": "1.0.0",
@@ -121,6 +122,8 @@ def build_certificate(
         body["project_summary"] = project_summary
     if phases_completed:
         body["phases_completed"] = phases_completed
+    if capability_coverage_result:
+        body["capability_coverage_result"] = capability_coverage_result
     body["evidence_bundle_hash"] = sha256_json({k: v for k, v in body.items() if k != "evidence_bundle_hash"})
 
     errors = validate(body, "clean-room-certificate.schema.json")
@@ -170,6 +173,7 @@ def render_final_report(certificate: dict[str, Any]) -> str:
         "## Provenance & similarity",
         f"- Provenance status: {certificate['provenance_status']}",
         f"- Similarity result: {certificate['similarity_result']}",
+        f"- Capability coverage result: {certificate.get('capability_coverage_result', 'not_run')}",
         "",
     ]
 
@@ -298,6 +302,7 @@ def render_html_report(certificate: dict[str, Any]) -> str:
       <li>Tests: {html.escape(str(c['tests']))}</li>
       <li>Provenance status: {html.escape(c['provenance_status'])}</li>
       <li>Similarity result: {html.escape(c['similarity_result'])}</li>
+      <li>Capability coverage result: {html.escape(c.get('capability_coverage_result', 'not_run'))}</li>
     </ul>
   </div>
 

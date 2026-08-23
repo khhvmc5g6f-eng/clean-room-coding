@@ -8,26 +8,38 @@ invocation, because doing so requires every command to know which
 registered agent is running it -- something the stateless CLI has no way
 to track on its own.
 
-That's now solved for a real, opt-in subset of commands: pass a global
+That's now solved for a real subset of commands: pass a global
 `--agent-id <id>` (an agent registered via `cleanroom build`, or directly
 via `AgentRegistry` for any other role) and `inspect`/`licence`/
-`similarity`/`sanitise` (see `cli.py`'s `Ctx.enforce_zone_access`)
-genuinely call `PathGuard.check()` against that agent's real registered
-scope before reading the path given -- verified end-to-end against a real
-project, not just this module's own self-test, including both the deny
-path (a Zone-H+I-only `cleanroom build` agent denied `zone-r`, and
-separately an R-only agent denied `cleanroom sanitise` of a Zone H
-document -- the actual R-to-H boundary-crossing gate PathGuard exists to
-police) and the allow path (an `R`-scoped agent let through `licence`, an
-`H`-scoped agent let through `sanitise`). Without `--agent-id`, every
-command's behaviour is exactly as before this existed -- this is
-additive, opt-in enforcement, not a default that could break an existing
-invocation.
+`similarity`/`sanitise`/`diff-reference` (see `cli.py`'s
+`Ctx.enforce_zone_access`) genuinely call `PathGuard.check()` against that
+agent's real registered scope before reading the path given -- verified
+end-to-end against a real project, not just this module's own self-test,
+including both the deny path (a Zone-H+I-only `cleanroom build` agent
+denied `zone-r`, and separately an R-only agent denied `cleanroom
+sanitise` of a Zone H document -- the actual R-to-H boundary-crossing gate
+PathGuard exists to police) and the allow path (an `R`-scoped agent let
+through `licence`, an `H`-scoped agent let through `sanitise`).
+
+This used to be purely opt-in: omitting `--agent-id` was a silent no-op
+regardless of project state, which meant an orchestrator that simply
+forgot the flag got unrestricted, ungated access with no warning -- a
+real footgun for a tool whose entire value proposition is provable
+separation. It is now fail-closed once there is something real to
+protect: as soon as a project has at least one registered Zone-I
+(implementation) agent (`AgentRegistry.has_registered_implementation_agent`
+-- i.e. `cleanroom build`/`cleanroom implement` has run at least once for
+that project), the five commands above REQUIRE `--agent-id` and refuse to
+run without it. Before any implementation agent has been registered
+(initial `init`/`recruit`/pre-build analysis, when there is no
+Reference/Implementation separation yet to protect), `--agent-id` remains
+optional and omitting it behaves exactly as before.
 
 **This is still a real, narrower-than-total gap, not "solved":** only
-those four commands call `enforce_zone_access`, and only when
-`--agent-id` is actually passed. Every other command, and any invocation
-that omits `--agent-id`, still reads files directly with no gate --
+those five commands call `enforce_zone_access`, and the fail-closed
+requirement is scoped to "does this project have a registered
+implementation agent yet," not "always." Every other command still reads
+files directly with no gate --
 notably `compare`, which doesn't load a `Project` at all today, so adding
 enforcement there would be a real behaviour change (forcing every
 invocation to run inside a clean-room project directory), not the

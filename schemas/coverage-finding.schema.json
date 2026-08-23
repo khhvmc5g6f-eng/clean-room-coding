@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroom.dev/schemas/coverage-finding.schema.json",
+  "title": "Coverage Finding",
+  "description": "Part XCVI: a capability-regression coverage finding -- whether a named field/usage the pre-migration ('legacy') code actually referenced is still referenced, with a compatible shape, in the Zone I implementation. Never a bare pass/fail: see src/cleanroom/coverage.py's module docstring for what this grep-based check does and does not catch.",
+  "type": "object",
+  "required": ["id", "name", "status", "confidence", "legacy_locations", "zone_i_locations", "explanation", "requires_review"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^COV-[0-9]{5}$" },
+    "name": { "type": "string", "description": "The referenced field/identifier name this finding is about." },
+    "status": {
+      "type": "string",
+      "enum": ["present", "missing", "divergent"],
+      "description": "'present': referenced by name in both. 'missing': referenced in legacy usage, never found under this name in Zone I -- a candidate dropped capability. 'divergent': present in both, but Zone I appears not to apply a value-conversion convention the legacy code consistently applied to this field."
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["CONFIRMED", "PLAUSIBLE", "insufficient_evidence"],
+      "description": "CONFIRMED: the underlying name-based presence/absence fact is deterministic (not a claim the finding is definitely a real bug). PLAUSIBLE: a convention-consistency signal requiring human review, never auto-failed. insufficient_evidence: the extractor found nothing to check (see 'overall_status' in the coverage report)."
+    },
+    "legacy_locations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["file", "line", "snippet", "value_expr"],
+        "additionalProperties": false,
+        "properties": {
+          "file": { "type": "string" },
+          "line": { "type": "integer", "minimum": 1 },
+          "snippet": { "type": "string" },
+          "value_expr": { "type": "string" }
+        }
+      }
+    },
+    "zone_i_locations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["file", "line", "snippet", "value_expr"],
+        "additionalProperties": false,
+        "properties": {
+          "file": { "type": "string" },
+          "line": { "type": "integer", "minimum": 1 },
+          "snippet": { "type": "string" },
+          "value_expr": { "type": "string" }
+        }
+      }
+    },
+    "explanation": { "type": "string" },
+    "requires_review": { "type": "boolean", "description": "true for 'missing' and 'divergent' -- false for 'present'." }
+  }
+}

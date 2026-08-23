@@ -27,6 +27,11 @@
     "requirement_traceability_percent": { "type": "number", "minimum": 0, "maximum": 100 },
     "provenance_status": { "type": "string", "enum": ["complete", "partial", "unknown"] },
     "similarity_result": { "type": "string", "enum": ["no_material_findings", "material_findings_open", "material_findings_resolved", "not_run"] },
+    "capability_coverage_result": {
+      "type": "string",
+      "enum": ["no_open_findings", "findings_open", "not_run"],
+      "description": "Part XCVI ('cleanroom coverage'): whether the Zone I implementation still references every field/usage the pre-migration code actually used. Optional/advisory -- 'not_run' is expected and not itself a defect for a project with no pre-migration usage code to compare against (e.g. a from-scratch clean-room build)."
+    },
     "jurisdictions": {
       "type": "array",
       "items": {

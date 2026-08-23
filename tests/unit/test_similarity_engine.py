@@ -138,6 +138,63 @@ def test_compare_trees_passes_language_hint_to_background_scoring(tmp_path: Path
     assert calls == ["javascript"]
 
 
+def test_proto_files_are_compared_lexically_only(tmp_path: Path):
+    """Regression test: .proto (and other IDL/schema) files were previously
+    excluded from SOURCE_SUFFIXES entirely, so a schema-only clean-room
+    project (e.g. a protobuf reimplementation) silently produced
+    comparisons_run: 0 with no error -- indistinguishable from 'verified
+    clean'. They must now be matched and lexically compared, with no
+    structural finding (ast-grep-py has no .proto grammar)."""
+    ref = tmp_path / "ref"
+    impl = tmp_path / "impl"
+    ref.mkdir()
+    impl.mkdir()
+    (ref / "mesh.proto").write_text(
+        'syntax = "proto3";\nmessage Mesh {\n  uint32 id = 1;\n  string name = 2;\n}\n', encoding="utf-8"
+    )
+    (impl / "mesh.proto").write_text(
+        'syntax = "proto3";\nmessage Mesh {\n  uint32 id = 1;\n  string name = 2;\n}\n', encoding="utf-8"
+    )
+
+    result = compare_trees(ref, impl)
+    assert result["files_matched_by_name"] == 1
+    assert result["comparisons_run"] == 1
+    methods = {f["method"] for f in result["findings"]}
+    assert methods == {"lexical"}  # no structural finding at all for .proto
+    assert result["unrecognized_extensions"] == {}
+
+
+def test_other_idl_extensions_are_recognised(tmp_path: Path):
+    for suffix in (".thrift", ".avsc", ".graphql", ".gql"):
+        ref = tmp_path / f"ref{suffix}"
+        impl = tmp_path / f"impl{suffix}"
+        ref.mkdir()
+        impl.mkdir()
+        (ref / f"schema{suffix}").write_text("identical content\n", encoding="utf-8")
+        (impl / f"schema{suffix}").write_text("identical content\n", encoding="utf-8")
+        result = compare_trees(ref, impl)
+        assert result["comparisons_run"] == 1, f"{suffix} was not recognised as source"
+        assert {f["method"] for f in result["findings"]} == {"lexical"}
+
+
+def test_unrecognized_extensions_reported_when_nothing_matches(tmp_path: Path):
+    """Regression test for the general silent-zero problem: an extension
+    this engine has never heard of (not just the newly-added IDL formats)
+    must surface as an explicit reason for comparisons_run: 0, not a bare
+    zero that looks identical to 'we checked, found nothing suspicious'."""
+    ref = tmp_path / "ref"
+    impl = tmp_path / "impl"
+    ref.mkdir()
+    impl.mkdir()
+    (ref / "schema.fbs").write_text("table Mesh { id: uint; }\n", encoding="utf-8")
+    (impl / "schema.fbs").write_text("table Mesh { id: uint; }\n", encoding="utf-8")
+    (impl / "notes").write_text("no extension at all\n", encoding="utf-8")
+
+    result = compare_trees(ref, impl)
+    assert result["comparisons_run"] == 0
+    assert result["unrecognized_extensions"] == {".fbs": 2, "(none)": 1}
+
+
 def test_findings_have_both_lexical_and_structural_methods(tmp_path: Path):
     ref = tmp_path / "ref"
     impl = tmp_path / "impl"

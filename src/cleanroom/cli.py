@@ -22,6 +22,7 @@ from cleanroom import __version__
 from cleanroom import benchmark as benchmark_module
 from cleanroom.config import default_config, load_config
 from cleanroom.contamination import Contamination
+from cleanroom import coverage as coverage_module
 from cleanroom.evidence import Actor
 from cleanroom.exit_codes import (
     CleanRoomError,
@@ -29,6 +30,7 @@ from cleanroom.exit_codes import (
     ExitCode,
     LegalRed,
     LicenceFailure,
+    ManualReviewRequired,
     PolicyFailure,
 )
 from cleanroom import gate as gate_module
@@ -46,6 +48,7 @@ from cleanroom.project import Project
 from cleanroom.provenance import intoto as intoto_module
 from cleanroom.provenance import sbom as sbom_module
 from cleanroom.provenance import transitive as transitive_module
+from cleanroom import reference_diff as reference_diff_module
 from cleanroom.report import (
     build_certificate,
     release_allowed,
@@ -104,15 +107,32 @@ class Ctx:
         sys.exit(int(error.exit_code))
 
     def enforce_zone_access(self, project: Project, path: Path) -> None:
-        """Part V-VII: the real per-invocation `PathGuard` gate the rest of
-        this file's docstrings say doesn't exist yet -- it now does, but
-        only opt-in via `--agent-id`, and only for the commands that call
-        this. Without `--agent-id` this is a no-op (existing behaviour is
-        unchanged); the caller is responsible for calling this before it
+        """Part V-VII: the real per-invocation `PathGuard` gate. Historically
+        this was a no-op unless the caller opted in with `--agent-id` --
+        which meant an orchestrator that simply forgot the flag got silent,
+        unrestricted access with no warning, on a tool whose entire value
+        proposition is provable separation. That footgun is now closed: once
+        this PROJECT has at least one registered Zone-I (implementation)
+        agent -- i.e. `cleanroom build`/`cleanroom implement` has run at
+        least once, per `AgentRegistry.has_registered_implementation_agent`
+        -- every zone-scoped command REQUIRES a valid `--agent-id` and fails
+        closed if it's omitted. A project with no implementation agent yet
+        (initial `init`/`recruit`/pre-build analysis, before any
+        Reference/Implementation separation exists to protect) keeps
+        behaving exactly as before: `--agent-id` is optional and omitting it
+        is a no-op. The caller is responsible for calling this before it
         actually reads `path`, not after."""
-        if self.agent_id is None:
-            return
         registry = AgentRegistry(project.root / "evidence")
+        if self.agent_id is None:
+            if registry.has_registered_implementation_agent():
+                raise click.ClickException(
+                    "--agent-id is required: this project has at least one registered "
+                    "implementation agent (via 'cleanroom build'), so zone-scoped commands "
+                    "no longer run ungated. Pass the global --agent-id <id> of the agent this "
+                    "invocation is acting on behalf of (see 'cleanroom status' or the evidence "
+                    "ledger's agents.json for registered agent ids)."
+                )
+            return
         record = next((a for a in registry.all() if a.agent_id == self.agent_id), None)
         if record is None:
             raise click.ClickException(f"No agent registered with id '{self.agent_id}' (register one with 'cleanroom build' or 'cleanroom recruit' first).")
@@ -139,7 +159,7 @@ pass_ctx = click.make_pass_decorator(Ctx)
 @click.option("--verbose", is_flag=True, default=False, help="Verbose diagnostic output.")
 @click.option(
     "--agent-id", "agent_id", default=None,
-    help="A 'cleanroom build'-registered agent id this invocation is acting on behalf of. When given, commands that read Zone R/H/I gate that read through a real per-invocation PathGuard.check() against that agent's actual registered scope (Part V-VII) -- omit it and behaviour is exactly as before (no gating). This is how an orchestration harness that knows which agent it just spawned gets real enforcement, not just the isolation self-test.",
+    help="A 'cleanroom build'/'cleanroom recruit'-registered agent id this invocation is acting on behalf of. When given, commands that read Zone R/H/I gate that read through a real per-invocation PathGuard.check() against that agent's actual registered scope (Part V-VII). Once this project has at least one registered implementation agent (i.e. 'cleanroom build' has run at least once), --agent-id becomes REQUIRED for every zone-scoped command (inspect/licence/similarity/sanitise/diff-reference) -- omitting it then fails closed with a clear error, rather than silently running ungated. Before any implementation agent has been registered for this project (initial init/recruit/pre-build analysis), --agent-id remains optional and omitting it behaves exactly as before (no gating). This is how an orchestration harness that knows which agent it just spawned gets real enforcement, not just the isolation self-test.",
 )
 @click.version_option(__version__, prog_name="cleanroom")
 @click.pass_context
@@ -551,10 +571,46 @@ def gate(
     -- never itself the decision; the human --decision is authoritative,
     and overriding an 'insufficient' signal to PASS requires an explicit
     acknowledgement, recorded as such rather than conflated with a
-    genuinely sufficient specification. See references/clean-room-gate.md."""
+    genuinely sufficient specification. See references/clean-room-gate.md.
+
+    Also surfaces (never blocks on) whether 'cleanroom coverage' -- the
+    capability-regression check for whether Zone I still references
+    everything the pre-migration code actually used -- has been run for
+    this project. Deliberately advisory, not folded into
+    automated_signal/GATE_DECISIONS.json's schema: unlike the requirement-
+    graph/sanitisation checks, coverage needs a legacy-usage-code path
+    this command has no way to discover on its own, and a real project
+    may legitimately have no pre-migration usage code to compare against
+    (e.g. a from-scratch clean-room build). Making it mandatory here
+    would either force an irrelevant flag on every gate call or require
+    guessing a path -- both worse than an honest, always-visible nudge."""
     project = ctx.load_project()
     graph = RequirementGraph.load(project.root / "requirements.json")
     signal = gate_module.compute_signal(graph, project.root / "evidence" / "sanitisation-reports")
+
+    coverage_path = project.root / "evidence" / "coverage-findings.json"
+    if coverage_path.is_file():
+        coverage_findings = jsonlib.loads(coverage_path.read_text(encoding="utf-8"))
+        coverage_advisory = {
+            "run": True,
+            "open_review_required": sum(1 for f in coverage_findings if f.get("requires_review")),
+        }
+    else:
+        coverage_advisory = {"run": False, "open_review_required": None}
+    if not ctx.json_output:
+        if not coverage_advisory["run"]:
+            click.echo(
+                "\nNote: 'cleanroom coverage' has not been run for this project -- it checks whether the Zone I "
+                "implementation still references every field/usage the pre-migration code actually used (a real "
+                "prior bug class; see 'cleanroom coverage --help'). Not required to gate, but recommended "
+                "before release."
+            )
+        elif coverage_advisory["open_review_required"]:
+            click.echo(
+                f"\nNote: 'cleanroom coverage' has {coverage_advisory['open_review_required']} open "
+                "review-required finding(s) in evidence/coverage-findings.json -- not required to gate, but "
+                "recommended to resolve or explicitly accept before release."
+            )
 
     overriding = decision == "pass" and signal["automated_signal"] == "insufficient"
     if overriding:
@@ -595,7 +651,7 @@ def gate(
             f"automated_signal={signal['automated_signal']} overrode={record['overrode_automated_signal']}"
         ),
     )
-    ctx.emit({**record, "saved_to": str(decisions_path)})
+    ctx.emit({**record, "saved_to": str(decisions_path), "coverage_advisory": coverage_advisory})
     if decision == "fail":
         ctx.fail(PolicyFailure(
             f"Clean-Room Gate FAIL recorded for specification version {specification_version} ({decisions_path}) -- "
@@ -609,11 +665,44 @@ def gate(
 @click.option("--specification-version", required=True)
 @click.option("--all-c0", is_flag=True, default=False, help="Classify every file currently in Zone H as C0 (only use once sanitisation is complete).")
 @click.option("--signer", default=None)
+@click.option(
+    "--format", "output_format", type=click.Choice(["markdown", "facts-json", "both"]), default="markdown",
+    help=(
+        "Which handoff document(s) to produce. 'markdown' (default, unchanged behaviour): only the free-form "
+        "CLEAN_ROOM_HANDOFF.md. 'facts-json': in place of the Markdown doc, validate --facts-file against "
+        "schemas/handoff-facts.schema.json and write it into Zone H as CLEAN_ROOM_HANDOFF_FACTS.json -- for the "
+        "common 'wire-format facts' case (protocol/schema clean-room work) where a handoff should mechanically "
+        "provably contain ONLY bare facts (field names/numbers/types), not prose or structure leaked from the "
+        "reference. This does not replace the free-form option for clean-room work that genuinely needs prose; "
+        "it is an additional, stricter option. 'both' writes both documents. Requires --facts-file when the "
+        "chosen format includes facts-json."
+    ),
+)
+@click.option(
+    "--facts-file", type=click.Path(exists=True, dir_okay=False, path_type=Path), default=None,
+    help="Path to a candidate facts-only handoff document (JSON) to validate against schemas/handoff-facts.schema.json. Required when --format is 'facts-json' or 'both'.",
+)
 @pass_ctx
-def handoff(ctx: Ctx, specification_version: str, all_c0: bool, signer: str | None) -> None:
+def handoff(ctx: Ctx, specification_version: str, all_c0: bool, signer: str | None, output_format: str, facts_file: Path | None) -> None:
     """Parts XXIV-XXV, XCIV: build the immutable, hashed HANDOFF_MANIFEST.json
     -- refuses to run without a PASS Clean-Room Gate decision already
     recorded for this exact specification version (see 'cleanroom gate')."""
+    if output_format in ("facts-json", "both") and facts_file is None:
+        raise click.ClickException(f"--format {output_format} requires --facts-file <path to a candidate facts document>.")
+
+    facts_data: dict[str, Any] | None = None
+    if facts_file is not None:
+        try:
+            facts_data = jsonlib.loads(facts_file.read_text(encoding="utf-8"))
+        except jsonlib.JSONDecodeError as e:
+            raise click.ClickException(f"--facts-file {facts_file} is not valid JSON: {e}") from e
+        facts_errors = handoff_manifest.validate_facts_document(facts_data)
+        if facts_errors:
+            raise click.ClickException(
+                f"--facts-file {facts_file} does not conform to schemas/handoff-facts.schema.json "
+                f"({len(facts_errors)} problem(s)):\n" + "\n".join(f"  - {e}" for e in facts_errors)
+            )
+
     project = ctx.load_project()
     decisions = gate_module.load_decisions(project.root / gate_module.DECISIONS_FILENAME)
     latest = gate_module.latest_decision(decisions, specification_version)
@@ -645,6 +734,18 @@ def handoff(ctx: Ctx, specification_version: str, all_c0: bool, signer: str | No
         combined = sorted(p.name for p in reports_dir.glob("*.json"))
         sanitisation_reports_hash = sha256_json(combined)
 
+    # facts_data was already validated above (fail-fast, before touching
+    # Zone H) -- writing it here just persists the already-conforming
+    # document so its hash can be recorded in the manifest.
+    facts_document_ref: dict[str, str] | None = None
+    if facts_data is not None:
+        from cleanroom.util import sha256_file
+        facts_path = handoff_manifest.write_facts_doc(facts_data, project.zone_h)
+        facts_document_ref = {
+            "path": facts_path.relative_to(project.zone_h).as_posix(),
+            "sha256": sha256_file(facts_path),
+        }
+
     try:
         m = handoff_manifest.build_manifest(
             project_id=project.config.project_id,
@@ -653,6 +754,7 @@ def handoff(ctx: Ctx, specification_version: str, all_c0: bool, signer: str | No
             file_contamination=file_contamination,
             sanitisation_report_hash=sanitisation_reports_hash,
             signer=signer,
+            facts_document=facts_document_ref,
         )
     except ContaminationFailure as e:
         project.evidence.append(
@@ -666,16 +768,22 @@ def handoff(ctx: Ctx, specification_version: str, all_c0: bool, signer: str | No
         return
     m = handoff_manifest.sign_manifest(m, gpg_key_id=signer)
     manifest_path = handoff_manifest.write_manifest(m, project.zone_h)
-    doc_path = handoff_manifest.write_handoff_doc(m, project.zone_h)
+    doc_path = handoff_manifest.write_handoff_doc(m, project.zone_h) if output_format in ("markdown", "both") else None
     project.evidence.append(
         actor=Actor(type="human" if signer else "tool", id=signer or "cleanroom-cli"),
         action="cleanroom handoff",
         zone="H",
         result="success",
         outputs=[{"path": str(manifest_path), "sha256": m["manifest_hash"]}],
-        detail=f"{len(m['files'])} file(s) in handoff bundle",
+        detail=f"{len(m['files'])} file(s) in handoff bundle, format={output_format}"
+        + (f", facts_document={facts_document_ref['path']}" if facts_document_ref else ""),
     )
-    ctx.emit({"manifest": str(manifest_path), "doc": str(doc_path), "manifest_hash": m["manifest_hash"]})
+    ctx.emit({
+        "manifest": str(manifest_path),
+        "doc": str(doc_path) if doc_path else None,
+        "facts_doc": str(project.zone_h / handoff_manifest.FACTS_DOC_FILENAME) if facts_document_ref else None,
+        "manifest_hash": m["manifest_hash"],
+    })
 
 
 # --------------------------------------------------------------------------- architect
@@ -947,6 +1055,155 @@ def recruit(ctx: Ctx, role: str, tools: tuple[str, ...], model_provider: str | N
     ctx.emit(record.to_dict())
 
 
+# --------------------------------------------------------------------------- diff-reference
+
+@main.command(name="diff-reference")
+@click.option(
+    "--check-zone-i-refs/--no-check-zone-i-refs", "check_zone_i_refs", default=True,
+    help=(
+        "Also search Zone H/I for files whose filename stem matches a changed reference file, as a "
+        "best-effort (filename-only, no language parsing) signal of which handoff/implementation "
+        "artifacts might now be stale relative to the updated reference. On by default; disable for a "
+        "pure file-diff with no Zone H/I filesystem walk."
+    ),
+)
+@click.option("--clone-timeout", type=int, default=300, help="Seconds allowed for the read-only re-clone of the reference source.")
+@pass_ctx
+def diff_reference(ctx: Ctx, check_zone_i_refs: bool, clone_timeout: int) -> None:
+    """Re-fetch the SAME registered Zone R reference source and diff it
+    against what was actually recruited into zone-r/ -- new/modified/deleted
+    files, and (best-effort) which Zone H/I artifacts might now be stale.
+
+    This closes a real gap: checking whether a recruited reference has newer
+    upstream commits previously meant a human/agent manually re-cloning the
+    source and hand-diffing it against zone-r/, with no evidence trail.
+    'Same registered reference source' means the recruited checkout's own
+    git 'origin' remote (see reference_diff.py's module docstring for why
+    that, not a separate manifest, is the source of truth) -- a Zone R
+    checkout that isn't a git clone with an origin remote is not supported,
+    per the never-fabricate-a-conclusion rule (AGENTS.md item c): this
+    refuses to guess an upstream rather than diffing against one.
+
+    This is inherently a Zone-R-capable operation -- it reads the full
+    content of zone-r/ to compute the baseline side of the diff -- so it is
+    gated by the exact same opt-in `--agent-id` PathGuard check as
+    `cleanroom inspect`/`licence`/`similarity`/`sanitise`; an agent not
+    scoped for Zone R gets ZoneAccessDenied here exactly as it would from
+    `cleanroom inspect zone-r`. The re-fetch itself never touches zone-r/ in
+    place (no `git fetch`/`pull` against the recruited checkout) -- it
+    clones into a throwaway temp directory that is removed before this
+    command returns, so a recruited project's own files/state are
+    unmodified by running this."""
+    project = ctx.load_project()
+    ctx.enforce_zone_access(project, project.zone_r)
+    try:
+        result = reference_diff_module.diff_reference(
+            project.zone_r,
+            zone_h=project.zone_h if check_zone_i_refs else None,
+            zone_i=project.zone_i if check_zone_i_refs else None,
+            clone_timeout=clone_timeout,
+        )
+    except reference_diff_module.ReferenceDiffError as e:
+        raise click.ClickException(str(e)) from e
+
+    stale = result["possibly_stale_refs"]
+    changed_count = len(result["new_files"]) + len(result["modified_files"]) + len(result["deleted_files"])
+    project.evidence.append(
+        actor=Actor(type="tool", id="cleanroom-diff-reference"),
+        action="cleanroom diff-reference",
+        zone="R",
+        result="success",
+        detail=(
+            f"source={result['reference_source']} baseline={result['baseline_commit']} "
+            f"latest={result['latest_commit']} up_to_date={result['up_to_date']} "
+            f"new={len(result['new_files'])} modified={len(result['modified_files'])} "
+            f"deleted={len(result['deleted_files'])} "
+            f"possibly_stale_zone_h={len(stale['zone_h'])} possibly_stale_zone_i={len(stale['zone_i'])}"
+        ),
+    )
+    human_lines = [
+        f"Reference source: {result['reference_source']}",
+        f"Baseline commit:  {result['baseline_commit']}",
+        f"Latest commit:    {result['latest_commit']}",
+    ]
+    if result["up_to_date"]:
+        human_lines.append("Up to date -- no changes upstream since this reference was recruited.")
+    else:
+        human_lines.append(
+            f"{changed_count} file(s) changed: {len(result['new_files'])} new, "
+            f"{len(result['modified_files'])} modified, {len(result['deleted_files'])} deleted."
+        )
+        if stale["zone_h"] or stale["zone_i"]:
+            human_lines.append(
+                "Possibly-stale artifacts (filename match only, not authoritative): "
+                f"{len(stale['zone_h'])} in Zone H, {len(stale['zone_i'])} in Zone I -- see 'possibly_stale_refs'."
+            )
+    ctx.emit(result, human="\n".join(human_lines))
+
+
+# --------------------------------------------------------------------------- exclude-source / check-url
+
+@main.command(name="exclude-source")
+@click.argument("pattern")
+@click.option("--note", default=None, help="Optional human-readable note recorded alongside this pattern (e.g. 'known fork on GitLab').")
+@pass_ctx
+def exclude_source(ctx: Ctx, pattern: str, note: str | None) -> None:
+    """Part XCV: manually add a URL/pattern to this project's web-lookup
+    exclusion list -- for a known mirror, fork, or rehost of the recruited
+    Zone R reference that the automatic owner/repo heuristic (derived from
+    Zone R's own git 'origin' remote, see webguard.py) doesn't identify on
+    its own. PATTERN is matched later as a plain case-insensitive substring
+    of any URL an orchestrating harness checks with `cleanroom check-url` /
+    `webguard.check_url_against_exclusions` -- give it something specific
+    (a host name, or a distinctive path fragment), not something so broad
+    it would block unrelated documentation lookups."""
+    project = ctx.load_project()
+    from cleanroom.webguard import ExclusionStore
+    store = ExclusionStore(project.root / "evidence")
+    entry = store.add(pattern, note=note)
+    project.evidence.append(
+        actor=Actor(type="human", id="cleanroom-cli-user"),
+        action="cleanroom exclude-source",
+        zone="none",
+        result="success",
+        detail=f"pattern={entry.pattern}" + (f" note={note}" if note else ""),
+    )
+    ctx.emit(entry.to_dict(), human=f"Added manual exclusion: {entry.pattern}")
+
+
+@main.command(name="check-url")
+@click.argument("url")
+@pass_ctx
+def check_url(ctx: Ctx, url: str) -> None:
+    """Part XCV: check URL against this project's web-lookup exclusion list
+    (the recruited Zone R reference's own git origin, normalised into
+    owner/repo + known-mirror variants, plus any `cleanroom exclude-source`
+    additions) and report whether it should be blocked.
+
+    This command is the CLI entry point an orchestrating harness is
+    expected to call -- or the equivalent direct call to
+    `cleanroom.webguard.check_url_against_exclusions` from Python -- BEFORE
+    it lets an implementation-zone agent's web-fetch/web-search tool
+    actually hit URL. See docs/web-lookup-guard.md for the full
+    integration contract, including what to do on a blocked result. This
+    command only decides; it has no ability to itself stop a fetch
+    happening in some other process -- that boundary is deliberate, not an
+    oversight (AGENTS.md item c: don't overclaim what a check function can
+    enforce)."""
+    project = ctx.load_project()
+    from cleanroom.webguard import check_url_against_exclusions
+    result = check_url_against_exclusions(url, project)
+    human = (
+        f"BLOCKED: {result['reason']}" if result["blocked"] else "ALLOWED: no exclusion match."
+    )
+    ctx.emit(result, human=human)
+    if result["blocked"]:
+        # Nonzero exit so a harness/CI script can gate on this directly
+        # (`cleanroom check-url ... || refuse-the-fetch`) without parsing
+        # --json output just to decide whether to proceed.
+        sys.exit(int(ExitCode.POLICY_FAILURE))
+
+
 # --------------------------------------------------------------------------- heartbeat
 
 _HEARTBEAT_TERMINAL_STATUSES = {"COMPLETE", "TERMINATED", "FAILED"}
@@ -1102,6 +1359,76 @@ def similarity(ctx: Ctx, reference_path: Path, implementation_path: Path, negati
     ctx.emit({**result, "saved_to": str(out_path)})
     if suspicious:
         sys.exit(int(ExitCode.SIMILARITY_FAILURE))
+
+
+# --------------------------------------------------------------------------- coverage
+
+@main.command()
+@click.argument("legacy_usage_path", type=click.Path(exists=True, path_type=Path))
+@click.argument("implementation_path", type=click.Path(exists=True, path_type=Path))
+@pass_ctx
+def coverage(ctx: Ctx, legacy_usage_path: Path, implementation_path: Path) -> None:
+    """Part XCVI: capability-regression coverage -- did the Zone I
+    implementation keep referencing everything the pre-migration
+    ("legacy") usage code actually referenced?
+
+    Distinct from 'similarity' (suspicious COPYING between reference and
+    implementation source text) and 'compare' (functional equivalence of
+    two program outputs): this diffs a REQUIREMENT SURFACE. LEGACY_USAGE_PATH
+    is the pre-migration application code that actually consumed the
+    thing being reimplemented (e.g. every screen/module reading/writing a
+    field from a schema being replaced); IMPLEMENTATION_PATH is the Zone I
+    output.
+
+    This is a real, useful, but bounded check: a grep/regex-based scan
+    over 'identifier: value' usage shapes, not an AST or semantic
+    analysis. It catches a named field/enum-value the legacy code
+    referenced silently going missing from the implementation, and flags
+    (for human review, never auto-failed) an implementation that appears
+    to skip a value-conversion convention the legacy code consistently
+    applied to an enum-like field -- the exact shape of a real prior bug
+    where a clean-room migration's deliberate scoping-down silently
+    dropped a region/modem-preset enum-name -> numeric-id conversion. See
+    src/cleanroom/coverage.py's module docstring for what this does and
+    does not catch."""
+    project = ctx.load_project()
+    ctx.enforce_zone_access(project, legacy_usage_path)
+    ctx.enforce_zone_access(project, implementation_path)
+    result = coverage_module.check_coverage(legacy_usage_path, implementation_path)
+
+    out_path = project.root / "evidence" / "coverage-findings.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(jsonlib.dumps(result["findings"], indent=2, sort_keys=True), encoding="utf-8")
+
+    needs_review = [f for f in result["findings"] if f["requires_review"]]
+    missing = [f for f in needs_review if f["status"] == "missing"]
+    divergent = [f for f in needs_review if f["status"] == "divergent"]
+
+    if result["overall_status"] == "insufficient_evidence":
+        ctx.echo(
+            "WARNING: no 'identifier: value' usage facts were extracted from LEGACY_USAGE_PATH -- nothing was "
+            "checked. This is NOT a clean result; it means the extractor found nothing in its narrow scope to "
+            "cross-check (see 'limitations' in the JSON output)."
+        )
+
+    project.evidence.append(
+        actor=Actor(type="tool", id="cleanroom-coverage-engine"),
+        action="cleanroom coverage",
+        result="success" if not needs_review else "failure",
+        detail=(
+            f"{result['distinct_fields_referenced_in_legacy']} distinct field(s) checked, "
+            f"{len(missing)} missing, {len(divergent)} divergent, overall_status={result['overall_status']}"
+        ),
+    )
+    ctx.emit({**result, "saved_to": str(out_path)})
+    if needs_review:
+        ctx.fail(ManualReviewRequired(
+            f"{len(missing)} field(s)/usage(s) referenced in the legacy usage code were not found in the Zone I "
+            f"implementation, and {len(divergent)} field(s) diverge from the legacy code's value-conversion "
+            "convention -- see evidence/coverage-findings.json. These are flags for human review, not a "
+            "confirmed defect (see 'limitations' in the JSON output); resolve or explicitly accept each before "
+            "release."
+        ))
 
 
 # --------------------------------------------------------------------------- provenance
@@ -1604,6 +1931,13 @@ def report(ctx: Ctx, version: str, emit_html: bool, emit_pdf: bool) -> None:
     else:
         similarity_result = "not_run"
 
+    coverage_path = project.root / "evidence" / "coverage-findings.json"
+    if coverage_path.is_file():
+        cov_findings = jsonlib.loads(coverage_path.read_text(encoding="utf-8"))
+        capability_coverage_result = "findings_open" if any(f["requires_review"] for f in cov_findings) else "no_open_findings"
+    else:
+        capability_coverage_result = "not_run"
+
     tasks_path = project.root / "REMEDIATION_TASKS.json"
     tasks = jsonlib.loads(tasks_path.read_text(encoding="utf-8")) if tasks_path.is_file() else []
     remediation_summary = {
@@ -1641,6 +1975,7 @@ def report(ctx: Ctx, version: str, emit_html: bool, emit_pdf: bool) -> None:
         remediation=remediation_summary,
         project_summary=project_summary,
         phases_completed=_phases_completed(project.evidence.read_all()),
+        capability_coverage_result=capability_coverage_result,
     )
     save_certificate(certificate, project.root / "CLEAN_ROOM_CERTIFICATE.json")
     report_text = render_final_report(certificate)

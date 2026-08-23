@@ -99,6 +99,20 @@ class AgentRegistry:
         STALLED/LOOPING/TERMINATED without a replacement having taken over."""
         return [a for a in self._agents.values() if a.status in ("STALLED", "LOOPING", "FAILED")]
 
+    def has_registered_implementation_agent(self) -> bool:
+        """True once at least one Zone-I-scoped agent has ever been
+        registered for this project (i.e. `cleanroom build`/`cleanroom
+        implement` has run at least once) -- regardless of that agent's
+        current `status`. Used to decide whether zone-scoped commands
+        should fail closed without `--agent-id` (see `cli.py`'s
+        `Ctx.enforce_zone_access`): a project with no implementation agent
+        yet has nothing to gate against (there's no separation to protect
+        during initial `init`/`recruit`/pre-build analysis), but once an
+        implementation agent exists, the whole point of the three-zone
+        model is defeated if an orchestrator can still silently omit
+        `--agent-id` and get ungated access."""
+        return any("I" in a.permitted_zones for a in self._agents.values())
+
     def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.path, "w", encoding="utf-8") as f:

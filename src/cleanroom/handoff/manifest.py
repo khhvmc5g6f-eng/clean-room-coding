@@ -21,6 +21,7 @@ from cleanroom.util import is_safe_regular_file, sha256_file, sha256_json, utc_n
 
 MANIFEST_FILENAME = "HANDOFF_MANIFEST.json"
 HANDOFF_DOC_FILENAME = "CLEAN_ROOM_HANDOFF.md"
+FACTS_DOC_FILENAME = "CLEAN_ROOM_HANDOFF_FACTS.json"
 
 
 def build_manifest(
@@ -31,6 +32,7 @@ def build_manifest(
     file_contamination: dict[str, str],
     sanitisation_report_hash: str,
     signer: str | None = None,
+    facts_document: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """file_contamination maps zone_h-relative posix paths to a contamination
     level. Any file not classified C0 blocks the handoff (Part V: Zone H
@@ -40,7 +42,7 @@ def build_manifest(
     for path in sorted(zone_h.rglob("*")):
         if path.is_dir() and not path.is_symlink():
             continue
-        if path.name in (MANIFEST_FILENAME, HANDOFF_DOC_FILENAME, ".gitkeep"):
+        if path.name in (MANIFEST_FILENAME, HANDOFF_DOC_FILENAME, FACTS_DOC_FILENAME, ".gitkeep"):
             continue
         rel = path.relative_to(zone_h).as_posix()
         safe, reason = is_safe_regular_file(path, zone_h)
@@ -75,6 +77,8 @@ def build_manifest(
         manifest["git_commit"] = git_commit
     if signer:
         manifest["signer"] = signer
+    if facts_document:
+        manifest["facts_document"] = facts_document
 
     manifest["manifest_hash"] = sha256_json(manifest)
 
@@ -141,6 +145,63 @@ def write_handoff_doc(manifest: dict[str, Any], zone_h: Path) -> Path:
     lines.append("")
     path = zone_h / HANDOFF_DOC_FILENAME
     path.write_text("\n".join(lines), encoding="utf-8")
+    return path
+
+
+def validate_facts_document(data: Any) -> list[str]:
+    """Validate a candidate facts-only handoff document against
+    handoff-facts.schema.json (see schemas/handoff-facts.schema.json --
+    that file, like every schema in schemas/, requires human
+    legal/governance review per CONTRIBUTING.md/GOVERNANCE.md beyond a
+    passing test run).
+
+    JSON Schema alone (string patterns/maxLength) already rejects most
+    prose leakage -- multi-line strings, long free-text fields, and
+    additional/unexpected keys. It cannot, however, express "this string
+    value looks like copied commentary rather than a short identifier"
+    for the one place the schema has to allow an arbitrary string --
+    `fact.value` (a bare scalar, which legitimately can be a string enum
+    value or similar). This function adds that one extra mechanical
+    check on top of schema validation: a string `value` that is
+    unreasonably long or contains whitespace-heavy prose-shaped content
+    is rejected the same way a schema violation would be, with the same
+    'reject rather than silently accept' bias the sanitisation scanner
+    already uses -- a false positive here costs a review, a false
+    negative costs a leak."""
+    if not isinstance(data, dict):
+        return ["<root>: facts document must be a JSON object"]
+    errors = validate(data, "handoff-facts.schema.json")
+    if errors:
+        return errors
+    prose_errors: list[str] = []
+    for i, fact in enumerate(data.get("facts", [])):
+        if not isinstance(fact, dict):
+            continue  # schema validation above already covers this
+        value = fact.get("value")
+        if isinstance(value, str):
+            if len(value) > 64:
+                prose_errors.append(
+                    f"facts/{i}/value: string value is {len(value)} chars, longer than the 64-char limit for a "
+                    "bare fact value -- this looks like copied commentary/prose rather than a short identifier "
+                    "or enum literal; move any explanatory text to a free-form Markdown handoff instead"
+                )
+            elif value.count(" ") >= 4:
+                prose_errors.append(
+                    f"facts/{i}/value: {value!r} contains {value.count(' ')} spaces -- bare fact values are "
+                    "short identifiers/literals, not sentences; this looks like leaked prose"
+                )
+    return prose_errors
+
+
+def write_facts_doc(facts_data: dict[str, Any], zone_h: Path) -> Path:
+    """Write an already-validated facts document into Zone H as
+    CLEAN_ROOM_HANDOFF_FACTS.json. Callers must call
+    `validate_facts_document` first and refuse to call this on a document
+    that failed validation -- this function does not re-validate, so it
+    must never be reachable with unvalidated input from `cli.py`."""
+    path = zone_h / FACTS_DOC_FILENAME
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(facts_data, f, indent=2, sort_keys=True)
     return path
 
 

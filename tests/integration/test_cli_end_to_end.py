@@ -141,7 +141,21 @@ def test_computed_maturity_level_advances_with_real_project_state(tmp_path: Path
 
     (project_dir / "zone-r" / "sort.py").write_text("def sort_ref(x):\n    return sorted(x)\n", encoding="utf-8")
     (project_dir / "zone-i" / "sort.py").write_text("def totally_different_impl(y):\n    result = []\n    return result\n", encoding="utf-8")
-    similarity_result = _run(runner, ["--project", str(project_dir), "similarity", str(project_dir / "zone-r"), str(project_dir / "zone-i")])
+
+    # 'cleanroom build' above registered a Zone-H+I-only implementation
+    # agent for this project, so (per the fail-closed zone gating feature)
+    # zone-scoped commands now REQUIRE --agent-id. This test isn't about
+    # zone separation -- register a comparison-role agent with both R and
+    # I access directly via AgentRegistry (there's no CLI role that grants
+    # both; 'recruit' is Zone-R-only by design) purely so the similarity
+    # call below can proceed ungated by this feature.
+    from cleanroom.orchestration.agents import AgentRegistry
+    comparison_agent = AgentRegistry(project_dir / "evidence").register(role="Similarity Reviewer", permitted_zones=["R", "I"])
+
+    similarity_result = _run(runner, [
+        "--project", str(project_dir), "--agent-id", comparison_agent.agent_id,
+        "similarity", str(project_dir / "zone-r"), str(project_dir / "zone-i"),
+    ])
     assert json.loads(similarity_result.output)["comparisons_skipped"] == 0
     _run(runner, ["--project", str(project_dir), "legal", "--access-authority", "public"])
 
@@ -606,14 +620,16 @@ def test_agent_id_denies_implementation_scoped_agent_zone_r_access(tmp_path: Pat
     (project_dir / "zone-r" / "lib").mkdir(parents=True)
     (project_dir / "zone-r" / "lib" / "LICENSE").write_text("MIT License\n", encoding="utf-8")
 
-    build_result = _run(runner, ["--project", str(project_dir), "--json", "build", "--role", "Backend Team"])
-    agent_id = json.loads(build_result.output)["agent_id"]
-
-    # Without --agent-id, behaviour is exactly as before -- this call
-    # succeeds (licence discovery runs; whether findings pass policy is a
-    # separate matter this test doesn't care about).
+    # Before any implementation agent has been registered, --agent-id
+    # remains optional -- this call succeeds (licence discovery runs;
+    # whether findings pass policy is a separate matter this test doesn't
+    # care about).
     unrestricted = runner.invoke(main, ["--project", str(project_dir), "licence", str(project_dir / "zone-r")])
     assert "PathGuard" not in unrestricted.output
+    assert "--agent-id is required" not in unrestricted.output
+
+    build_result = _run(runner, ["--project", str(project_dir), "--json", "build", "--role", "Backend Team"])
+    agent_id = json.loads(build_result.output)["agent_id"]
 
     denied = runner.invoke(main, ["--agent-id", agent_id, "--project", str(project_dir), "--json", "licence", str(project_dir / "zone-r")])
     assert denied.exit_code == 4  # ContaminationFailure
@@ -667,6 +683,78 @@ def test_recruit_registers_an_r_scoped_agent_explicitly_denied_zone_h_and_i(tmp_
     denied = runner.invoke(main, ["--agent-id", record["agent_id"], "--project", str(project_dir), "--json", "sanitise", str(project_dir / "zone-h" / ".gitkeep")])
     assert denied.exit_code == 4  # ContaminationFailure
     assert "PathGuard denied" in json.loads(denied.output)["error"]
+
+
+def test_diff_reference_denies_implementation_scoped_agent(tmp_path: Path):
+    """'cleanroom diff-reference' reads the full content of zone-r/ to
+    compute the baseline side of its diff, so it must be gated by the same
+    opt-in --agent-id PathGuard check as 'inspect'/'licence' -- a
+    Zone-H+I-only agent must be denied exactly as it would be from
+    'cleanroom licence zone-r'."""
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    runner = CliRunner()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    (project_dir / "zone-r").mkdir(exist_ok=True)
+    (project_dir / "zone-r" / "notes.txt").write_text("not a git checkout\n", encoding="utf-8")
+
+    build_result = _run(runner, ["--project", str(project_dir), "--json", "build", "--role", "Backend Team"])
+    agent_id = json.loads(build_result.output)["agent_id"]
+
+    denied = runner.invoke(main, ["--agent-id", agent_id, "--project", str(project_dir), "--json", "diff-reference"])
+    assert denied.exit_code == 4  # ContaminationFailure
+    assert "PathGuard denied" in json.loads(denied.output)["error"]
+
+
+def test_diff_reference_reports_a_clear_error_for_a_non_git_zone_r(tmp_path: Path):
+    """Never fabricate a comparison against an unknown source (AGENTS.md
+    item c): a zone-r/ that isn't a git checkout with a resolvable origin
+    must fail with an explicit message, not a silent/empty diff."""
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    runner = CliRunner()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    (project_dir / "zone-r").mkdir(exist_ok=True)
+    (project_dir / "zone-r" / "notes.txt").write_text("not a git checkout\n", encoding="utf-8")
+
+    result = runner.invoke(main, ["--project", str(project_dir), "diff-reference"])
+    assert result.exit_code != 0
+    assert "not a git checkout" in result.output
+
+
+def test_diff_reference_up_to_date_against_a_real_local_git_reference(tmp_path: Path):
+    """End-to-end through the actual CLI (not just the reference_diff unit):
+    recruit a reference by git-cloning a local 'upstream' repo into zone-r/
+    (the same pattern every real recruited project uses), then confirm
+    diff-reference reports it up to date and writes an evidence event."""
+    import subprocess
+
+    upstream = tmp_path / "upstream"
+    upstream.mkdir()
+    subprocess.run(["git", "init", "--quiet", "-b", "main"], cwd=upstream, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=upstream, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=upstream, check=True)
+    (upstream / "schema.proto").write_text("message M {}\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=upstream, check=True)
+    subprocess.run(["git", "commit", "--quiet", "-m", "initial"], cwd=upstream, check=True)
+
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    runner = CliRunner()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    import shutil
+
+    shutil.rmtree(project_dir / "zone-r")  # created by init (with a .gitkeep); git clone needs to create it fresh
+    subprocess.run(["git", "clone", "--quiet", str(upstream), str(project_dir / "zone-r")], check=True, capture_output=True, text=True)
+
+    result = runner.invoke(main, ["--project", str(project_dir), "--json", "diff-reference"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["up_to_date"] is True
+    assert payload["reference_source"] == str(upstream)
+
+    ledger_events = json.loads(_run(runner, ["--project", str(project_dir), "--json", "status"]).output)
+    assert ledger_events["ledger_events"] >= 1
 
 
 def test_build_registers_tools_on_the_agent_record(tmp_path: Path):
@@ -1010,3 +1098,214 @@ def test_legal_surfaces_eupl_compatible_licence_overlap_from_config(tmp_path: Pa
     assert findings["distribution"]["decision_state"] == "AMBER"
     assert "MPL-2.0" in findings["distribution"]["alternative_explanation"]
     assert "compatible licence" in findings["distribution"]["alternative_explanation"]
+
+
+# --------------------------------------------------------------------------- fail-closed zone gating
+
+
+def test_zone_scoped_command_fails_closed_without_agent_id_once_implementation_agent_registered(tmp_path: Path):
+    """The footgun this feature closes: once a project has at least one
+    registered Zone-I (implementation) agent (`cleanroom build` has run at
+    least once), omitting the global `--agent-id` on a zone-scoped command
+    must no longer silently run ungated -- it must refuse outright with a
+    clear error, for every command `enforce_zone_access` gates: inspect,
+    licence, similarity, sanitise, diff-reference."""
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    runner = CliRunner()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    (project_dir / "zone-r" / "lib").mkdir(parents=True)
+    (project_dir / "zone-r" / "lib" / "LICENSE").write_text("MIT License\n", encoding="utf-8")
+    (project_dir / "zone-h" / "spec.md").write_text("GIVEN a list\nWHEN sorted\nTHEN it is ordered\n", encoding="utf-8")
+
+    _run(runner, ["--project", str(project_dir), "--json", "build", "--role", "Backend Team"])
+
+    for args in (
+        ["licence", str(project_dir / "zone-r")],
+        ["inspect", str(project_dir / "zone-r")],
+        ["sanitise", str(project_dir / "zone-h" / "spec.md")],
+        ["diff-reference"],
+        ["similarity", str(project_dir / "zone-r"), str(project_dir / "zone-i")],
+    ):
+        result = runner.invoke(main, ["--project", str(project_dir), "--json"] + args)
+        assert result.exit_code != 0, f"expected failure without --agent-id for {args!r}, got {result.output!r}"
+        assert "--agent-id is required" in result.output, result.output
+
+
+def test_zone_scoped_command_still_ungated_without_any_registered_implementation_agent(tmp_path: Path):
+    """Before any implementation agent has ever been registered for a
+    project (fresh `init`, or a project that only ever used `recruit` for
+    Reference-side agents), there is no Reference/Implementation separation
+    yet to protect -- `--agent-id` must remain optional and omitting it
+    must behave exactly as before this feature existed (no PathGuard
+    denial, no fail-closed error)."""
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    runner = CliRunner()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    (project_dir / "zone-r" / "lib").mkdir(parents=True)
+    (project_dir / "zone-r" / "lib" / "LICENSE").write_text("MIT License\n", encoding="utf-8")
+
+    # No 'cleanroom build' has ever run for this project -- only 'recruit',
+    # which registers Zone-R-only (not Zone-I) agents.
+    _run(runner, ["--project", str(project_dir), "--json", "recruit", "--role", "Analyst"])
+
+    result = runner.invoke(main, ["--project", str(project_dir), "--json", "licence", str(project_dir / "zone-r")])
+    assert "--agent-id is required" not in result.output
+    assert "PathGuard" not in result.output
+
+
+def _init_gated_ready_for_handoff(runner: CliRunner, project_dir: Path, spec_version: str = "v1") -> None:
+    """Shared setup: a project past `cleanroom gate --decision pass`, ready
+    for `cleanroom handoff`."""
+    project_dir.mkdir(exist_ok=True)
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    _run(runner, [
+        "--project", str(project_dir), "specify", "add-requirement",
+        "--id", "CR-REQ-000001", "--kind", "requirement",
+        "--statement", "sorts ascending", "--classification", "observable_requirement",
+    ])
+    (project_dir / "zone-h" / "spec.md").write_text(
+        "GIVEN a list\nWHEN sorted ascending\nTHEN alphabetical order is returned\n", encoding="utf-8"
+    )
+    _run(runner, ["--project", str(project_dir), "sanitise", str(project_dir / "zone-h" / "spec.md")])
+    _run(runner, [
+        "--project", str(project_dir), "gate",
+        "--specification-version", spec_version, "--decision", "pass",
+        "--reviewer", "Test Reviewer", "--notes", "Sufficient for independent implementation.",
+    ])
+
+
+def test_handoff_format_facts_json_writes_a_validated_facts_document(tmp_path: Path):
+    """The new structured, schema-validated Zone H handoff format: a
+    conforming facts-only document passed via --facts-file must validate,
+    be written into Zone H as CLEAN_ROOM_HANDOFF_FACTS.json, and have its
+    hash recorded in HANDOFF_MANIFEST.json -- a real smoke test of
+    'cleanroom handoff --format facts-json', not just the underlying
+    Python functions."""
+    import cleanroom.handoff.manifest as handoff_manifest
+
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    _init_gated_ready_for_handoff(runner, project_dir)
+
+    facts_file = tmp_path / "facts.json"
+    facts_file.write_text(json.dumps({
+        "schema_version": "1.0.0",
+        "facts": [
+            {"kind": "enum_value", "container": "HardwareModel", "name": "SEEED_WIO_TRACKER_L1_PRO_1W", "value": 144},
+            {
+                "kind": "field", "container": "EnvironmentMetrics", "name": "lightning_strike_count_1h",
+                "number": 40, "type": "uint32", "optional": True,
+            },
+        ],
+    }), encoding="utf-8")
+
+    result = _run(runner, [
+        "--project", str(project_dir), "--json", "handoff",
+        "--specification-version", "v1", "--all-c0",
+        "--format", "facts-json", "--facts-file", str(facts_file),
+    ])
+    payload = json.loads(result.output)
+    assert payload["doc"] is None  # markdown handoff doc was NOT produced for this format
+    assert payload["facts_doc"] is not None
+
+    facts_doc_path = project_dir / "zone-h" / handoff_manifest.FACTS_DOC_FILENAME
+    assert facts_doc_path.is_file()
+    manifest = json.loads((project_dir / "zone-h" / "HANDOFF_MANIFEST.json").read_text(encoding="utf-8"))
+    assert manifest["facts_document"]["path"] == handoff_manifest.FACTS_DOC_FILENAME
+    assert len(manifest["facts_document"]["sha256"]) == 64
+    # The facts document is a distinct, separately-tracked artefact --
+    # never double-counted as a regular handoff-eligible spec file.
+    assert all(f["path"] != handoff_manifest.FACTS_DOC_FILENAME for f in manifest["files"])
+
+
+def test_handoff_format_both_writes_markdown_and_facts_documents(tmp_path: Path):
+    import cleanroom.handoff.manifest as handoff_manifest
+
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    _init_gated_ready_for_handoff(runner, project_dir)
+
+    facts_file = tmp_path / "facts.json"
+    facts_file.write_text(json.dumps({
+        "schema_version": "1.0.0",
+        "facts": [{"kind": "constant", "container": "Limits", "name": "MAX_PACKET_SIZE", "value": 237}],
+    }), encoding="utf-8")
+
+    result = _run(runner, [
+        "--project", str(project_dir), "--json", "handoff",
+        "--specification-version", "v1", "--all-c0",
+        "--format", "both", "--facts-file", str(facts_file),
+    ])
+    payload = json.loads(result.output)
+    assert payload["doc"] is not None
+    assert payload["facts_doc"] is not None
+    assert (project_dir / "zone-h" / handoff_manifest.HANDOFF_DOC_FILENAME).is_file()
+    assert (project_dir / "zone-h" / handoff_manifest.FACTS_DOC_FILENAME).is_file()
+
+
+def test_handoff_format_facts_json_rejects_malformed_facts_file(tmp_path: Path):
+    """A facts document that leaks prose/commentary through an unexpected
+    key must be rejected with a clear error, and must NOT produce a
+    handoff manifest at all -- a rejected facts-json handoff is a refusal,
+    not a partial success."""
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    _init_gated_ready_for_handoff(runner, project_dir)
+
+    facts_file = tmp_path / "facts.json"
+    facts_file.write_text(json.dumps({
+        "schema_version": "1.0.0",
+        "facts": [
+            {
+                "kind": "field", "container": "EnvironmentMetrics", "name": "lightning_strike_count_1h",
+                "number": 40, "type": "uint32",
+                "commentary": "The reference implementation computes this using a sliding window that also...",
+            },
+        ],
+    }), encoding="utf-8")
+
+    result = runner.invoke(main, [
+        "--project", str(project_dir), "--json", "handoff",
+        "--specification-version", "v1", "--all-c0",
+        "--format", "facts-json", "--facts-file", str(facts_file),
+    ])
+    assert result.exit_code != 0
+    assert "handoff-facts.schema.json" in result.output
+    assert not (project_dir / "zone-h" / "HANDOFF_MANIFEST.json").is_file()
+
+
+def test_handoff_format_facts_json_requires_facts_file(tmp_path: Path):
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    _init_gated_ready_for_handoff(runner, project_dir)
+
+    result = runner.invoke(main, [
+        "--project", str(project_dir), "handoff",
+        "--specification-version", "v1", "--all-c0", "--format", "facts-json",
+    ])
+    assert result.exit_code != 0
+    assert "--facts-file" in result.output
+
+
+def test_agent_registry_has_registered_implementation_agent(tmp_path: Path):
+    """Unit-level check of the new state query itself: false with no
+    agents or only Zone-R agents registered, true as soon as any Zone-I
+    agent (regardless of its current status) has been registered."""
+    from cleanroom.orchestration.agents import AgentRegistry
+
+    evidence_dir = tmp_path / "evidence"
+    registry = AgentRegistry(evidence_dir)
+    assert registry.has_registered_implementation_agent() is False
+
+    registry.register(role="Analyst", permitted_zones=["R"])
+    assert registry.has_registered_implementation_agent() is False
+
+    record = registry.register(role="Backend Team", permitted_zones=["H", "I"])
+    assert registry.has_registered_implementation_agent() is True
+
+    # Still true even if that agent's status later changes -- registration,
+    # not liveness, is what the fail-closed gate cares about.
+    registry.set_status(record.agent_id, "TERMINATED")
+    assert registry.has_registered_implementation_agent() is True

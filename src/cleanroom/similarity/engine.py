@@ -19,17 +19,37 @@ from typing import Any
 from cleanroom.similarity.classify import classify
 from cleanroom.similarity.lexical import lexical_similarity
 from cleanroom.similarity.negative_control import background_scores
-from cleanroom.similarity.structural import SOURCE_SUFFIXES, SUFFIX_TO_ASTGREP_LANG, structural_similarity
+from cleanroom.similarity.structural import (
+    SOURCE_SUFFIXES,
+    STRUCTURAL_UNSUPPORTED_SUFFIXES,
+    SUFFIX_TO_ASTGREP_LANG,
+    structural_similarity,
+)
 IGNORE_DIRNAMES = {".git", "__pycache__", ".venv", "node_modules", "dist", "build"}
 
 
-def _source_files(root: Path) -> list[Path]:
+def _source_files(root: Path) -> tuple[list[Path], dict[str, int]]:
+    """Returns (recognised source files, {extension: count} for every file
+    under root that was NOT recognised as source). The second value exists
+    so a caller can tell "we scanned this tree and genuinely found nothing
+    comparable" apart from "we scanned this tree and everything in it is a
+    format we don't recognise" -- both previously looked identical
+    (comparisons_run: 0, no error), which is a worse failure mode than an
+    explicit message: a user could mistake a silent zero for "verified
+    clean" rather than "never actually checked"."""
     if not root.exists():
-        return []
-    return [
-        p for p in sorted(root.rglob("*"))
-        if p.is_file() and p.suffix in SOURCE_SUFFIXES and not any(part in IGNORE_DIRNAMES for part in p.parts)
-    ]
+        return [], {}
+    recognised: list[Path] = []
+    unrecognised: dict[str, int] = {}
+    for p in sorted(root.rglob("*")):
+        if not p.is_file() or any(part in IGNORE_DIRNAMES for part in p.parts):
+            continue
+        if p.suffix in SOURCE_SUFFIXES:
+            recognised.append(p)
+        else:
+            ext = p.suffix or "(none)"
+            unrecognised[ext] = unrecognised.get(ext, 0) + 1
+    return recognised, unrecognised
 
 
 @dataclass
@@ -37,11 +57,21 @@ class ComparisonPlan:
     pairs: list[tuple[Path, Path]]
     matched_by_name: int
     skipped: int
+    unrecognized_extensions: dict[str, int]
 
 
 def _plan_pairs(reference_root: Path, implementation_root: Path, *, max_comparisons: int) -> ComparisonPlan:
-    ref_files = _source_files(reference_root)
-    impl_files = _source_files(implementation_root)
+    ref_files, ref_unrecognized = _source_files(reference_root)
+    impl_files, impl_unrecognized = _source_files(implementation_root)
+    # Combined across both trees: an unrecognised extension anywhere in
+    # scope is worth surfacing, not just on the implementation side --
+    # a reference tree that's entirely, say, .fbs (FlatBuffers) would
+    # otherwise produce the same silent comparisons_run: 0 this exists to
+    # prevent, just from the other direction.
+    unrecognized_extensions: dict[str, int] = {}
+    for source in (ref_unrecognized, impl_unrecognized):
+        for ext, count in source.items():
+            unrecognized_extensions[ext] = unrecognized_extensions.get(ext, 0) + count
 
     # A basename can legitimately appear more than once in the reference
     # tree (e.g. "utils.py" in two different reference directories) -- a
@@ -86,7 +116,10 @@ def _plan_pairs(reference_root: Path, implementation_root: Path, *, max_comparis
         skipped = total_available - len(budgeted)
         pairs.extend(budgeted)
 
-    return ComparisonPlan(pairs=pairs, matched_by_name=matched_by_name, skipped=skipped)
+    return ComparisonPlan(
+        pairs=pairs, matched_by_name=matched_by_name, skipped=skipped,
+        unrecognized_extensions=unrecognized_extensions,
+    )
 
 
 def compare_trees(
@@ -133,21 +166,30 @@ def compare_trees(
             ).to_dict()
         )
 
-        struct_score, struct_method = structural_similarity(ref_text, impl_text, language=language)
-        # A generic bracket/keyword fallback is real but weaker evidence
-        # than an actual AST/tree-sitter comparison (see structural.py's
-        # docstring) -- down-weight it by requiring a higher score before
-        # it's flagged, rather than silently giving it the same confidence
-        # as a real parse.
-        effective_threshold = structural_threshold * 1.5 if struct_method == "generic_fallback" else structural_threshold
-        finding = classify(
-            finding_id=f"SIM-STRUCT-{i:05d}", method="structural", reference_ref=ref_rel,
-            implementation_ref=impl_rel, score=struct_score, threshold=effective_threshold,
-            background_score=background.get("structural"),
-        )
-        finding_dict = finding.to_dict()
-        finding_dict["structural_method"] = struct_method
-        findings.append(finding_dict)
+        # IDL/schema formats (.proto, .thrift, .avsc, .graphql/.gql) have no
+        # ast-grep-py grammar and aren't bracket/keyword-shaped code, so
+        # forcing them through structural_similarity would only ever reach
+        # generic_fallback on content it wasn't designed for. Rather than
+        # emit a low-confidence structural finding for a comparison that
+        # was never really attempted, skip the structural step entirely for
+        # these suffixes -- lexical similarity (above) still runs and is
+        # language-agnostic already.
+        if impl_file.suffix not in STRUCTURAL_UNSUPPORTED_SUFFIXES:
+            struct_score, struct_method = structural_similarity(ref_text, impl_text, language=language)
+            # A generic bracket/keyword fallback is real but weaker evidence
+            # than an actual AST/tree-sitter comparison (see structural.py's
+            # docstring) -- down-weight it by requiring a higher score before
+            # it's flagged, rather than silently giving it the same confidence
+            # as a real parse.
+            effective_threshold = structural_threshold * 1.5 if struct_method == "generic_fallback" else structural_threshold
+            finding = classify(
+                finding_id=f"SIM-STRUCT-{i:05d}", method="structural", reference_ref=ref_rel,
+                implementation_ref=impl_rel, score=struct_score, threshold=effective_threshold,
+                background_score=background.get("structural"),
+            )
+            finding_dict = finding.to_dict()
+            finding_dict["structural_method"] = struct_method
+            findings.append(finding_dict)
 
     return {
         "reference_root": str(reference_root),
@@ -155,5 +197,12 @@ def compare_trees(
         "files_matched_by_name": plan.matched_by_name,
         "comparisons_run": len(plan.pairs),
         "comparisons_skipped": plan.skipped,
+        # Files under either tree whose extension wasn't recognised as
+        # source at all (never even candidates for comparison) -- e.g. a
+        # project written entirely in a schema/IDL format this engine
+        # doesn't yet parse. Populated (never omitted) so `comparisons_run:
+        # 0` with an empty dict here means "we looked and found nothing
+        # comparable," never "we don't know why we found nothing."
+        "unrecognized_extensions": dict(sorted(plan.unrecognized_extensions.items(), key=lambda kv: -kv[1])),
         "findings": findings,
     }

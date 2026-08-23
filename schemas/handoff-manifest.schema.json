@@ -27,6 +27,16 @@
       }
     },
     "sanitisation_report_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "facts_document": {
+      "type": "object",
+      "description": "Present only when this handoff was built with 'cleanroom handoff --format facts-json'/'--format both': records that a schema-validated CLEAN_ROOM_HANDOFF_FACTS.json (see handoff-facts.schema.json) accompanies the free-form Markdown handoff for this specification version.",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
     "manifest_hash": {
       "type": "string",
       "description": "SHA-256 over the canonical JSON of this manifest excluding this field and 'signature'.",

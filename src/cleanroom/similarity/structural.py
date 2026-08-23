@@ -32,11 +32,23 @@ SUFFIX_TO_ASTGREP_LANG = {
     ".c": "c", ".h": "c", ".cpp": "cpp", ".cc": "cpp", ".hpp": "cpp", ".cxx": "cpp",
 }
 
+# IDL/schema formats: real source material a clean-room project can be
+# reimplementing (e.g. a protobuf wire-schema reimplementation), but
+# ast-grep-py has no grammar for any of them and forcing them through
+# python_structural_shape/treesitter_structural_shape would either raise
+# or silently fall through to generic_structural_shape's weak
+# bracket/keyword heuristic on content that isn't really bracket-oriented
+# code. Recognised-but-structural-unsupported: compare_trees() (engine.py)
+# runs lexical similarity only for these suffixes and skips the
+# structural/ast-grep step entirely rather than emitting a low-confidence
+# structural finding for a comparison that was never really attempted.
+STRUCTURAL_UNSUPPORTED_SUFFIXES = {".proto", ".thrift", ".avsc", ".graphql", ".gql"}
+
 # The single source of truth for "which file extensions does the
 # similarity engine consider source code" -- both engine.py and
 # negative_control.py import this rather than maintaining their own copy
 # (they previously duplicated an identical set, risking drift).
-SOURCE_SUFFIXES = {".py"} | set(SUFFIX_TO_ASTGREP_LANG)
+SOURCE_SUFFIXES = {".py"} | set(SUFFIX_TO_ASTGREP_LANG) | STRUCTURAL_UNSUPPORTED_SUFFIXES
 
 _STRUCTURAL_KEYWORDS = {
     "if", "else", "elif", "elsif", "for", "while", "try", "except", "finally",
