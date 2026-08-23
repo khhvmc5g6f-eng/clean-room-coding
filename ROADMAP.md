@@ -120,6 +120,57 @@ original review/audit/research pass this roadmap was first extended from.
   `--want-ai/--no-ai`). This is the concrete, testable answer to "does a
   flagged legal concern get sent back to be recoded" at BOTH ends of the
   pipeline, not just at release.
+- **Update (2026-08-22): a real orchestration harness, the first actual
+  implementation of "whatever LLM orchestration the caller uses."**
+  `legal/panels.py`'s adversarial-review prompt templates, and every
+  agent-registration command (`recruit`/`build`), have always been
+  designed for SOME external harness to actually run -- `orchestration/
+  backends.py` (a pluggable `AgentBackend` interface, a real
+  `AnthropicBackend` via the official `anthropic` SDK, `pip install
+  cleanroom[orchestrate]`) and `orchestration/harness.py` are that
+  harness, built into the tool itself rather than left as an exercise
+  for an external caller:
+  - `cleanroom council` (requires the global `--agent-id`, a Council
+    member registered via `cleanroom recruit`) builds the same
+    applicant/challenger/judicial-review prompts `cleanroom judge`
+    writes to disk for a human, sends each to a real backend, and merges
+    the parsed judicial review into `evidence/legal-findings.json` via
+    `legal_panels.merge_panel_answers()` -- extracted from `cli.py`'s
+    `judge-adjudicate` command (which now calls the same function) so
+    both paths share one tested implementation, not two that could
+    drift.
+  - `cleanroom implement` (requires `--agent-id`, an implementation agent
+    already registered via `cleanroom build`, so it's already been
+    through that command's remediation panel) sends the agent Zone H's
+    real sanitised documents and the requirement graph's real
+    handoff-eligible statements -- NEVER anything from Zone R -- and
+    writes whatever files the model returns into Zone I. Source-blind by
+    construction: the model is given nothing from the reference zone to
+    have read in the first place, not merely blocked from re-reading it.
+    Every returned path is resolved and checked to stay within Zone I
+    before anything is written; a path-traversal attempt is rejected
+    entirely, not clamped or partially applied.
+  - Both commands require the model to respond in a specific JSON
+    contract (never free prose parsed with regex); a response wrapped in
+    a stray ```` ```json ```` fence is unwrapped automatically (the one
+    common real deviation from an explicit "no other text" instruction),
+    but a genuinely unparseable response is recorded as an honest error
+    per jurisdiction pack (`council`) or aborts cleanly (`implement`),
+    never silently guessed at.
+  - **What's actually verified, and what isn't.** Every real piece of
+    this harness's OWN logic -- prompt construction from real project
+    state, the JSON parsing contract (including the code-fence-stripping
+    fallback), the merge back through `merge_panel_answers`, the path-
+    traversal defence, the clean-error paths for a missing API key or a
+    real `AnthropicError` -- is covered by tests using a `FakeBackend`
+    test double (never presented as a real LLM response) and, for
+    `AnthropicBackend` itself, by mocking only the network call against
+    the real installed SDK's actual response shape. What is NOT verified
+    in this environment: an actual end-to-end run against the real
+    Anthropic API, because no `ANTHROPIC_API_KEY` was available here.
+    Set one and run `cleanroom council`/`cleanroom implement` yourself
+    for the first live proof that a real model's response round-trips
+    correctly through this pipeline.
 - Optional AI-model suggestion (`cleanroom ai-suggest`): asks explicitly
   whether AI/ML capability should be added, and if so searches the real
   Hugging Face Hub, classifying each candidate as `embeddable` (ships an
@@ -782,6 +833,22 @@ change that should be evaluated on its own.
   not a guarantee -- it reports `unknown` rather than guessing whenever
   the evidence is insufficient, but "embeddable" doesn't verify the model
   will actually run acceptably on any given target hardware.
+- **The orchestration harness (`cleanroom council`/`cleanroom implement`)
+  ships one real backend, `AnthropicBackend`, and it has NOT been
+  exercised end-to-end against the live Anthropic API in this
+  environment** -- no `ANTHROPIC_API_KEY` was available. Every piece of
+  the harness's OWN logic is real and tested (prompt construction, the
+  JSON-parsing contract and its code-fence-stripping fallback, the merge
+  back through `legal_panels.merge_panel_answers`, the Zone-I
+  path-traversal defence, clean error handling for a missing key or a
+  real `anthropic.AnthropicError`, all verified via a `FakeBackend` test
+  double or by mocking only the network call against the real installed
+  SDK's actual response shape) -- what's unverified is specifically
+  whether a real model's real response, in practice, reliably follows
+  the required output format closely enough for the parsing/merge logic
+  to succeed often rather than falling into its (also real, also tested)
+  error path. This is the single most important thing to verify with a
+  real key before relying on this for an actual project.
 
 ## Likely next additions
 

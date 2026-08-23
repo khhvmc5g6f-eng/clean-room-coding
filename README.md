@@ -84,8 +84,24 @@ not yet built. Currently ships:
   JSON/Markdown) covering what the project started with, what it did,
   functional coverage, remediation status, and the jurisdiction-by-
   jurisdiction decision.
-- A 28-command CLI (`cleanroom ...`) with `--json` output, an actually-wired
+- A 33-command CLI (`cleanroom ...`) with `--json` output, an actually-wired
   `--config` override, and documented exit codes for CI/CD.
+- A real, opt-in **orchestration harness** (`cleanroom council` /
+  `cleanroom implement`, `pip install cleanroom[orchestrate]`): the first
+  actual implementation of "whatever LLM orchestration the caller uses"
+  that `legal/panels.py`'s adversarial-review prompts have always
+  deferred to. A Reference-side Council (registered via `cleanroom
+  recruit`) sends the same applicant/challenger/judicial-review prompts
+  `cleanroom judge` writes to disk for a human to a real LLM backend and
+  merges the result back exactly as `judge-adjudicate` would; a
+  registered `cleanroom build` agent then hands off to `cleanroom
+  implement`, which sends it Zone H's real sanitised documents (never
+  Zone R) and writes whatever files the model returns into Zone I, with
+  every path checked to stay inside it. Real, cost-incurring LLM API
+  calls -- never invoked implicitly. See ROADMAP.md for exactly what's
+  verified (all the harness's own logic, via a `FakeBackend` test
+  double) versus what a live `ANTHROPIC_API_KEY` run of your own would be
+  the first real end-to-end proof of.
 - An Agent Skill at [skills/clean-room-coding/SKILL.md](skills/clean-room-coding/SKILL.md)
   for use from Claude Code.
 

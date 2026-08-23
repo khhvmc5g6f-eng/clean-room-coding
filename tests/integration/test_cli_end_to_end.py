@@ -47,18 +47,25 @@ def test_full_pipeline(tmp_path: Path, monkeypatch):
     _run(runner, ["--project", str(project_dir), "jurisdiction"])
     assert (project_dir / "JURISDICTION_MATRIX.json").is_file()
 
-    (project_dir / "zone-h" / "spec.md").write_text(
-        "GIVEN a list\nWHEN sorted ascending\nTHEN alphabetical order is returned\n", encoding="utf-8"
-    )
-    _run(runner, ["--project", str(project_dir), "sanitise", str(project_dir / "zone-h" / "spec.md")])
-    _run(runner, ["--project", str(project_dir), "handoff", "--specification-version", "v1", "--all-c0"])
-    assert (project_dir / "zone-h" / "HANDOFF_MANIFEST.json").is_file()
-
     _run(runner, [
         "--project", str(project_dir), "specify", "add-requirement",
         "--id", "CR-REQ-000001", "--kind", "requirement",
         "--statement", "sorts ascending", "--classification", "observable_requirement",
     ])
+
+    (project_dir / "zone-h" / "spec.md").write_text(
+        "GIVEN a list\nWHEN sorted ascending\nTHEN alphabetical order is returned\n", encoding="utf-8"
+    )
+    _run(runner, ["--project", str(project_dir), "sanitise", str(project_dir / "zone-h" / "spec.md")])
+    gate_result = _run(runner, ["--project", str(project_dir), "--json", "gate",
+        "--specification-version", "v1", "--decision", "pass",
+        "--reviewer", "Test Reviewer", "--notes", "Sufficient for independent implementation.",
+    ])
+    gate_payload = json.loads(gate_result.output)
+    assert gate_payload["automated_signal"] == "sufficient"
+    assert gate_payload["overrode_automated_signal"] is False
+    _run(runner, ["--project", str(project_dir), "handoff", "--specification-version", "v1", "--all-c0"])
+    assert (project_dir / "zone-h" / "HANDOFF_MANIFEST.json").is_file()
 
     (project_dir / "zone-i").mkdir(exist_ok=True)
     (project_dir / "zone-i" / "requirements.txt").write_text("click==8.1.7\n", encoding="utf-8")
@@ -113,8 +120,16 @@ def test_computed_maturity_level_advances_with_real_project_state(tmp_path: Path
     _run(runner, ["--project", str(project_dir), "intake", "--source", "lib", "--access-authority", "public"])
     _run(runner, ["--project", str(project_dir), "jurisdiction"])
 
+    _run(runner, [
+        "--project", str(project_dir), "specify", "add-requirement",
+        "--id", "CR-REQ-000001", "--kind", "requirement",
+        "--statement", "sorts ascending", "--classification", "observable_requirement",
+    ])
     (project_dir / "zone-h" / "spec.md").write_text("GIVEN a list\nWHEN sorted\nTHEN it is ordered\n", encoding="utf-8")
     _run(runner, ["--project", str(project_dir), "sanitise", str(project_dir / "zone-h" / "spec.md")])
+    _run(runner, ["--project", str(project_dir), "gate", "--specification-version", "v1", "--decision", "pass",
+        "--reviewer", "Test Reviewer", "--notes", "Sufficient for independent implementation.",
+    ])
     _run(runner, ["--project", str(project_dir), "handoff", "--specification-version", "v1", "--all-c0"])
     _run(runner, ["--project", str(project_dir), "build", "--role", "Implementation Team"])
     assert _computed_level(runner, project_dir)["computed_level"] == "CR2"
@@ -779,6 +794,115 @@ def test_build_surfaces_but_does_not_block_on_review_required_only_concerns(tmp_
     assert payload["open_remediation_concerns"]["blocking"] == 0
     assert payload["open_remediation_concerns"]["review_required"] > 0
     assert payload["agent_id"]  # registered without any acknowledgment needed
+
+
+def _setup_project_ready_for_gate(runner: CliRunner, project_dir: Path) -> None:
+    """A project with one handoff-eligible requirement node and a clean
+    (non-blocked) sanitised Zone H document -- the automated signal
+    `cleanroom gate` computes from this reads 'sufficient'."""
+    project_dir.mkdir(exist_ok=True)
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    _run(runner, [
+        "--project", str(project_dir), "specify", "add-requirement",
+        "--id", "CR-REQ-000001", "--kind", "requirement",
+        "--statement", "sorts ascending", "--classification", "observable_requirement",
+    ])
+    (project_dir / "zone-h" / "spec.md").write_text(
+        "GIVEN a list\nWHEN sorted ascending\nTHEN alphabetical order is returned\n", encoding="utf-8"
+    )
+    _run(runner, ["--project", str(project_dir), "sanitise", str(project_dir / "zone-h" / "spec.md")])
+
+
+def test_handoff_refuses_without_a_gate_decision(tmp_path: Path):
+    """The Clean-Room Gate is mechanically enforced, not just documented:
+    'cleanroom handoff' must refuse to build a manifest for a
+    specification version that has no recorded PASS decision -- no silent
+    'sanitisation passed so handoff just proceeds'."""
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    _setup_project_ready_for_gate(runner, project_dir)
+
+    result = runner.invoke(main, ["--project", str(project_dir), "--json", "handoff", "--specification-version", "v1", "--all-c0"])
+    assert result.exit_code == 3
+    assert "Clean-Room Gate" in json.loads(result.output)["error"]
+    assert not (project_dir / "zone-h" / "HANDOFF_MANIFEST.json").is_file()
+
+
+def test_gate_fail_is_recorded_and_still_blocks_handoff(tmp_path: Path):
+    """A FAIL decision is real evidence, not a no-op -- it's saved to
+    GATE_DECISIONS.json (so the loop back to Team A has something to
+    reference) and it does not unblock handoff for that version."""
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    _setup_project_ready_for_gate(runner, project_dir)
+
+    gate_result = runner.invoke(main, ["--project", str(project_dir), "--json", "gate",
+        "--specification-version", "v1", "--decision", "fail",
+        "--reviewer", "Jane Reviewer", "--notes", "Missing acceptance criteria for the descending-sort case.",
+    ])
+    assert gate_result.exit_code == 3
+    decisions = json.loads((project_dir / "GATE_DECISIONS.json").read_text(encoding="utf-8"))
+    assert decisions[0]["decision"] == "fail"
+    assert decisions[0]["reviewer"] == "Jane Reviewer"
+
+    handoff_result = runner.invoke(main, ["--project", str(project_dir), "--json", "handoff", "--specification-version", "v1", "--all-c0"])
+    assert handoff_result.exit_code == 3
+
+
+def test_gate_pass_unblocks_handoff_for_that_specification_version_only(tmp_path: Path):
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    _setup_project_ready_for_gate(runner, project_dir)
+
+    gate_result = _run(runner, ["--project", str(project_dir), "--json", "gate",
+        "--specification-version", "v1", "--decision", "pass",
+        "--reviewer", "Jane Reviewer", "--notes", "Coverage looks complete.",
+    ])
+    payload = json.loads(gate_result.output)
+    assert payload["automated_signal"] == "sufficient"
+    assert payload["overrode_automated_signal"] is False
+
+    _run(runner, ["--project", str(project_dir), "handoff", "--specification-version", "v1", "--all-c0"])
+    assert (project_dir / "zone-h" / "HANDOFF_MANIFEST.json").is_file()
+
+    # v2 was never gated -- the PASS above does not carry over to a different version.
+    other_version = runner.invoke(main, ["--project", str(project_dir), "--json", "handoff", "--specification-version", "v2", "--all-c0"])
+    assert other_version.exit_code == 3
+
+
+def test_gate_pass_despite_insufficient_signal_requires_explicit_acknowledgment(tmp_path: Path):
+    """Recording PASS over an 'insufficient' automated signal is a real
+    human override the tool must never let through silently -- refuses
+    without acknowledgment (interactively or via the flag), and always
+    records overrode_automated_signal=true when it does go through."""
+    runner = CliRunner()
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    # No requirement nodes and no sanitisation reports at all -- automated_signal is 'insufficient'.
+
+    no_input = runner.invoke(main, ["--project", str(project_dir), "gate",
+        "--specification-version", "v1", "--decision", "pass",
+        "--reviewer", "Jane Reviewer", "--notes", "Small feature, judged sufficient by inspection.",
+    ], input="")
+    assert no_input.exit_code != 0
+    assert "Traceback" not in no_input.output
+    assert not (project_dir / "GATE_DECISIONS.json").is_file()
+
+    declined = runner.invoke(main, ["--project", str(project_dir), "gate",
+        "--specification-version", "v1", "--decision", "pass",
+        "--reviewer", "Jane Reviewer", "--notes", "x",
+    ], input="n\n")
+    assert declined.exit_code != 0
+    assert "INSUFFICIENT" in declined.output
+
+    accepted = _run(runner, ["--project", str(project_dir), "--json", "gate",
+        "--specification-version", "v1", "--decision", "pass",
+        "--reviewer", "Jane Reviewer", "--notes", "x", "--acknowledge-automated-signal",
+    ])
+    payload = json.loads(accepted.output)
+    assert payload["automated_signal"] == "insufficient"
+    assert payload["overrode_automated_signal"] is True
 
 
 def test_agent_id_rejects_unregistered_id(tmp_path: Path):

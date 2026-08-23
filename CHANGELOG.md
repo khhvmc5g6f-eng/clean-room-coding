@@ -8,6 +8,53 @@ once it reaches 1.0.
 
 ## [Unreleased]
 
+### Added (twenty-seventh pass — the Clean-Room Gate, a mechanically-enforced handover checkpoint)
+
+- New `cleanroom gate --specification-version vN --decision pass|fail
+  --reviewer "<name>" --notes "..."` command (Part XCIV,
+  `src/cleanroom/gate.py`, `schemas/gate-decision.schema.json`): a
+  recorded PASS/FAIL decision on whether a specification version is
+  sufficient for independent implementation and free of restricted
+  material, sitting between Sanitise and Handoff. Every decision is
+  appended (never overwritten) to `GATE_DECISIONS.json` and to the
+  evidence ledger.
+- `cleanroom gate` computes a real, deterministic `automated_signal`
+  (`sufficient`/`insufficient`) from the requirement graph's
+  handoff-eligible node count and whether any on-file sanitisation
+  report is blocked -- evidence for the human reviewer, never itself the
+  decision.
+- `cleanroom handoff` now mechanically refuses (`PolicyFailure`, exit 3)
+  to build a manifest for a specification version without a matching
+  PASS already recorded for that exact version -- this was previously
+  only a documented recommendation in `SKILL.md`, not something the tool
+  itself enforced.
+- Recording `--decision pass` against an `insufficient` automated signal
+  requires an explicit override (`--acknowledge-automated-signal`, or an
+  interactive confirmation outside `--json` mode, mirroring `cleanroom
+  build`'s existing panel pattern) and is always recorded as
+  `overrode_automated_signal: true` -- never conflated with a genuinely
+  sufficient specification.
+- `SKILL.md`'s phase list gained a real phase 9 (Clean-Room Gate,
+  renumbering Handoff onward to 10-18) and a short "Two teams, not one
+  pipeline" framing (Team A = Zone R analyst agents, Team B = Zone H+I
+  implementation agents) instead of a separate, partly-redundant
+  "mandatory stage" section; the Team A/Team B terms are now defined
+  exactly once, in `references/three-zone-model.md`, and every other
+  document links there rather than redefining them. New
+  `references/clean-room-gate.md` covers the gate's mechanics in full.
+  `docs/quickstart.md`, `docs/concepts.md` and
+  `examples/walkthrough-mit-library/run.sh` (verified to actually run
+  end-to-end) all updated to match; the previous quickstart's `sanitise`
+  -> `handoff` sequence would otherwise now fail at `handoff`.
+- 18 new tests (`tests/unit/test_gate.py` for the pure signal/decision
+  logic, 5 new end-to-end CLI tests in `test_cli_end_to_end.py` for the
+  refusal, the FAIL path, the PASS path, and the override prompt/flag);
+  the two existing end-to-end tests that drove `sanitise` -> `handoff`
+  directly were updated to gate first, reordering `specify
+  add-requirement` before `sanitise` in `test_full_pipeline` to match the
+  documented phase order (7 before 8), which it had previously drifted
+  from harmlessly.
+
 ### Added (twenty-sixth pass — a real pre-build remediation panel)
 
 - `cleanroom build` now re-derives `REMEDIATION_TASKS.json` from

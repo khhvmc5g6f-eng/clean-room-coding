@@ -3,10 +3,16 @@
 Records what any agent instance -- analyst, sanitiser, implementer,
 orchestrator -- is allowed to see and do, so the evidence ledger can prove
 who/what produced any given artefact and under what scope. This registry
-does not spawn or run agents itself (Part LXV: provider-agnostic); it is
-the record-keeping layer any orchestration harness (Claude Code subagents,
-another framework) should write to.
-"""
+itself still does not spawn or run agents (Part LXV: provider-agnostic) --
+it is the record-keeping layer any orchestration harness (Claude Code
+subagents, another framework, or this project's own `orchestration/
+harness.py`) writes to. `harness.py` IS a real, opt-in exception to
+"cleanroom doesn't call an LLM": it makes real, cost-incurring API calls
+via `orchestration/backends.py`'s `AnthropicBackend` to actually answer
+the prompts `legal/panels.py` builds and to actually write implementation
+code -- but only when a caller explicitly runs `cleanroom council`/
+`cleanroom implement`, never implicitly from `recruit`/`build`
+themselves, which remain pure registration."""
 
 from __future__ import annotations
 

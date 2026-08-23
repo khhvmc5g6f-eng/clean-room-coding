@@ -31,6 +31,7 @@ from cleanroom.exit_codes import (
     LicenceFailure,
     PolicyFailure,
 )
+from cleanroom import gate as gate_module
 from cleanroom.handoff import manifest as handoff_manifest
 from cleanroom.jurisdiction import resolver as jurisdiction_resolver
 from cleanroom.legal import engine as legal_engine
@@ -525,6 +526,83 @@ def sanitise(ctx: Ctx, path: Path) -> None:
         ctx.fail(ContaminationFailure(f"{path} contains blocking sanitisation findings; see {report_path}"))
 
 
+# --------------------------------------------------------------------------- gate
+
+@main.command()
+@click.option("--specification-version", required=True)
+@click.option("--decision", type=click.Choice(["pass", "fail"]), required=True)
+@click.option("--reviewer", required=True, help="The human making this call. Never a tool/agent id -- the automated signal below is evidence for them, not itself an actor.")
+@click.option("--notes", required=True)
+@click.option(
+    "--acknowledge-automated-signal/--no-acknowledge-automated-signal", default=None,
+    help="Required (interactively prompted if omitted, in a terminal) to record --decision pass when the automated sufficiency/cleanliness signal reads 'insufficient'.",
+)
+@pass_ctx
+def gate(
+    ctx: Ctx, specification_version: str, decision: str, reviewer: str, notes: str,
+    acknowledge_automated_signal: bool | None,
+) -> None:
+    """Part XCIV: the Clean-Room Gate -- a recorded, evidence-backed PASS/FAIL
+    decision on whether the specification is sufficient for independent
+    implementation and free of restricted material. `cleanroom handoff`
+    refuses to build a manifest for a specification version without a
+    matching PASS recorded here. The automated signal is real, derived
+    evidence (requirement-graph coverage + sanitisation-report cleanliness)
+    -- never itself the decision; the human --decision is authoritative,
+    and overriding an 'insufficient' signal to PASS requires an explicit
+    acknowledgement, recorded as such rather than conflated with a
+    genuinely sufficient specification. See references/clean-room-gate.md."""
+    project = ctx.load_project()
+    graph = RequirementGraph.load(project.root / "requirements.json")
+    signal = gate_module.compute_signal(graph, project.root / "evidence" / "sanitisation-reports")
+
+    overriding = decision == "pass" and signal["automated_signal"] == "insufficient"
+    if overriding:
+        if acknowledge_automated_signal is None and not ctx.json_output:
+            click.echo(f"\nAutomated signal reads INSUFFICIENT for specification version {specification_version}:")
+            click.echo(f"  handoff-eligible requirement nodes: {signal['sufficiency']['handoff_eligible_nodes']}")
+            if signal["blocking_sanitisation_reports"]:
+                click.echo(f"  blocking sanitisation reports: {', '.join(signal['blocking_sanitisation_reports'])}")
+            try:
+                acknowledge_automated_signal = click.confirm(
+                    "\nRecord a PASS decision anyway? This is saved as an explicit override, not a clean pass.",
+                    default=False,
+                )
+            except click.Abort:
+                acknowledge_automated_signal = False
+        if not acknowledge_automated_signal:
+            raise click.ClickException(
+                "Automated signal is insufficient (see above) and --decision is 'pass' -- resolve the gap in "
+                "the specification, pass --decision fail instead, or pass --acknowledge-automated-signal to "
+                "record an explicit human override."
+            )
+
+    decisions_path = project.root / gate_module.DECISIONS_FILENAME
+    decisions = gate_module.load_decisions(decisions_path)
+    record = gate_module.build_decision(
+        project_id=project.config.project_id, specification_version=specification_version,
+        decision=decision, reviewer=reviewer, notes=notes, signal=signal, sequence=len(decisions) + 1,
+    )
+    decisions.append(record)
+    gate_module.save_decisions(decisions_path, decisions)
+
+    project.evidence.append(
+        actor=Actor(type="human", id=reviewer, role="clean-room-gate-reviewer"),
+        action="cleanroom gate",
+        result="success" if decision == "pass" else "denied",
+        detail=(
+            f"specification_version={specification_version} decision={decision} "
+            f"automated_signal={signal['automated_signal']} overrode={record['overrode_automated_signal']}"
+        ),
+    )
+    ctx.emit({**record, "saved_to": str(decisions_path)})
+    if decision == "fail":
+        ctx.fail(PolicyFailure(
+            f"Clean-Room Gate FAIL recorded for specification version {specification_version} ({decisions_path}) -- "
+            "return the findings to Team A and re-run analyse/specify/sanitise before gating this version again."
+        ))
+
+
 # --------------------------------------------------------------------------- handoff
 
 @main.command()
@@ -533,8 +611,26 @@ def sanitise(ctx: Ctx, path: Path) -> None:
 @click.option("--signer", default=None)
 @pass_ctx
 def handoff(ctx: Ctx, specification_version: str, all_c0: bool, signer: str | None) -> None:
-    """Parts XXIV-XXV: build the immutable, hashed HANDOFF_MANIFEST.json."""
+    """Parts XXIV-XXV, XCIV: build the immutable, hashed HANDOFF_MANIFEST.json
+    -- refuses to run without a PASS Clean-Room Gate decision already
+    recorded for this exact specification version (see 'cleanroom gate')."""
     project = ctx.load_project()
+    decisions = gate_module.load_decisions(project.root / gate_module.DECISIONS_FILENAME)
+    latest = gate_module.latest_decision(decisions, specification_version)
+    if latest is None or latest["decision"] != "pass":
+        state = "no Clean-Room Gate decision recorded" if latest is None else f"latest Clean-Room Gate decision is '{latest['decision']}'"
+        project.evidence.append(
+            actor=Actor(type="tool", id="cleanroom-cli"),
+            action="cleanroom handoff",
+            zone="H",
+            result="denied",
+            detail=f"specification_version={specification_version}: {state}",
+        )
+        ctx.fail(PolicyFailure(
+            f"Refusing to build a handoff manifest for specification version {specification_version}: {state}. "
+            f"Run 'cleanroom gate --specification-version {specification_version} --decision pass ...' first."
+        ))
+        return
     if not all_c0:
         raise click.ClickException("Pass --all-c0 once every file in Zone H has been sanitised and classified C0, or classify files individually via the Python API.")
     file_contamination = {
@@ -756,6 +852,58 @@ def build(
         **record.to_dict(),
         "open_remediation_concerns": {"blocking": len(open_blocking), "review_required": len(open_review_required)},
     })
+
+
+# --------------------------------------------------------------------------- implement
+
+@main.command()
+@click.option("--backend", type=click.Choice(["anthropic"]), default="anthropic", help="Which real LLM backend actually writes the implementation.")
+@click.option("--model-id", default=None, help="Overrides the backend's default model.")
+@pass_ctx
+def implement(ctx: Ctx, backend: str, model_id: str | None) -> None:
+    """Real Part XXVI: the actual "hand it over to the team to do the
+    build out" step. Requires the global --agent-id (an implementation
+    agent already registered via `cleanroom build`, so it has already
+    been through that command's remediation panel) and, for the
+    'anthropic' backend, a real ANTHROPIC_API_KEY in the environment.
+    Sends the registered agent Zone H's real sanitised documents and the
+    requirement graph's real handoff-eligible statements -- NEVER
+    anything from Zone R -- and writes whatever files a real model
+    returns into Zone I. Source-blind by construction: the model is
+    given nothing from the reference zone to have read in the first
+    place, not merely blocked from re-reading it. Real, cost-incurring
+    LLM API calls; never invoked implicitly by any other command."""
+    if ctx.agent_id is None:
+        raise click.ClickException("The global --agent-id is required (register an implementation agent first with 'cleanroom build').")
+    project = ctx.load_project()
+    registry = AgentRegistry(project.root / "evidence")
+    record = next((a for a in registry.all() if a.agent_id == ctx.agent_id), None)
+    if record is None:
+        raise click.ClickException(f"No agent registered with id '{ctx.agent_id}' (register one with 'cleanroom build').")
+    if "I" not in record.permitted_zones:
+        raise click.ClickException(f"Agent '{ctx.agent_id}' (role={record.role}) is not Zone-I-scoped -- register an implementation agent with 'cleanroom build' first.")
+
+    if backend == "anthropic":
+        from cleanroom.orchestration.backends import AnthropicBackend
+        try:
+            agent_backend = AnthropicBackend(model=model_id) if model_id else AnthropicBackend()
+        except RuntimeError as e:
+            raise click.ClickException(str(e)) from e
+    else:  # pragma: no cover -- click.Choice already restricts this
+        raise click.ClickException(f"Unknown backend '{backend}'.")
+
+    from cleanroom.orchestration.harness import HarnessError, run_implementation
+    try:
+        result = run_implementation(project, agent_backend, agent_id=ctx.agent_id)
+    except (HarnessError, RuntimeError) as e:
+        raise click.ClickException(str(e)) from e
+
+    project.evidence.append(
+        actor=Actor(type="agent", id=ctx.agent_id, role=record.role, model_provider=record.model_provider, model_id=model_id or record.model_id),
+        action="cleanroom implement", zone="I", result="success",
+        detail=f"files_written={result['files_written']}",
+    )
+    ctx.emit(result)
 
 
 # --------------------------------------------------------------------------- recruit
@@ -1133,6 +1281,65 @@ def judge(ctx: Ctx) -> None:
     ctx.emit({"prompts_written_for": written, "directory": str(out_dir)})
 
 
+# --------------------------------------------------------------------------- council
+
+@main.command()
+@click.option("--backend", type=click.Choice(["anthropic"]), default="anthropic", help="Which real LLM backend answers the Council's prompts.")
+@click.option("--model-provider", default="anthropic", help="Recorded on each panel_adjudication -- feeds providers.panel_diversity_required.")
+@click.option("--model-id", default=None, help="Overrides the backend's default model.")
+@pass_ctx
+def council(ctx: Ctx, backend: str, model_provider: str | None, model_id: str | None) -> None:
+    """Real Parts XLV-LI: the first actual implementation of "whatever LLM
+    orchestration the caller uses" that `cleanroom judge`'s own docstring
+    has always deferred to. Requires the global --agent-id (a Council
+    member registered via `cleanroom recruit`) and, for the 'anthropic'
+    backend, a real ANTHROPIC_API_KEY in the environment. Builds the same
+    applicant/challenger/judicial-review prompts `cleanroom judge`
+    writes to disk for a human, sends each to a REAL model, and merges
+    the parsed judicial review back into evidence/legal-findings.json --
+    the same merge `cleanroom judge-adjudicate` performs from a
+    hand-completed answer file. Real, cost-incurring LLM API calls; never
+    invoked implicitly by any other command.
+
+    *** SIMULATED ROLES, NOT REAL LAWYERS OR JUDGES *** -- see
+    legal/panels.py. This does not change what these findings mean or
+    how much weight they carry, only who answered the prompts."""
+    if ctx.agent_id is None:
+        raise click.ClickException("The global --agent-id is required (register a Council member first with 'cleanroom recruit').")
+    project = ctx.load_project()
+    registry = AgentRegistry(project.root / "evidence")
+    record = next((a for a in registry.all() if a.agent_id == ctx.agent_id), None)
+    if record is None:
+        raise click.ClickException(f"No agent registered with id '{ctx.agent_id}' (register one with 'cleanroom recruit').")
+
+    if backend == "anthropic":
+        from cleanroom.orchestration.backends import AnthropicBackend
+        try:
+            agent_backend = AnthropicBackend(model=model_id) if model_id else AnthropicBackend()
+        except RuntimeError as e:
+            raise click.ClickException(str(e)) from e
+    else:  # pragma: no cover -- click.Choice already restricts this
+        raise click.ClickException(f"Unknown backend '{backend}'.")
+
+    from cleanroom.orchestration.harness import HarnessError, run_council_review
+    try:
+        result = run_council_review(
+            project, agent_backend, panel_member_id=ctx.agent_id, model_provider=model_provider, model_id=model_id,
+        )
+    except (HarnessError, RuntimeError) as e:
+        raise click.ClickException(str(e)) from e
+
+    failed_packs = [pack_id for pack_id, r in result["packs"].items() if "error" in r]
+    project.evidence.append(
+        actor=Actor(type="agent", id=ctx.agent_id, role=record.role, model_provider=model_provider, model_id=model_id),
+        action="cleanroom council", result="denied" if failed_packs else "success",
+        detail=f"packs={list(result['packs'].keys())} failed={failed_packs}",
+    )
+    ctx.emit(result)
+    if failed_packs:
+        ctx.fail(PolicyFailure(f"The model's response could not be parsed/merged for pack(s): {failed_packs} -- see the emitted output for the raw response."))
+
+
 # --------------------------------------------------------------------------- judge-adjudicate
 
 @main.command(name="judge-adjudicate")
@@ -1163,69 +1370,21 @@ def judge_adjudicate(ctx: Ctx, pack_id: str, answer_file: Path, panel_member_id:
     findings = jsonlib.loads(findings_path.read_text(encoding="utf-8"))
     answers = jsonlib.loads(answer_file.read_text(encoding="utf-8"))
 
-    markets_for_pack = {
-        market for market, mapped_pack_id in jurisdiction_resolver.COUNTRY_TO_PACK.items() if mapped_pack_id == pack_id
-    }
-    if not markets_for_pack:
-        raise click.ClickException(f"'{pack_id}' is not a known jurisdiction pack id (see jurisdiction/resolver.py's COUNTRY_TO_PACK).")
-
-    now = utc_now_iso()
-    updated_issues: list[str] = []
-    for answer in answers:
-        matched = False
-        for finding in findings:
-            if finding["issue"] != answer["issue"] or (finding.get("jurisdiction") or "").lower() not in markets_for_pack:
-                continue
-            matched = True
-            entry = {
-                "panel_member_id": panel_member_id,
-                "decision_state": answer["decision_state"],
-                "reviewer": f"simulated-{pack_id}-judicial-panel",
-                "submitted_utc": now,
-            }
-            for key in ("for_release_argument", "against_release_argument", "adjudication"):
-                if answer.get(key):
-                    entry[key] = answer[key]
-            if model_provider:
-                entry["model_provider"] = model_provider
-            if model_id:
-                entry["model_id"] = model_id
-            finding.setdefault("panel_adjudications", [])
-            finding["panel_adjudications"] = [
-                a for a in finding["panel_adjudications"] if a.get("panel_member_id") != panel_member_id
-            ] + [entry]
-
-            worst_state = legal_panels.aggregate_panel_decision(finding["panel_adjudications"])
-            worst_entry = max(
-                finding["panel_adjudications"],
-                key=lambda a: legal_panels.DECISION_RANK.get(a["decision_state"], 2),
-            )
-            finding["decision_state"] = worst_state
-            finding["reviewer"] = worst_entry["reviewer"]
-            for key in ("for_release_argument", "against_release_argument", "adjudication"):
-                if worst_entry.get(key):
-                    finding[key] = worst_entry[key]
-            updated_issues.append(answer["issue"])
-        if not matched:
-            raise click.ClickException(
-                f"No legal finding matches issue '{answer['issue']}' for pack '{pack_id}' (checked markets {sorted(markets_for_pack)}) -- run 'cleanroom legal' with this project's actual configured markets first."
-            )
-
-    for finding in findings:
-        errors = schema_registry.validate(finding, "legal-finding.schema.json")
-        if errors:
-            raise click.ClickException(f"Refusing to save: adjudicated finding fails schema validation: {errors}")
+    try:
+        updated_issues = legal_panels.merge_panel_answers(
+            findings, pack_id, panel_member_id, answers, model_provider=model_provider, model_id=model_id,
+        )
+    except ValueError as e:
+        raise click.ClickException(str(e)) from e
 
     findings_path.write_text(jsonlib.dumps(findings, indent=2, sort_keys=True), encoding="utf-8")
 
     providers_config = project.config.data.get("providers", {})
-    panel_size_required = providers_config.get("panel_size", 1)
-    diversity_required = providers_config.get("panel_diversity_required", False)
-    member_ids = {a["panel_member_id"] for f in findings for a in f.get("panel_adjudications", []) if f["issue"] in updated_issues}
-    providers_seen = {
-        a.get("model_provider") for f in findings for a in f.get("panel_adjudications", []) if f["issue"] in updated_issues
-    } - {None}
-    diversity_satisfied = (not diversity_required) or len(providers_seen) > 1
+    completeness = legal_panels.panel_completeness_for_call(
+        findings, updated_issues,
+        panel_size_required=providers_config.get("panel_size", 1),
+        diversity_required=providers_config.get("panel_diversity_required", False),
+    )
 
     project.evidence.append(
         actor=Actor(type="human", id=panel_member_id, role="judicial-panel-member", model_provider=model_provider, model_id=model_id),
@@ -1234,12 +1393,7 @@ def judge_adjudicate(ctx: Ctx, pack_id: str, answer_file: Path, panel_member_id:
     )
     ctx.emit({
         "pack_id": pack_id, "panel_member_id": panel_member_id, "issues_updated": updated_issues,
-        "panel_completeness": {
-            "panel_size_required": panel_size_required, "panel_members_recorded": len(member_ids),
-            "panel_size_satisfied": len(member_ids) >= panel_size_required,
-            "diversity_required": diversity_required, "distinct_providers_recorded": sorted(p for p in providers_seen if p),
-            "diversity_satisfied": diversity_satisfied,
-        },
+        "panel_completeness": completeness,
     })
 
 
