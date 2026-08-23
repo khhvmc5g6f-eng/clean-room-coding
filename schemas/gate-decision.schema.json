@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroom.dev/schemas/gate-decision.schema.json",
+  "title": "Clean-Room Gate Decision",
+  "description": "A recorded PASS/FAIL decision on whether a specification version is sufficient for independent implementation and free of restricted material, checked before it may cross Zone R -> Zone H via 'cleanroom handoff'. See SKILL.md's 'Mandatory stage: Team A / Team B implementation handover' and references/clean-room-gate.md.",
+  "type": "object",
+  "required": [
+    "id", "project_id", "specification_version", "decision", "reviewer", "notes",
+    "reviewed_utc", "automated_signal", "overrode_automated_signal", "sufficiency",
+    "blocking_sanitisation_reports"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^CR-GATE-[0-9]{6}$" },
+    "project_id": { "type": "string" },
+    "specification_version": { "type": "string" },
+    "decision": { "type": "string", "enum": ["pass", "fail"] },
+    "reviewer": { "type": "string", "description": "The human who made this call -- never a tool or agent id; the automated_signal below is evidence for the reviewer, not itself an actor." },
+    "notes": { "type": "string" },
+    "reviewed_utc": { "type": "string", "format": "date-time" },
+    "automated_signal": {
+      "type": "string",
+      "enum": ["sufficient", "insufficient"],
+      "description": "Deterministic: 'sufficient' iff at least one observable_requirement node is handoff-eligible AND no on-file sanitisation report for a candidate Zone H document is blocked. A low bar, not a claim of spec quality -- see 'sufficiency' for the actual counts."
+    },
+    "overrode_automated_signal": {
+      "type": "boolean",
+      "description": "True only when decision=pass was recorded despite automated_signal=insufficient -- a deliberate human override, never silently conflated with a genuinely sufficient specification."
+    },
+    "sufficiency": {
+      "type": "object",
+      "required": ["handoff_eligible_nodes", "total_requirement_nodes", "source_implementation_details_excluded"],
+      "additionalProperties": false,
+      "properties": {
+        "handoff_eligible_nodes": { "type": "integer", "minimum": 0 },
+        "total_requirement_nodes": { "type": "integer", "minimum": 0 },
+        "source_implementation_details_excluded": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "blocking_sanitisation_reports": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Filenames under evidence/sanitisation-reports/ that were blocked at the time of this decision."
+    }
+  }
+}

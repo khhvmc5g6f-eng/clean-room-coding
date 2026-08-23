@@ -59,15 +59,20 @@ cleanroom specify add-behavioral --given "a list of entries" \
   --requirement CR-REQ-000001
 ```
 
-**5. Write the handoff specification into `zone-h/`**, sanitise it, then build
-the manifest:
+**5. Write the handoff specification into `zone-h/`**, sanitise it, pass it
+through the Clean-Room Gate, then build the manifest:
 
 ```bash
 echo "GIVEN a list of entries / WHEN sorted ascending / THEN alphabetical order" \
   > zone-h/sort-behaviour.md
 cleanroom sanitise zone-h/sort-behaviour.md
+cleanroom gate --specification-version v1 --decision pass \
+  --reviewer "Your Name" --notes "Sufficient for independent implementation."
 cleanroom handoff --specification-version v1 --all-c0
 ```
+
+`handoff` refuses (exit 3) without a matching PASS already recorded for
+`v1` -- see [docs/concepts.md](concepts.md#the-clean-room-gate).
 
 **6. Implement** in `zone-i/` (a fresh agent/contributor, Zone H access
 only), registering the agent and recording architecture decisions:

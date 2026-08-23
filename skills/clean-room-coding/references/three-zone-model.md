@@ -12,6 +12,24 @@
   design assets, build environment. Implementation agents must have **no
   read path** to Zone R.
 
+## Team A / Team B
+
+When the reference material is proprietary, closed-source or otherwise
+restricted, this project's own documentation (SKILL.md, quickstart,
+examples) also calls these two roles **Team A** and **Team B** -- the
+common name for this split in clean-room literature and in this
+project's own mandatory handover stage. They are exactly the two roles
+above, not a third vocabulary layered on top:
+
+- **Team A** = Zone R analyst agents, registered via `cleanroom recruit`.
+- **Team B** = Zone H + Zone I implementation agents, registered via
+  `cleanroom build`.
+
+This is the one place "Team A"/"Team B" is defined; every other document
+in this project should link here rather than redefining the terms.
+`references/clean-room-gate.md` covers the recorded PASS/FAIL checkpoint
+between the two.
+
 ## Technical isolation
 
 `src/cleanroom/zones.py`'s `PathGuard` is the actual enforcement

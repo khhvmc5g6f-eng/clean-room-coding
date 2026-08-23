@@ -7,7 +7,7 @@ From `src/cleanroom/exit_codes.py`:
 | 0 | PASS | Success. |
 | 1 | GENERAL_FAILURE | Unclassified error. |
 | 2 | CONFIGURATION_ERROR | Missing/invalid `.cleanroom.yml`. |
-| 3 | POLICY_FAILURE | Release policy gate failed (not a RED jurisdiction specifically -- see 8). |
+| 3 | POLICY_FAILURE | Release policy gate failed (not a RED jurisdiction specifically -- see 8); also `cleanroom gate --decision fail`, and `cleanroom handoff` refusing because no PASS Clean-Room Gate decision is on record for that specification version -- see `clean-room-gate.md`. |
 | 4 | CONTAMINATION_FAILURE | Non-C0 material in Zone H, or the isolation self-test failed. |
 | 5 | LICENCE_FAILURE | A licence finding is `denied` or unresolved-and-blocking. |
 | 6 | TEST_FAILURE | Behavioural/pytest/`compare` failure. |

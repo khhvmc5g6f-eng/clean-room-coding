@@ -53,7 +53,7 @@ cleanroom specify add-behavioral --given "a list of entries" \
   --then "entries are returned alphabetically ascending" \
   --requirement CR-REQ-000001
 
-echo "== sanitise + handoff =="
+echo "== sanitise + gate + handoff =="
 cat > zone-h/sort-behaviour.md <<'EOF'
 # Feature: sort entries
 
@@ -62,6 +62,8 @@ WHEN the user requests ascending order by name
 THEN entries are returned sorted alphabetically ascending
 EOF
 cleanroom sanitise zone-h/sort-behaviour.md
+cleanroom gate --specification-version v1 --decision pass \
+  --reviewer "Example Reviewer" --notes "Sufficient for independent implementation."
 cleanroom handoff --specification-version v1 --all-c0
 
 echo "== build (register a fresh, source-blind implementation agent) =="

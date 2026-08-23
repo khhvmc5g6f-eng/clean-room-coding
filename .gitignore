@@ -14,7 +14,12 @@ htmlcov/
 
 # Project-instance working state — never commit a real project's evidence
 # ledger, reference material, or contamination-classified artefacts.
+# Default zone dir names (src/cleanroom/config.py) have no leading dot —
+# keep the dotted variants too in case a project's .cleanroom.yml renames them.
 projects/*/evidence/
+projects/*/zone-r/
+projects/*/zone-h/
+projects/*/zone-i/
 projects/*/.zone-r/
 projects/*/.zone-h/
 projects/*/.zone-i/

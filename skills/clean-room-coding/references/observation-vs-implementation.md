@@ -23,3 +23,12 @@ internal method name and code structure" (not fine).
 When genuinely unsure which category a finding belongs in, default to
 `source_implementation_detail` (excluded) and flag it for human review
 rather than guessing it's safe to hand off.
+
+This split applies every time an analyst compares the reference against
+anything else, not only on the first read of Zone R -- including the
+validation loop's behavioural comparison of Team B's build against the
+reference (`cleanroom compare`/`test`, SKILL.md phase 12). A discrepancy
+found there ("the built version returns entries in a different order
+than the reference for tied names") must still be written up as an
+`observable_requirement`, never as a description of how the reference's
+own comparator achieves it.

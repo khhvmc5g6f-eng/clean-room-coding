@@ -53,6 +53,14 @@ on aggregation). Worst-finding-wins; a `RED` in a required market blocks
 release regardless of other markets (no averaging). See
 [docs/legal-disclaimer.md](legal-disclaimer.md).
 
+## The Clean-Room Gate
+
+A recorded PASS/FAIL decision, checked against real evidence (requirement-
+graph coverage + sanitisation cleanliness), required before a
+specification version may cross into the Handoff zone -- `cleanroom
+handoff` mechanically refuses without a matching PASS. See
+[skills/clean-room-coding/references/clean-room-gate.md](../skills/clean-room-coding/references/clean-room-gate.md).
+
 ## Evidence ledger
 
 An append-only, hash-chained JSON-Lines log
