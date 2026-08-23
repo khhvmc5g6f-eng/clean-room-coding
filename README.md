@@ -35,11 +35,13 @@ independent code review and security audit (see
 what was found and fixed), then substantially extended (13 licence packs,
 opt-in `--agent-id` PathGuard enforcement, real SBOM checksums and
 Cargo/composer support, in-toto signing, judicial-panel provider
-diversity with a real opt-in release gate, and a Reference-side agent
-registration path -- see [CHANGELOG.md](CHANGELOG.md) for the full,
-dated history of every pass). ROADMAP.md is the source of truth for
-what's fully implemented, what is a documented limitation, and what is
-not yet built. Currently ships:
+diversity with a real opt-in release gate, a Reference-side agent
+registration path, a mechanically-enforced Clean-Room Gate between
+Sanitise and Handoff, and a real, opt-in orchestration harness with
+distinct default models on each side of the clean line -- see
+[CHANGELOG.md](CHANGELOG.md) for the full, dated history of every pass).
+ROADMAP.md is the source of truth for what's fully implemented, what is
+a documented limitation, and what is not yet built. Currently ships:
 
 - A full three-zone (Reference / Handoff / Implementation) project model
   with an allow-list-capable `PathGuard` and an append-only, hash-chained
@@ -65,9 +67,18 @@ not yet built. Currently ships:
   for JS/TS/Go/Rust/Java/Ruby/C/C++ + negative-control background
   comparison) now wired to a real `cleanroom similarity` command.
 - SBOM generation (SPDX + CycloneDX), and a heuristic legal-issue engine
-  with adversarial-counsel and judicial-review **prompt generation** (the
-  reasoning itself is performed by whatever LLM harness you run it through
-  — this library never calls one on its own).
+  with adversarial-counsel and judicial-review **prompt generation**
+  (`cleanroom judge`) that any external LLM harness can answer by hand
+  via `cleanroom judge-adjudicate` — or that this library's own real,
+  opt-in orchestration harness can answer directly (see below).
+- A **mechanically-enforced handover checkpoint** (`cleanroom gate`,
+  Part XCIV): a recorded PASS/FAIL decision, backed by a real
+  deterministic sufficiency/cleanliness signal, required before a
+  specification version may cross into the Handoff zone — `cleanroom
+  handoff` refuses outright without a matching PASS on record for that
+  exact version. The human decision is always authoritative; overriding
+  an `insufficient` signal to PASS requires an explicit acknowledgment
+  and is recorded as such, never conflated with a genuinely clean pass.
 - A **remediation feedback loop** (`cleanroom remediate`): a RED legal
   finding or a suspicious/material similarity finding is automatically
   routed back to the implementation team as a blocked requirement, and
@@ -84,24 +95,35 @@ not yet built. Currently ships:
   JSON/Markdown) covering what the project started with, what it did,
   functional coverage, remediation status, and the jurisdiction-by-
   jurisdiction decision.
-- A 33-command CLI (`cleanroom ...`) with `--json` output, an actually-wired
+- A 32-command CLI (`cleanroom ...`) with `--json` output, an actually-wired
   `--config` override, and documented exit codes for CI/CD.
 - A real, opt-in **orchestration harness** (`cleanroom council` /
   `cleanroom implement`, `pip install cleanroom[orchestrate]`): the first
   actual implementation of "whatever LLM orchestration the caller uses"
   that `legal/panels.py`'s adversarial-review prompts have always
-  deferred to. A Reference-side Council (registered via `cleanroom
-  recruit`) sends the same applicant/challenger/judicial-review prompts
-  `cleanroom judge` writes to disk for a human to a real LLM backend and
-  merges the result back exactly as `judge-adjudicate` would; a
-  registered `cleanroom build` agent then hands off to `cleanroom
-  implement`, which sends it Zone H's real sanitised documents (never
-  Zone R) and writes whatever files the model returns into Zone I, with
-  every path checked to stay inside it. Real, cost-incurring LLM API
-  calls -- never invoked implicitly. See ROADMAP.md for exactly what's
-  verified (all the harness's own logic, via a `FakeBackend` test
-  double) versus what a live `ANTHROPIC_API_KEY` run of your own would be
-  the first real end-to-end proof of.
+  deferred to. A Reference-side Council member (registered via
+  `cleanroom recruit`) sends the same applicant/challenger/judicial-
+  review prompts `cleanroom judge` writes to disk for a human to a real
+  LLM backend and merges the result back exactly as `judge-adjudicate`
+  would; a registered `cleanroom build` agent then hands off to
+  `cleanroom implement`, which sends it Zone H's real sanitised
+  documents (never Zone R) and writes whatever files the model returns
+  into Zone I, with every path checked to stay inside it. **Each side of
+  the clean line gets a real, deliberately different default model, not
+  one generic choice reused everywhere:** the Council defaults to
+  `claude-opus-5` (the adversarial, multi-jurisdiction legal reasoning it
+  performs is the task most worth the strongest available reasoning
+  budget), and the implementation team defaults to `claude-sonnet-5`
+  (fast and cost-effective for writing code from an already-frozen,
+  already-reviewed specification) — either is overridable per call with
+  `--model-id`, and the evidence ledger always records whichever model
+  actually did the work, never a blank field left over from an
+  unspecified default. Real, cost-incurring LLM API calls -- never
+  invoked implicitly. See ROADMAP.md for exactly what's verified (all
+  the harness's own logic, via a `FakeBackend` test double, and the
+  model-provenance recording via a mocked Anthropic client) versus what
+  a live `ANTHROPIC_API_KEY` run of your own would be the first real
+  end-to-end proof of.
 - An Agent Skill at [skills/clean-room-coding/SKILL.md](skills/clean-room-coding/SKILL.md)
   for use from Claude Code.
 

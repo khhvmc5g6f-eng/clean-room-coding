@@ -8,6 +8,74 @@ once it reaches 1.0.
 
 ## [Unreleased]
 
+### Added (twenty-eighth pass — a real orchestration harness, and correct per-role model provenance)
+
+- New `orchestration/backends.py`: a real, pluggable `AgentBackend`
+  interface making Part LXV's "provider-agnostic" a real contract
+  instead of just a docstring. `AnthropicBackend` makes genuine calls to
+  the Anthropic Messages API via the official `anthropic` SDK (a new
+  optional `cleanroom[orchestrate]` extra, imported lazily); `FakeBackend`
+  is a deterministic test double, never presented as a real response.
+- New `orchestration/harness.py`: `run_council_review()` builds the same
+  applicant/challenger/judicial-review prompts `cleanroom judge` writes
+  to disk for a human, sends each to a real backend, and merges the
+  parsed judicial review into `evidence/legal-findings.json` via a new
+  `legal_panels.merge_panel_answers()` -- extracted from `cli.py`'s
+  `judge-adjudicate` command (which now calls the same function, so both
+  paths share one tested implementation). `run_implementation()` sends a
+  registered implementation agent Zone H's real sanitised documents and
+  the requirement graph's real handoff-eligible statements -- NEVER
+  anything from Zone R -- and writes whatever files the model returns
+  into Zone I, with every path resolved and checked to stay inside it (a
+  path-traversal attempt is rejected entirely).
+- New `cleanroom council`/`cleanroom implement` commands (global
+  `--agent-id`, requiring an agent already registered via
+  `recruit`/`build` respectively). Both require the model to respond in
+  a specific JSON contract (a stray ```` ```json ```` fence is stripped
+  automatically; a genuinely unparseable response is recorded as an
+  honest error, never guessed at). Real, cost-incurring LLM API calls;
+  never invoked implicitly by any other command.
+- **Different default models per side of the clean line**:
+  `DEFAULT_COUNCIL_MODEL = "claude-opus-5"` for the adversarial,
+  multi-jurisdiction legal reasoning `council` performs; `DEFAULT_
+  IMPLEMENTATION_MODEL = "claude-sonnet-5"` for writing code from an
+  already-frozen specification. `--model-id` overrides either.
+- Fixed a real provenance bug found while wiring this in: both commands
+  used to record whatever `--model-provider`/`--model-id` happened to be
+  passed (or, for `implement`, whatever `cleanroom build` was separately
+  given) -- meaning the evidence ledger and `panel_adjudications` could
+  read `model_id: null` even though a real, specific model had just done
+  real work, simply because the caller trusted the default instead of
+  re-stating it. `AnthropicBackend` now exposes the actual resolved
+  model as a public `.model` attribute; both commands record that.
+  Verified end-to-end with a mocked Anthropic client through the real
+  CLI path (not just a unit test of the backend in isolation).
+- Also fixed two raw-traceback bugs found by direct reproduction while
+  building this: `click.Abort` on closed stdin (mirroring the earlier
+  `cleanroom build` panel fix) and a bare `TypeError` the Anthropic SDK
+  raises from its own pre-flight "could not resolve authentication
+  method" check when no credentials are configured -- neither is caught
+  by Click's default exception handling in this project's
+  `standalone_mode=False` entry point.
+- **What's actually verified, and what isn't.** Every real piece of the
+  harness's OWN logic -- prompt construction, JSON parsing (including
+  the code-fence-stripping fallback), the merge back through
+  `merge_panel_answers`, the Zone-I path-traversal defence, clean error
+  handling for a missing key or a real `anthropic.AnthropicError`, and
+  now the model-provenance recording -- is covered by tests using
+  `FakeBackend` or by mocking only the network call against the real
+  installed SDK's actual response shape. What is NOT verified in this
+  environment: an actual end-to-end run against the live Anthropic API,
+  because no `ANTHROPIC_API_KEY` was available here.
+- This work was developed in the same working tree as a concurrent
+  session's Clean-Room Gate feature (see below) -- reconciled without
+  data loss; one piece of this pass's own SKILL.md documentation that
+  had been silently overwritten by the concurrent edit was re-applied.
+- 15 new/updated tests across `test_orchestration_backends.py` and
+  `test_orchestration_harness.py`, plus real end-to-end CLI verification
+  for every guard rail (missing `--agent-id`, wrong-zone agent, missing
+  credentials, model provenance).
+
 ### Added (twenty-seventh pass — the Clean-Room Gate, a mechanically-enforced handover checkpoint)
 
 - New `cleanroom gate --specification-version vN --decision pass|fail

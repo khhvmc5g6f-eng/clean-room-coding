@@ -858,7 +858,7 @@ def build(
 
 @main.command()
 @click.option("--backend", type=click.Choice(["anthropic"]), default="anthropic", help="Which real LLM backend actually writes the implementation.")
-@click.option("--model-id", default=None, help="Overrides the backend's default model.")
+@click.option("--model-id", default=None, help="Overrides the implementation team's default model (orchestration/backends.py::DEFAULT_IMPLEMENTATION_MODEL).")
 @pass_ctx
 def implement(ctx: Ctx, backend: str, model_id: str | None) -> None:
     """Real Part XXVI: the actual "hand it over to the team to do the
@@ -884,11 +884,12 @@ def implement(ctx: Ctx, backend: str, model_id: str | None) -> None:
         raise click.ClickException(f"Agent '{ctx.agent_id}' (role={record.role}) is not Zone-I-scoped -- register an implementation agent with 'cleanroom build' first.")
 
     if backend == "anthropic":
-        from cleanroom.orchestration.backends import AnthropicBackend
+        from cleanroom.orchestration.backends import DEFAULT_IMPLEMENTATION_MODEL, AnthropicBackend
         try:
-            agent_backend = AnthropicBackend(model=model_id) if model_id else AnthropicBackend()
+            agent_backend = AnthropicBackend(model=model_id or DEFAULT_IMPLEMENTATION_MODEL)
         except RuntimeError as e:
             raise click.ClickException(str(e)) from e
+        actual_model_provider = "anthropic"
     else:  # pragma: no cover -- click.Choice already restricts this
         raise click.ClickException(f"Unknown backend '{backend}'.")
 
@@ -898,12 +899,17 @@ def implement(ctx: Ctx, backend: str, model_id: str | None) -> None:
     except (HarnessError, RuntimeError) as e:
         raise click.ClickException(str(e)) from e
 
+    # Record the model that ACTUALLY did the work (agent_backend.model,
+    # resolved above from --model-id or the role's real default) --
+    # never `record.model_provider`/`record.model_id`, which reflect
+    # whatever (if anything) `cleanroom build` happened to be given and
+    # can be None even though a real model just wrote real code.
     project.evidence.append(
-        actor=Actor(type="agent", id=ctx.agent_id, role=record.role, model_provider=record.model_provider, model_id=model_id or record.model_id),
+        actor=Actor(type="agent", id=ctx.agent_id, role=record.role, model_provider=actual_model_provider, model_id=agent_backend.model),
         action="cleanroom implement", zone="I", result="success",
         detail=f"files_written={result['files_written']}",
     )
-    ctx.emit(result)
+    ctx.emit({**result, "model_provider": actual_model_provider, "model_id": agent_backend.model})
 
 
 # --------------------------------------------------------------------------- recruit
@@ -1286,7 +1292,7 @@ def judge(ctx: Ctx) -> None:
 @main.command()
 @click.option("--backend", type=click.Choice(["anthropic"]), default="anthropic", help="Which real LLM backend answers the Council's prompts.")
 @click.option("--model-provider", default="anthropic", help="Recorded on each panel_adjudication -- feeds providers.panel_diversity_required.")
-@click.option("--model-id", default=None, help="Overrides the backend's default model.")
+@click.option("--model-id", default=None, help="Overrides the Council's default model (orchestration/backends.py::DEFAULT_COUNCIL_MODEL).")
 @pass_ctx
 def council(ctx: Ctx, backend: str, model_provider: str | None, model_id: str | None) -> None:
     """Real Parts XLV-LI: the first actual implementation of "whatever LLM
@@ -1313,29 +1319,34 @@ def council(ctx: Ctx, backend: str, model_provider: str | None, model_id: str | 
         raise click.ClickException(f"No agent registered with id '{ctx.agent_id}' (register one with 'cleanroom recruit').")
 
     if backend == "anthropic":
-        from cleanroom.orchestration.backends import AnthropicBackend
+        from cleanroom.orchestration.backends import DEFAULT_COUNCIL_MODEL, AnthropicBackend
         try:
-            agent_backend = AnthropicBackend(model=model_id) if model_id else AnthropicBackend()
+            agent_backend = AnthropicBackend(model=model_id or DEFAULT_COUNCIL_MODEL)
         except RuntimeError as e:
             raise click.ClickException(str(e)) from e
     else:  # pragma: no cover -- click.Choice already restricts this
         raise click.ClickException(f"Unknown backend '{backend}'.")
 
+    # Record the model that ACTUALLY answered the prompts
+    # (agent_backend.model, resolved above from --model-id or the
+    # Council's real default) -- never the raw model_id CLI param, which
+    # is None whenever a caller relies on the default despite a real
+    # model having done the work.
     from cleanroom.orchestration.harness import HarnessError, run_council_review
     try:
         result = run_council_review(
-            project, agent_backend, panel_member_id=ctx.agent_id, model_provider=model_provider, model_id=model_id,
+            project, agent_backend, panel_member_id=ctx.agent_id, model_provider=model_provider, model_id=agent_backend.model,
         )
     except (HarnessError, RuntimeError) as e:
         raise click.ClickException(str(e)) from e
 
     failed_packs = [pack_id for pack_id, r in result["packs"].items() if "error" in r]
     project.evidence.append(
-        actor=Actor(type="agent", id=ctx.agent_id, role=record.role, model_provider=model_provider, model_id=model_id),
+        actor=Actor(type="agent", id=ctx.agent_id, role=record.role, model_provider=model_provider, model_id=agent_backend.model),
         action="cleanroom council", result="denied" if failed_packs else "success",
         detail=f"packs={list(result['packs'].keys())} failed={failed_packs}",
     )
-    ctx.emit(result)
+    ctx.emit({**result, "model_provider": model_provider, "model_id": agent_backend.model})
     if failed_packs:
         ctx.fail(PolicyFailure(f"The model's response could not be parsed/merged for pack(s): {failed_packs} -- see the emitted output for the raw response."))
 

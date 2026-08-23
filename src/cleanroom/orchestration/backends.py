@@ -10,6 +10,19 @@ from __future__ import annotations
 
 from typing import Protocol
 
+# Real, differentiated defaults per Council/AUTISTIC "side of the clean
+# line" role, not one generic model reused everywhere: the Council's
+# adversarial, multi-jurisdiction legal reasoning (three sequential
+# prompts per pack, each building on the last) is the task most worth
+# spending the strongest available reasoning budget on; the
+# implementation team's task -- writing code from an already-frozen,
+# already-reviewed specification -- is exactly the kind of well-scoped
+# generation a fast, cost-effective model handles well. Both are only
+# ever the DEFAULT `--model-id` isn't overridden; either role can use
+# either model.
+DEFAULT_COUNCIL_MODEL = "claude-opus-5"
+DEFAULT_IMPLEMENTATION_MODEL = "claude-sonnet-5"
+
 
 class AgentBackend(Protocol):
     """One LLM completion call: a system prompt and a user prompt in, a
@@ -30,7 +43,7 @@ class AnthropicBackend:
     from the environment exactly as the SDK's own client does by default;
     this class never accepts, stores, or logs a raw key string itself."""
 
-    def __init__(self, *, model: str = "claude-sonnet-5", max_tokens: int = 8192) -> None:
+    def __init__(self, *, model: str = DEFAULT_IMPLEMENTATION_MODEL, max_tokens: int = 8192) -> None:
         try:
             import anthropic
         except ImportError as e:
@@ -40,7 +53,12 @@ class AnthropicBackend:
                 "the ANTHROPIC_API_KEY environment variable."
             ) from e
         self._client = anthropic.Anthropic()
-        self._model = model
+        # Public and real: callers (cli.py) read this back to record the
+        # ACTUAL model used in the evidence ledger/panel_adjudications --
+        # never leaving that field None just because the caller didn't
+        # pass an explicit --model-id, when a real, specific model was in
+        # fact used.
+        self.model = model
         self._max_tokens = max_tokens
 
     def complete(self, *, system: str, prompt: str) -> str:
@@ -48,7 +66,7 @@ class AnthropicBackend:
 
         try:
             response = self._client.messages.create(
-                model=self._model,
+                model=self.model,
                 max_tokens=self._max_tokens,
                 system=system,
                 messages=[{"role": "user", "content": prompt}],

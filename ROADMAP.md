@@ -157,6 +157,28 @@ original review/audit/research pass this roadmap was first extended from.
     but a genuinely unparseable response is recorded as an honest error
     per jurisdiction pack (`council`) or aborts cleanly (`implement`),
     never silently guessed at.
+  - **Different default models for each side of the clean line, not one
+    generic model reused everywhere.** `orchestration/backends.py` sets
+    `DEFAULT_COUNCIL_MODEL = "claude-opus-5"` (the adversarial,
+    multi-jurisdiction, three-prompts-per-pack legal reasoning `council`
+    performs is the task most worth the strongest available reasoning
+    budget) and `DEFAULT_IMPLEMENTATION_MODEL = "claude-sonnet-5"` (a
+    fast, cost-effective choice well suited to writing code from an
+    already-frozen, already-reviewed specification). Either role can
+    still use either model via `--model-id`. This also fixed a real
+    provenance bug found while wiring it in: both commands used to
+    record whatever `--model-provider`/`--model-id` a caller happened to
+    pass (or, for `implement`, whatever `cleanroom build` was separately
+    given) -- meaning the evidence ledger and `panel_adjudications` could
+    read `model_id: null` even though a real, specific model had just
+    done real work, simply because the caller trusted the default
+    instead of re-stating it. `AnthropicBackend` now exposes the actual
+    resolved model as a public `.model` attribute, and both commands
+    record that instead of the raw (possibly-`None`) CLI argument --
+    verified end-to-end with a mocked Anthropic client through the real
+    CLI path, confirming the evidence ledger, `ctx.emit()`'s output, and
+    (for `council`) `panel_adjudications` all agree on the real model
+    used.
   - **What's actually verified, and what isn't.** Every real piece of
     this harness's OWN logic -- prompt construction from real project
     state, the JSON parsing contract (including the code-fence-stripping

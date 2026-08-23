@@ -245,3 +245,95 @@ def test_cli_implement_with_no_credentials_fails_cleanly_not_with_a_traceback(tm
     assert result.exit_code != 0
     assert "Traceback" not in result.output
     assert "ANTHROPIC_API_KEY" in result.output
+
+
+def _mock_anthropic_text_response(text: str):
+    from unittest.mock import MagicMock
+
+    block = MagicMock()
+    block.type = "text"
+    block.text = text
+    message = MagicMock()
+    message.content = [block]
+    client = MagicMock()
+    client.messages.create.return_value = message
+    return client
+
+
+def test_cli_implement_records_the_real_default_model_when_model_id_is_omitted(tmp_path: Path):
+    """Regression: implement's evidence entry used to record whatever
+    (if anything) `cleanroom build` happened to be given for
+    --model-provider/--model-id -- None whenever the user didn't ALSO
+    pass matching flags there, even though a real, specific model
+    (DEFAULT_IMPLEMENTATION_MODEL) had just actually written the code.
+    The evidence ledger must reflect the model that really did the work,
+    not a field nobody happened to fill in."""
+    from unittest.mock import patch
+
+    from cleanroom.orchestration.backends import DEFAULT_IMPLEMENTATION_MODEL
+
+    project_dir = tmp_path / "proj"
+    runner = CliRunner()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    _run(runner, [
+        "--project", str(project_dir), "specify", "add-requirement",
+        "--id", "CR-REQ-000001", "--kind", "requirement", "--statement", "sorts ascending", "--classification", "observable_requirement",
+    ])
+    # Deliberately no --model-provider/--model-id here -- the exact
+    # under-specified case that used to lose provenance.
+    build_result = _run(runner, ["--project", str(project_dir), "--json", "build", "--role", "Backend Team"])
+    agent_id = json.loads(build_result.output)["agent_id"]
+    assert json.loads(build_result.output)["model_provider"] is None  # confirms the setup: build really was given nothing
+
+    mock_client = _mock_anthropic_text_response(json.dumps([{"path": "sort.py", "content": "def f(x): return sorted(x)\n"}]))
+    with patch("anthropic.Anthropic", return_value=mock_client):
+        result = _run(runner, ["--project", str(project_dir), "--json", "--agent-id", agent_id, "implement"])
+
+    payload = json.loads(result.output)
+    assert payload["model_provider"] == "anthropic"
+    assert payload["model_id"] == DEFAULT_IMPLEMENTATION_MODEL
+    mock_client.messages.create.assert_called_once()
+    assert mock_client.messages.create.call_args.kwargs["model"] == DEFAULT_IMPLEMENTATION_MODEL
+
+    last_event = json.loads((project_dir / "evidence" / "ledger.jsonl").read_text(encoding="utf-8").splitlines()[-1])
+    assert last_event["actor"]["model_provider"] == "anthropic"
+    assert last_event["actor"]["model_id"] == DEFAULT_IMPLEMENTATION_MODEL
+
+
+def test_cli_council_records_the_real_default_model_when_model_id_is_omitted(tmp_path: Path):
+    """Same regression, for council -- the Council's default is
+    DEFAULT_COUNCIL_MODEL specifically (a genuinely different, real
+    default from the implementation team's), and that specific default
+    must be what's actually recorded, not the None a caller who trusted
+    the default would otherwise leave behind."""
+    from unittest.mock import patch
+
+    from cleanroom.orchestration.backends import DEFAULT_COUNCIL_MODEL
+
+    project_dir = tmp_path / "proj"
+    runner = CliRunner()
+    _run(runner, ["--project", str(project_dir), "init", "--name", "Demo", "--id", "demo", "--target-language", "python"])
+    (project_dir / "zone-r" / "lib").mkdir(parents=True)
+    (project_dir / "zone-r" / "lib" / "LICENSE").write_text("MIT License\n", encoding="utf-8")
+    runner.invoke(main, ["--project", str(project_dir), "--json", "licence", str(project_dir / "zone-r")])
+    _run(runner, ["--project", str(project_dir), "intake", "--source", "lib", "--access-authority", "public"])
+    _run(runner, ["--project", str(project_dir), "jurisdiction"])
+    _run(runner, ["--project", str(project_dir), "--json", "legal", "--access-authority", "public"])
+    recruit_result = _run(runner, ["--project", str(project_dir), "--json", "recruit", "--role", "Analyst"])
+    agent_id = json.loads(recruit_result.output)["agent_id"]
+
+    matrix = json.loads((project_dir / "JURISDICTION_MATRIX.json").read_text(encoding="utf-8"))
+    num_calls = len(matrix["legal_panels_convened"]) * 3
+    mock_client = _mock_anthropic_text_response(json.dumps([{"issue": "lawful_access", "decision_state": "GREEN_WITH_CONDITIONS", "adjudication": "fine"}]))
+
+    with patch("anthropic.Anthropic", return_value=mock_client):
+        result = _run(runner, ["--project", str(project_dir), "--json", "--agent-id", agent_id, "council"])
+
+    payload = json.loads(result.output)
+    assert payload["model_id"] == DEFAULT_COUNCIL_MODEL
+    assert mock_client.messages.create.call_count == num_calls
+    assert mock_client.messages.create.call_args.kwargs["model"] == DEFAULT_COUNCIL_MODEL
+
+    findings = json.loads((project_dir / "evidence" / "legal-findings.json").read_text(encoding="utf-8"))
+    gb_finding = next(f for f in findings if f["issue"] == "lawful_access" and f["jurisdiction"] == "gb")
+    assert gb_finding["panel_adjudications"][0]["model_id"] == DEFAULT_COUNCIL_MODEL

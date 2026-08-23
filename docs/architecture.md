@@ -53,10 +53,26 @@ inside an evidence bundle without extra tooling.
 ## Provider abstraction
 
 `src/cleanroom/legal/panels.py` builds prompt *text* for the adversarial/
-judicial roles; it never calls an LLM API itself. This keeps the core
-library provider-agnostic (Claude is the primary orchestration target for
-this project, per the design brief, but nothing is hard-wired to it) and
-keeps the deterministic core honestly deterministic.
+judicial roles; it never calls an LLM API itself, and every prompt it
+builds is fully answerable by a human, a Claude Code subagent, or any
+other harness reading the same text. This keeps the deterministic core
+(licence discovery, hashing, SBOM generation, schema validation, the
+legal-issue heuristic engine) honestly deterministic, independent of
+whether anyone ever answers a single judicial-review prompt.
+
+`src/cleanroom/orchestration/{backends,harness}.py` is a real, opt-in
+exception, not a contradiction of the above: it is a genuine, pluggable
+`AgentBackend` interface (`orchestration/backends.py`) with one shipped
+implementation (`AnthropicBackend`, an optional `cleanroom[orchestrate]`
+dependency) that `cleanroom council`/`cleanroom implement` use to
+actually answer `panels.py`'s prompts and actually write implementation
+code. Adding another provider means implementing `AgentBackend`'s one
+`complete()` method; nothing in `harness.py`'s own orchestration logic
+(prompt construction, response parsing, merging results back through the
+deterministic machinery) is Anthropic-specific. This is never invoked
+implicitly -- `recruit`/`build`/`judge`/`judge-adjudicate`/`remediate`
+all remain exactly as provider-agnostic (i.e. they never call an LLM)
+as before this existed.
 
 ## What's a documented limitation, not a silent gap
 
