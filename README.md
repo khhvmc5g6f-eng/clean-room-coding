@@ -180,11 +180,27 @@ detection.
 
 ## Quick start
 
+Install the current development release from GitHub, then initialise and
+check a project:
+
 ```bash
+git clone https://github.com/khhvmc5g6f-eng/clean-room-coding.git
+cd clean-room-coding
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e ".[dev]"
 cleanroom init --name "My Reimplementation Project" --target-language python
 cleanroom doctor
 ```
+
+Install the portable Agent Skill separately with:
+
+```bash
+gh skill install khhvmc5g6f-eng/clean-room-coding clean-room-coding
+```
+
+The Python package is not yet published to PyPI. The editable Git checkout
+above is the supported installation route for this pre-1.0 release.
 
 See [docs/quickstart.md](docs/quickstart.md) for a full worked walkthrough
 and [docs/concepts.md](docs/concepts.md) for the three-zone model,
