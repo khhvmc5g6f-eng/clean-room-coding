@@ -3,9 +3,17 @@
 ```bash
 git clone https://github.com/khhvmc5g6f-eng/clean-room-coding
 cd clean-room-coding
-python3 -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e ".[dev]"
 cleanroom doctor
+```
+
+This project is not yet published to PyPI. Run it from the editable Git
+checkout shown above. To use its Agent Skill independently of the Python CLI:
+
+```bash
+gh skill install khhvmc5g6f-eng/clean-room-coding clean-room-coding
 ```
 
 `doctor` should report `ok` for `schemas`, `licence_policy_packs`,
