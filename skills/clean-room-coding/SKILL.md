@@ -35,7 +35,7 @@ licensing concern in view -- that's just normal coding.
 ## Prerequisites
 
 The `cleanroom` CLI must be installed (`pip install -e ".[dev]"` from a
-checkout of this repo, or `pip install cleanroom` once published). Confirm
+checkout of this repository; it is not yet published to PyPI). Confirm
 with `cleanroom doctor` before starting a project -- it checks the schema,
 licence-pack and jurisdiction-pack directories are resolvable. Resuming an
 in-progress project? Run `cleanroom status` first for a one-shot summary
