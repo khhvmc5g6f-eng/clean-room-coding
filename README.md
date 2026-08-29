@@ -97,6 +97,15 @@ a documented limitation, and what is not yet built. Currently ships:
   project's pre-migration/legacy code actually used, banded by
   confidence rather than a binary pass/fail — a non-blocking advisory
   surfaced by `cleanroom gate` and `cleanroom report`.
+- A **build-side debugging suite for the implementation team**
+  (`cleanroom debug`, Part XCVII): triages every failing behavioural
+  test into `implementation_bug` (a structured, Zone-I-only worksheet —
+  backward root-cause tracing, defense-in-depth, temporal/concurrency
+  prompts when relevant) or `spec_gap` (routed through the existing
+  remediation ledger and a blocked requirement-graph node, never
+  resolved by reading Zone R) — so Team B stops bouncing every failure
+  to Team A and only escalates the ones it genuinely can't resolve
+  itself.
 - A **guarded web-lookup contract** for implementation-zone agents
   (`cleanroom check-url`/`cleanroom exclude-source`): blocks a URL that
   matches a project's own registered reference source (or its

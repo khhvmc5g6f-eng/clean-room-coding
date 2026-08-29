@@ -45,6 +45,29 @@ def test_fixed_finding_auto_resolves_on_rescan():
     assert "resolved_utc" in second_pass[0]
 
 
+def test_spec_gap_debug_finding_creates_review_required_task():
+    debug_findings = [{"test_id": "CR-BEH-000001", "classification": "spec_gap", "reasons": ["ambiguity marker 'may vary' found"]}]
+    tasks = rem.reconcile([], [], [], debug_findings)
+    assert len(tasks) == 1
+    assert tasks[0]["severity"] == "review_required"
+    assert tasks[0]["source_type"] == "debug_finding"
+    assert tasks[0]["source_ref"] == "CR-BEH-000001"
+
+
+def test_implementation_bug_debug_finding_creates_no_task():
+    debug_findings = [{"test_id": "CR-BEH-000002", "classification": "implementation_bug", "reasons": ["x"]}]
+    assert rem.reconcile([], [], [], debug_findings) == []
+
+
+def test_spec_gap_debug_finding_auto_resolves_on_rescan():
+    debug_findings = [{"test_id": "CR-BEH-000003", "classification": "spec_gap", "reasons": ["x"]}]
+    first_pass = rem.reconcile([], [], [], debug_findings)
+    assert first_pass[0]["status"] == "open"
+
+    second_pass = rem.reconcile(first_pass, [], [], [])
+    assert second_pass[0]["status"] == "resolved_by_rescan"
+
+
 def test_still_broken_finding_stays_open_across_reconcile():
     legal = [{"issue": "copying", "jurisdiction": "gb", "decision_state": "RED", "finding": "x"}]
     first_pass = rem.reconcile([], legal, [])

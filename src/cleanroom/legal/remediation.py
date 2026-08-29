@@ -1,7 +1,15 @@
 """Closes the loop the design brief asks for explicitly: if a legal or
 similarity finding flags a real concern, does it get sent back to the
 implementation team to recode before release -- or does it just sit in a
-report nobody acts on?
+report nobody acts on? Part XCVII extends this with a third source:
+a `spec_gap` finding from `cleanroom debug` (`debugging.py`) -- a
+behavioural-test failure the implementation team cannot resolve within
+Zone I because the linked requirement text doesn't clearly say what
+correct behaviour is. It is deliberately routed through this same ledger
+rather than a parallel one, so it shows up wherever legal/similarity
+findings already do (`cleanroom build`'s pre-flight panel, `cleanroom
+report`'s remediation_summary, the blocked requirement-graph node) with
+no separate bookkeeping to keep in sync.
 
 `reconcile()` is idempotent and re-derives the *should-exist* set of
 remediation tasks from whatever legal/similarity findings currently exist
@@ -55,9 +63,24 @@ def _similarity_task_source(finding: dict[str, Any]) -> tuple[str, str, str] | N
     return None
 
 
+def _debug_task_source(finding: dict[str, Any]) -> tuple[str, str, str] | None:
+    if finding.get("classification") != "spec_gap":
+        return None
+    # Always review_required, never blocking: this is Team B's own
+    # deterministic heuristic guess about its own test failure, not a
+    # confirmed legal/similarity violation -- it must not unilaterally
+    # block 'cleanroom release' the way a RED legal finding does.
+    reasons = "; ".join(finding.get("reasons", [])) or "no reason recorded"
+    return (
+        finding["test_id"], "review_required",
+        f"'cleanroom debug' classified behavioural test {finding['test_id']} as a spec gap: {reasons}",
+    )
+
+
 def derive_expected_tasks(
     legal_findings: list[dict[str, Any]],
     similarity_findings: list[dict[str, Any]],
+    debug_findings: list[dict[str, Any]] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Returns {source_key: {source_type, source_ref, severity, description}}
     for every finding that currently warrants a remediation task."""
@@ -78,6 +101,14 @@ def derive_expected_tasks(
                 "source_type": "similarity_finding", "source_ref": ref,
                 "severity": severity, "description": description,
             }
+    for finding in debug_findings or []:
+        result = _debug_task_source(finding)
+        if result:
+            ref, severity, description = result
+            expected[f"debug_finding:{ref}"] = {
+                "source_type": "debug_finding", "source_ref": ref,
+                "severity": severity, "description": description,
+            }
     return expected
 
 
@@ -85,11 +116,12 @@ def reconcile(
     existing_tasks: list[dict[str, Any]],
     legal_findings: list[dict[str, Any]],
     similarity_findings: list[dict[str, Any]],
+    debug_findings: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Pure function: given the current task list and current findings,
     return the reconciled task list (new tasks added, stale ones marked
     resolved_by_rescan, overridden/open ones left untouched)."""
-    expected = derive_expected_tasks(legal_findings, similarity_findings)
+    expected = derive_expected_tasks(legal_findings, similarity_findings, debug_findings)
     by_key = {f"{t['source_type']}:{t['source_ref']}": t for t in existing_tasks}
 
     reconciled: list[dict[str, Any]] = []

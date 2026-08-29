@@ -236,6 +236,20 @@ machine-readable output) over re-deriving its logic by hand.
     functionality is implemented, behavioural tests pass, and material
     behavioural discrepancies are resolved.
 
+    Before every failing test becomes a round trip to Team A, run
+    `cleanroom debug` (Part XCVII, `references/build-debugging.md`) --
+    it triages each failing test, deterministically and without ever
+    touching Zone R, into `implementation_bug` (Zone I doesn't yet meet a
+    spec that IS clear -- fix it in Zone I; you get a structured
+    backward-tracing/defense-in-depth worksheet, and a temporal/
+    concurrency section when the failure looks timing-sensitive) or
+    `spec_gap` (the linked requirement text is genuinely ambiguous --
+    Team B cannot resolve this itself; it's routed through the same
+    `REMEDIATION_TASKS.json`/blocked-node mechanism as phase 16, so it
+    surfaces in `cleanroom build`'s panel and `cleanroom report` without
+    a separate discrepancy report). Re-run it after a fix; a cleared
+    finding resolves itself the same way a fixed remediation task does.
+
 13. **Provenance** -- `cleanroom provenance` generates SPDX + CycloneDX
     SBOMs for Zone I's declared dependencies. `--resolve-transitive`
     additionally walks the real dependency graph via PyPI/npm registry
@@ -290,9 +304,10 @@ machine-readable output) over re-deriving its logic by hand.
     call per prompt, never invoked implicitly.
 
 16. **Remediate** -- `cleanroom remediate` closes the loop: every RED
-    legal finding and every suspicious/material similarity finding
-    automatically becomes a tracked task and a blocked requirement-graph
-    node assigned to the implementation team. Re-run it after an actual
+    legal finding, every suspicious/material similarity finding, and
+    every `spec_gap` finding from `cleanroom debug` (phase 12, Part
+    XCVII) automatically becomes a tracked task and a blocked
+    requirement-graph node assigned to the implementation team. Re-run it after an actual
     fix and the task clears itself (`resolved_by_rescan`); if the team
     instead deliberately accepts residual risk, that requires an explicit
     `--override --by "<name>" --notes "..."` (recorded as

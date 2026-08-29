@@ -8,6 +8,22 @@ once it reaches 1.0.
 
 ## [Unreleased]
 
+### Added (thirtieth pass — build-side debugging suite for Team B)
+
+- New `cleanroom debug` (Part XCVII, `src/cleanroom/debugging.py`): a
+  build-side debugging suite for the implementation team. Triages every
+  currently-failing behavioural test into `implementation_bug` / `spec_gap`
+  / `insufficient_evidence` via deterministic lexical heuristics, never a
+  fabricated diagnosis. `implementation_bug` findings get a structured,
+  Zone-I-scoped debugging worksheet (backward root-cause tracing,
+  defense-in-depth, and a temporal/concurrency section when relevant).
+  `spec_gap` findings are routed through the existing remediation ledger
+  (`legal/remediation.py`, extended with a third `debug_finding` source
+  type) and a blocked requirement-graph node — the same mechanism used
+  for legal/similarity findings — so Team B never resolves its own
+  ambiguity by reading Zone R. Idempotent, like `cleanroom remediate`.
+  See `skills/clean-room-coding/references/build-debugging.md`.
+
 ## [0.3.0] - 2026-08-23
 
 Four further build-out passes (26-29) on top of the 0.2.0 cut: a

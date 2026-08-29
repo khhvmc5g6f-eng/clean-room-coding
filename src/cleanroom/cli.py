@@ -23,6 +23,7 @@ from cleanroom import benchmark as benchmark_module
 from cleanroom.config import default_config, load_config
 from cleanroom.contamination import Contamination
 from cleanroom import coverage as coverage_module
+from cleanroom import debugging as debugging_module
 from cleanroom.evidence import Actor
 from cleanroom.exit_codes import (
     CleanRoomError,
@@ -1320,6 +1321,62 @@ def compare(ctx: Ctx, reference_output: Path, implementation_output: Path, ignor
         sys.exit(int(ExitCode.TEST_FAILURE))
 
 
+# --------------------------------------------------------------------------- debug
+
+@main.command()
+@pass_ctx
+def debug(ctx: Ctx) -> None:
+    """Part XCVII: build-side debugging suite for the implementation team
+    (Team B). Triages every currently-failing behavioural test
+    (`behavioral_tests.json`, result == "fail") against the requirement
+    graph into implementation_bug / spec_gap / insufficient_evidence --
+    never fabricating a conclusion the deterministic evidence doesn't
+    support (AGENTS.md rule c). An implementation_bug finding gets a
+    structured, Zone-I-scoped debugging worksheet (backward root-cause
+    tracing, defense-in-depth, and temporal/concurrency prompts when the
+    failure looks timing-sensitive) -- a methodology to work through, not
+    an automated fix. A spec_gap finding is routed through the existing
+    remediation ledger (REMEDIATION_TASKS.json) and a blocked
+    requirement-graph node, exactly like a legal or similarity finding --
+    Team B never resolves its own ambiguity by reading Zone R; it is
+    surfaced for the reference side or a human to answer instead
+    (AGENTS.md rule a). Idempotent: re-run after a fix or a reworded
+    requirement and stale findings clear via the same resolved_by_rescan
+    mechanism 'cleanroom remediate' uses."""
+    project = ctx.load_project()
+    suite = BehavioralSuite.load(project.root / "behavioral_tests.json")
+    graph = RequirementGraph.load(project.root / "requirements.json")
+    result = debugging_module.triage_suite(list(suite.tests.values()), list(graph.nodes.values()))
+
+    findings_path = project.root / "DEBUG_FINDINGS.json"
+    findings_path.write_text(jsonlib.dumps(result["findings"], indent=2, sort_keys=True), encoding="utf-8")
+
+    tasks_path = project.root / "REMEDIATION_TASKS.json"
+    existing_tasks = jsonlib.loads(tasks_path.read_text(encoding="utf-8")) if tasks_path.is_file() else []
+    tasks = _reconcile_and_sync_remediation(project, existing_tasks)
+
+    counts = {c: 0 for c in debugging_module.CLASSIFICATIONS}
+    for finding in result["findings"]:
+        counts[finding["classification"]] += 1
+
+    project.evidence.append(
+        actor=Actor(type="tool", id="cleanroom-debug"),
+        action="cleanroom debug",
+        zone="I",
+        detail=(
+            f"implementation_bug={counts['implementation_bug']} spec_gap={counts['spec_gap']} "
+            f"insufficient_evidence={counts['insufficient_evidence']}"
+        ),
+        result="success",
+    )
+    ctx.emit({
+        "findings": result["findings"],
+        "worksheets": result["worksheets"],
+        "counts": counts,
+        "remediation_tasks_open": sum(1 for t in tasks if t["status"] == "open"),
+    })
+
+
 # --------------------------------------------------------------------------- similarity
 
 @main.command()
@@ -1745,6 +1802,11 @@ def _load_legal_and_similarity_findings(project: Project) -> tuple[list[dict[str
     return legal_findings, similarity_findings
 
 
+def _load_debug_findings(project: Project) -> list[dict[str, Any]]:
+    debug_path = project.root / "DEBUG_FINDINGS.json"
+    return jsonlib.loads(debug_path.read_text(encoding="utf-8")) if debug_path.is_file() else []
+
+
 def _reconcile_and_sync_remediation(project: Project, existing_tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Re-derive REMEDIATION_TASKS.json from whatever legal/similarity
     findings currently exist and sync the requirement graph's blocked/
@@ -1756,7 +1818,8 @@ def _reconcile_and_sync_remediation(project: Project, existing_tasks: list[dict[
     loaded fresh, no override path -- registering a new implementation
     agent is not itself a way to resolve an open concern)."""
     legal_findings, similarity_findings = _load_legal_and_similarity_findings(project)
-    tasks = remediation_module.reconcile(existing_tasks, legal_findings, similarity_findings)
+    debug_findings = _load_debug_findings(project)
+    tasks = remediation_module.reconcile(existing_tasks, legal_findings, similarity_findings, debug_findings)
     tasks_path = project.root / "REMEDIATION_TASKS.json"
     tasks_path.write_text(jsonlib.dumps(tasks, indent=2, sort_keys=True), encoding="utf-8")
 

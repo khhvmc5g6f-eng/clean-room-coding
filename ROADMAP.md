@@ -947,6 +947,33 @@ change that should be evaluated on its own.
   error path. This is the single most important thing to verify with a
   real key before relying on this for an actual project.
 
+## Recent additions (continued)
+
+- **`cleanroom debug`** (Part XCVII, `src/cleanroom/debugging.py`,
+  `references/build-debugging.md`): a build-side debugging suite for the
+  implementation team. Triages every currently-failing behavioural test
+  against the requirement graph into `implementation_bug` / `spec_gap` /
+  `insufficient_evidence` via a small, intentionally over-flagging set of
+  deterministic lexical checks -- never a model call, never a fabricated
+  diagnosis (AGENTS.md rule c). `implementation_bug` findings get a
+  structured, Zone-I-scoped worksheet (backward root-cause tracing,
+  defense-in-depth, and a temporal/concurrency section gated on the
+  failure's own text actually looking timing-sensitive) -- a methodology
+  to work through, not an automated fix. `spec_gap` findings are routed
+  through the existing `legal/remediation.py` ledger as a third source
+  type alongside legal/similarity findings (always `review_required`,
+  never `blocking` -- it's Team B's own heuristic guess, not a confirmed
+  violation), so they surface in `cleanroom build`'s pre-flight panel and
+  `cleanroom report` with no separate bookkeeping, and clear themselves
+  (`resolved_by_rescan`) the same way a fixed legal/similarity finding
+  does. Deliberately reuses the `remediation` node kind/id scheme rather
+  than adding a new schema -- see `references/build-debugging.md` for
+  why. Known limitation, stated plainly: the ambiguity/concurrency
+  marker lists are lexical, English-only, and will both over- and
+  under-flag on real requirement text -- that's why `spec_gap` still
+  goes through human/Team-A review rather than being treated as a final
+  answer.
+
 ## Likely next additions
 
 1. ~~Wire `PathGuard.check()` into a real per-agent file-access path~~ --
